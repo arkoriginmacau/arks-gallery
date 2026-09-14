@@ -15,7 +15,9 @@
     --ink-2: var(--ink);
     --ink-on-accent: var(--paper-2);
     --ink-soft: #6b6459;
+    --ink-soft-2: var(--ink-soft);
     --ink-faint: #9a9285;
+    --ink-faint-2: var(--ink-faint);
     --line: #dbd1bd;
     --line-soft: #e8e0d0;
     --ochre: #a5661f;
@@ -325,9 +327,9 @@
   .field-hint { font-size: 11.5px; color: var(--ink-faint); }
   .upload-drop {
     border: 1px dashed var(--line); border-radius: 4px; padding: 16px; text-align: center;
-    font-size: 13px; color: var(--ink-soft); cursor: pointer; background: var(--paper-2);
+    font-size: 13px; color: var(--ink-soft-2); cursor: pointer; background: var(--paper-2);
   }
-  .upload-drop:hover { border-color: var(--ochre); color: var(--ink); }
+  .upload-drop:hover { border-color: var(--ochre); color: var(--ink-2); }
   .upload-preview { display: flex; align-items: center; gap: 10px; font-size: 12.5px; }
   .upload-preview img { width: 44px; height: 44px; object-fit: cover; border-radius: 3px; border: 1px solid var(--line); }
   .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
@@ -343,7 +345,7 @@
   .print-field label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-soft); }
   .seg { display: flex; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
   .seg button {
-    border: none; background: var(--paper-2); color: var(--ink-soft); padding: 8px 16px;
+    border: none; background: var(--paper-2); color: var(--ink-soft-2); padding: 8px 16px;
     font-size: 13px; font-weight: 600; cursor: pointer; border-right: 1px solid var(--line);
   }
   .seg button:last-child { border-right: none; }
@@ -475,6 +477,7 @@
     { varName: '--paper', label: 'Panels' },
     { varName: '--paper-2', label: 'Cards' },
     { varName: '--ink', label: 'Text' },
+    { varName: '--ink-soft', label: 'Muted text' },
     { varName: '--ochre', label: 'Accent' },
     { varName: '--sold', label: 'Sold tag' }
   ];
@@ -1032,7 +1035,7 @@
     }
     return '#888888';
   }
-  var DERIVED_INK_VARS = ['--ink-2', '--ink-on-accent'];
+  var DERIVED_INK_VARS = ['--ink-2', '--ink-on-accent', '--ink-soft-2', '--ink-faint', '--ink-faint-2'];
   function applyThemeColors(colors) {
     var rootStyle = document.documentElement.style;
     THEME_VARS.map(function (v) { return v.varName; }).concat(DERIVED_INK_VARS).forEach(function (varName) {
@@ -1086,7 +1089,11 @@
     return {
       '--ink': pickReadableAgainst(get('--ink'), [get('--canvas'), get('--paper')]),
       '--ink-2': pickReadableAgainst(get('--ink'), [get('--paper-2')]),
-      '--ink-on-accent': pickReadableAgainst(get('--paper-2'), [get('--ochre')])
+      '--ink-on-accent': pickReadableAgainst(get('--paper-2'), [get('--ochre')]),
+      '--ink-soft': pickReadableAgainst(get('--ink-soft'), [get('--canvas'), get('--paper')]),
+      '--ink-soft-2': pickReadableAgainst(get('--ink-soft'), [get('--paper-2')]),
+      '--ink-faint': pickReadableAgainst(get('--ink-faint'), [get('--canvas'), get('--paper')]),
+      '--ink-faint-2': pickReadableAgainst(get('--ink-faint'), [get('--paper-2')])
     };
   }
   async function loadTheme() {
@@ -1123,13 +1130,14 @@
       var current = currentPickerColors();
       var derived = deriveTextColors(current);
       var rootStyle = document.documentElement.style;
-      rootStyle.setProperty('--ink-2', derived['--ink-2']);
-      rootStyle.setProperty('--ink-on-accent', derived['--ink-on-accent']);
-      if (derived['--ink'] !== current['--ink']) {
-        rootStyle.setProperty('--ink', derived['--ink']);
-        var inkInput = colorsEl.querySelector('input[data-var="--ink"]');
-        if (inkInput) inkInput.value = derived['--ink'];
-      }
+      DERIVED_INK_VARS.forEach(function (v) { rootStyle.setProperty(v, derived[v]); });
+      ['--ink', '--ink-soft'].forEach(function (v) {
+        if (derived[v] !== current[v]) {
+          rootStyle.setProperty(v, derived[v]);
+          var input = colorsEl.querySelector('input[data-var="' + v + '"]');
+          if (input) input.value = derived[v];
+        }
+      });
     }
     colorsEl.addEventListener('input', function (e) {
       var input = e.target.closest('input[data-var]');
@@ -1151,10 +1159,10 @@
     });
     document.getElementById('themeSave').addEventListener('click', async function () {
       var colors = currentPickerColors();
-      var originalInk = colors['--ink'];
+      var originalInk = colors['--ink'], originalInkSoft = colors['--ink-soft'];
       var derived = deriveTextColors(colors);
       Object.assign(colors, derived);
-      var adjusted = colors['--ink'] !== originalInk;
+      var adjusted = colors['--ink'] !== originalInk || colors['--ink-soft'] !== originalInkSoft;
       applyThemeColors(colors);
       var res = await sb.from('site_theme').upsert({ id: 1, colors: colors, updated_at: new Date().toISOString() });
       if (res.error) toast('Could not save theme: ' + res.error.message);
