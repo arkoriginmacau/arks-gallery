@@ -26,9 +26,14 @@
     --ochre-bg: #f4e9d3;
     --sold: #a53a2a;
     --sold-2: var(--sold);
+    --sold-on-bg: var(--sold);
     --sold-ink: #7e2c20;
     --sold-soft: #ecd2cb;
     --sold-bg: #f7e3de;
+    --toast-ink: var(--canvas);
+    --hover-ink: var(--ink);
+    --ochre-on-bg: var(--ochre);
+    --ochre-readable: var(--ochre);
     --shadow: 220 20% 10%;
     color-scheme: light;
   }
@@ -99,7 +104,7 @@
   }
   .brand-eyebrow {
     font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
-    color: var(--ochre); font-weight: 600; margin: 0 0 6px;
+    color: var(--ochre-readable); font-weight: 600; margin: 0 0 6px;
   }
   header.top h1 { font-size: clamp(28px, 4vw, 38px); font-weight: 600; margin: 0; line-height: 1.05; }
   .top-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -130,7 +135,7 @@
   .admin-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: #4c8a5e; flex-shrink: 0; }
   .toast-root { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 200; display: flex; flex-direction: column; gap: 8px; align-items: center; }
   .toast {
-    background: var(--ink); color: var(--canvas); font-size: 13px; font-weight: 500;
+    background: var(--ink); color: var(--toast-ink); font-size: 13px; font-weight: 500;
     padding: 10px 18px; border-radius: 5px; box-shadow: 0 6px 24px rgba(0,0,0,.25);
     animation: toastIn .18s ease-out;
   }
@@ -167,13 +172,13 @@
     border: none; background: none; color: var(--ink-faint); cursor: pointer;
     padding: 3px; border-radius: 3px; display: flex;
   }
-  .tab-edit-btn:hover { color: var(--ochre); background: var(--ochre-bg); }
+  .tab-edit-btn:hover { color: var(--ochre-on-bg); background: var(--ochre-bg); }
   .tab-add {
     padding: 9px 14px; border-radius: 3px; border: 1px dashed var(--line);
     background: none; color: var(--ink-faint); cursor: pointer; font-size: 13px; font-weight: 600;
     margin-left: 4px;
   }
-  .tab-add:hover { color: var(--ochre); border-color: var(--ochre); }
+  .tab-add:hover { color: var(--ochre-readable); border-color: var(--ochre-readable); }
 
   .panel {
     background: var(--paper); border: 1px solid var(--line); border-radius: 4px;
@@ -258,8 +263,8 @@
     font-family: 'Archivo', sans-serif; text-transform: uppercase; font-weight: 700;
     font-size: 10px; letter-spacing: .05em; color: var(--ink-faint-2);
   }
-  .card.is-sold .card-name, .card.is-sold .price-tag, .card.is-sold .card-meta { color: var(--sold-2); }
-  .card.is-sold .price-tag { border-color: var(--sold-soft); background: var(--sold-bg); }
+  .card.is-sold .card-name, .card.is-sold .card-meta { color: var(--sold-2); }
+  .card.is-sold .price-tag { border-color: var(--sold-soft); background: var(--sold-bg); color: var(--sold-on-bg); }
 
   .card-footer {
     margin-top: auto; display: flex; align-items: center; justify-content: space-between;
@@ -285,7 +290,7 @@
     border: none; background: none; color: var(--ink-faint-2); cursor: pointer;
     padding: 5px; border-radius: 3px; display: flex;
   }
-  .icon-btn:hover { color: var(--ink-2); background: var(--line-soft); }
+  .icon-btn:hover { color: var(--hover-ink); background: var(--line-soft); }
   .icon-btn.danger:hover { color: var(--sold-2); background: var(--sold-bg); }
   .sold-static {
     font-size: 12px; font-weight: 600; color: var(--ink-faint-2);
@@ -347,7 +352,7 @@
   .seg button.active { background: var(--ochre); color: var(--ink-on-accent); }
   .stepper { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
   .stepper button { border: none; background: var(--paper-2); width: 30px; height: 34px; font-size: 15px; cursor: pointer; color: var(--ink-2); }
-  .stepper button:hover { background: var(--ochre-bg); }
+  .stepper button:hover { background: var(--ochre-bg); color: var(--hover-ink); }
   .stepper span { width: 34px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 14px; }
   select.print-select {
     border: 1px solid var(--line); background: var(--paper-2); color: var(--ink-2);
@@ -1029,7 +1034,10 @@
     }
     return '#888888';
   }
-  var DERIVED_INK_VARS = ['--ink-2', '--ink-on-accent', '--ink-soft-2', '--ink-faint', '--ink-faint-2', '--sold-2'];
+  var DERIVED_INK_VARS = [
+    '--ink-2', '--ink-on-accent', '--ink-soft-2', '--ink-faint', '--ink-faint-2', '--sold-2',
+    '--sold-on-bg', '--toast-ink', '--hover-ink', '--ochre-on-bg', '--ochre-readable'
+  ];
   function applyThemeColors(colors) {
     var rootStyle = document.documentElement.style;
     THEME_VARS.map(function (v) { return v.varName; }).concat(DERIVED_INK_VARS).forEach(function (varName) {
@@ -1088,7 +1096,17 @@
       '--ink-soft-2': pickReadableAgainst(get('--ink-soft'), [get('--paper-2')]),
       '--ink-faint': pickReadableAgainst(get('--ink-faint'), [get('--canvas'), get('--paper')]),
       '--ink-faint-2': pickReadableAgainst(get('--ink-faint'), [get('--paper-2')]),
-      '--sold-2': pickReadableAgainst(get('--sold'), [get('--paper-2')])
+      '--sold-2': pickReadableAgainst(get('--sold'), [get('--paper-2')]),
+      /* Fixed (non-editable) surfaces text can also land on: the sold price
+         tag's pale sold-bg chip, the toast's ink-colored background, the
+         line-soft/ochre-bg hover highlights, and canvas/paper behind the
+         accent color itself. Each gets its own correction because these
+         surfaces don't move when Panels/Cards are recolored. */
+      '--sold-on-bg': pickReadableAgainst(get('--sold'), [hexOfVar('--sold-bg')]),
+      '--toast-ink': pickReadableAgainst(get('--canvas'), [get('--ink')]),
+      '--hover-ink': pickReadableAgainst(get('--ink'), [hexOfVar('--line-soft'), hexOfVar('--ochre-bg')]),
+      '--ochre-on-bg': pickReadableAgainst(get('--ochre'), [hexOfVar('--ochre-bg')]),
+      '--ochre-readable': pickReadableAgainst(get('--ochre'), [get('--canvas'), get('--paper')])
     };
   }
   async function loadTheme() {
