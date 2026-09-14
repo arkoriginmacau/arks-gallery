@@ -460,6 +460,12 @@
   var state = { tabs: [], paintings: [], activeTabId: null, printMode: 'A4', printRows: 8, printScope: 'current', loaded: false };
   var isAdmin = false;
   var currentUserEmail = null;
+  /* When this page is loaded inside someone else's site (e.g. embedded on the
+     Wix website) it must always stay pure viewing mode — no "Admin" sign-in
+     affordance, and no edit controls even if a stray admin session exists. */
+  var isEmbedded = (function () {
+    try { return window.self !== window.top; } catch (e) { return true; }
+  })();
 
   /* ---------------- toast ---------------- */
   function toast(msg) {
@@ -562,7 +568,7 @@
   function refreshAuthFromSession(session) {
     var user = session && session.user;
     currentUserEmail = user ? user.email : null;
-    isAdmin = !!user && user.email === ADMIN_EMAIL;
+    isAdmin = !isEmbedded && !!user && user.email === ADMIN_EMAIL;
     renderAll();
   }
 
@@ -584,6 +590,9 @@
         openPaintingModal();
       });
       document.getElementById('btnSignOut').addEventListener('click', signOut);
+    } else if (isEmbedded) {
+      /* Embedded on the Wix website: pure viewing mode, no admin affordance at all. */
+      el.innerHTML = printBtn;
     } else {
       el.innerHTML = printBtn +
         '<span class="view-badge">Viewing gallery</span>' +
