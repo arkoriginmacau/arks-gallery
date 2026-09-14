@@ -25,6 +25,7 @@
     --ochre-soft: #e9d6b2;
     --ochre-bg: #f4e9d3;
     --sold: #a53a2a;
+    --sold-2: var(--sold);
     --sold-ink: #7e2c20;
     --sold-soft: #ecd2cb;
     --sold-bg: #f7e3de;
@@ -116,7 +117,7 @@
   .btn-ghost { background: transparent; border-color: transparent; padding: 10px 10px; }
   .btn-ghost:hover { border-color: var(--line); }
   .btn-sm { padding: 7px 11px; font-size: 12.5px; }
-  .btn-danger { color: var(--sold); }
+  .btn-danger { color: var(--sold-2); }
   .btn[disabled] { opacity: .55; cursor: default; }
   .btn[disabled]:hover { border-color: var(--line); }
 
@@ -263,7 +264,7 @@
     font-family: 'Archivo', sans-serif; text-transform: uppercase; font-weight: 700;
     font-size: 10px; letter-spacing: .05em; color: var(--ink-faint);
   }
-  .card.is-sold .card-name, .card.is-sold .price-tag, .card.is-sold .card-meta { color: var(--sold); }
+  .card.is-sold .card-name, .card.is-sold .price-tag, .card.is-sold .card-meta { color: var(--sold-2); }
   .card.is-sold .price-tag { border-color: var(--sold-soft); background: var(--sold-bg); }
 
   .card-footer {
@@ -1035,7 +1036,7 @@
     }
     return '#888888';
   }
-  var DERIVED_INK_VARS = ['--ink-2', '--ink-on-accent', '--ink-soft-2', '--ink-faint', '--ink-faint-2'];
+  var DERIVED_INK_VARS = ['--ink-2', '--ink-on-accent', '--ink-soft-2', '--ink-faint', '--ink-faint-2', '--sold-2'];
   function applyThemeColors(colors) {
     var rootStyle = document.documentElement.style;
     THEME_VARS.map(function (v) { return v.varName; }).concat(DERIVED_INK_VARS).forEach(function (varName) {
@@ -1093,7 +1094,8 @@
       '--ink-soft': pickReadableAgainst(get('--ink-soft'), [get('--canvas'), get('--paper')]),
       '--ink-soft-2': pickReadableAgainst(get('--ink-soft'), [get('--paper-2')]),
       '--ink-faint': pickReadableAgainst(get('--ink-faint'), [get('--canvas'), get('--paper')]),
-      '--ink-faint-2': pickReadableAgainst(get('--ink-faint'), [get('--paper-2')])
+      '--ink-faint-2': pickReadableAgainst(get('--ink-faint'), [get('--paper-2')]),
+      '--sold-2': pickReadableAgainst(get('--sold'), [get('--paper-2')])
     };
   }
   async function loadTheme() {
