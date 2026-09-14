@@ -1037,9 +1037,48 @@
       else rootStyle.removeProperty(v.varName);
     });
   }
+  /* -- contrast safety: Text (--ink) sits on top of Background/Panels/Cards, so
+     whichever colors those are set to, the text must stay legible against all
+     three. If the chosen text color already reads fine everywhere, it is left
+     exactly as picked; it's only overridden (to pure black or white, whichever
+     contrasts better) when it would otherwise be unreadable somewhere. -- */
+  function hexToRgb(hex) {
+    hex = String(hex).replace('#', '');
+    if (hex.length === 3) hex = hex.split('').map(function (c) { return c + c; }).join('');
+    var num = parseInt(hex, 16);
+    return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+  }
+  function relLuminance(hex) {
+    var rgb = hexToRgb(hex).map(function (c) {
+      c /= 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+  }
+  function contrastRatio(hexA, hexB) {
+    var l1 = relLuminance(hexA), l2 = relLuminance(hexB);
+    var hi = Math.max(l1, l2), lo = Math.min(l1, l2);
+    return (hi + 0.05) / (lo + 0.05);
+  }
+  var TEXT_SURFACE_VARS = ['--canvas', '--paper', '--paper-2'];
+  var READABLE_CONTRAST = 4.5;
+  function ensureReadableInk(colors) {
+    var get = function (v) { return (colors && colors[v]) || hexOfVar(v); };
+    var ink = get('--ink');
+    var failsAny = TEXT_SURFACE_VARS.some(function (v) { return contrastRatio(ink, get(v)) < READABLE_CONTRAST; });
+    if (!failsAny) return ink;
+    var worstCase = function (candidate) {
+      return Math.min.apply(null, TEXT_SURFACE_VARS.map(function (v) { return contrastRatio(candidate, get(v)); }));
+    };
+    return worstCase('#000000') >= worstCase('#ffffff') ? '#000000' : '#ffffff';
+  }
   async function loadTheme() {
     var res = await sb.from('site_theme').select('colors').eq('id', 1).maybeSingle();
-    if (!res.error && res.data && res.data.colors) applyThemeColors(res.data.colors);
+    if (!res.error && res.data && res.data.colors) {
+      var colors = Object.assign({}, res.data.colors);
+      colors['--ink'] = ensureReadableInk(colors);
+      applyThemeColors(colors);
+    }
   }
   function openThemeModal() {
     var root = document.getElementById('modalRoot');
@@ -1059,11 +1098,27 @@
       '</div></div>';
 
     var colorsEl = document.getElementById('themeColors');
+    function currentPickerColors() {
+      var current = {};
+      colorsEl.querySelectorAll('input[data-var]').forEach(function (inp) { current[inp.getAttribute('data-var')] = inp.value; });
+      return current;
+    }
+    function reguardTextReadability() {
+      var current = currentPickerColors();
+      var safeInk = ensureReadableInk(current);
+      if (safeInk !== current['--ink']) {
+        document.documentElement.style.setProperty('--ink', safeInk);
+        var inkInput = colorsEl.querySelector('input[data-var="--ink"]');
+        if (inkInput) inkInput.value = safeInk;
+      }
+    }
     colorsEl.addEventListener('input', function (e) {
       var input = e.target.closest('input[data-var]');
       if (!input) return;
       document.documentElement.style.setProperty(input.getAttribute('data-var'), input.value);
+      if (input.getAttribute('data-var') !== '--ink') reguardTextReadability();
     });
+    reguardTextReadability(); /* self-heal if the panel opened onto an already-unreadable preview */
     document.getElementById('themeBackdrop').addEventListener('click', function (e) { if (e.target.id === 'themeBackdrop') closeModal(); });
     document.getElementById('themeCancel').addEventListener('click', closeModal);
     document.getElementById('themeResetDefault').addEventListener('click', async function () {
@@ -1076,13 +1131,14 @@
       else toast('Theme reset to default for everyone.');
     });
     document.getElementById('themeSave').addEventListener('click', async function () {
-      var colors = {};
-      colorsEl.querySelectorAll('input[data-var]').forEach(function (input) {
-        colors[input.getAttribute('data-var')] = input.value;
-      });
+      var colors = currentPickerColors();
+      var originalInk = colors['--ink'];
+      colors['--ink'] = ensureReadableInk(colors);
+      var adjusted = colors['--ink'] !== originalInk;
+      applyThemeColors(colors);
       var res = await sb.from('site_theme').upsert({ id: 1, colors: colors, updated_at: new Date().toISOString() });
       if (res.error) toast('Could not save theme: ' + res.error.message);
-      else { toast('Theme saved for everyone.'); closeModal(); }
+      else { toast(adjusted ? 'Saved — text color adjusted to stay readable.' : 'Theme saved for everyone.'); closeModal(); }
     });
   }
 
