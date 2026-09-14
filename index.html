@@ -210,12 +210,6 @@
     font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; font-weight: 600;
     padding: 3px 8px; border-radius: 3px; font-variant-numeric: tabular-nums;
   }
-  .num-badge {
-    position: absolute; right: 8px; top: 8px;
-    background: rgba(34,31,28,.72); color: #f1ece1;
-    font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600;
-    padding: 3px 7px; border-radius: 3px; letter-spacing: .02em;
-  }
   .sold-slash {
     position: absolute; inset: 0; pointer-events: none;
     background: linear-gradient(135deg, transparent calc(50% - 1.6px), var(--sold) 50%, transparent calc(50% + 1.6px));
@@ -679,13 +673,13 @@
         : '<div class="swatch" style="background:' + swatchGradient(p.hue || 30) + '"><span>' + esc((p.name || '?').charAt(0).toUpperCase()) + '</span></div>';
       return '<div class="card' + (p.sold ? ' is-sold' : '') + '" data-card="' + p.id + '">' +
         '<div class="card-image"' + (thumbSrc ? ' data-lightbox="' + esc(fullSrc) + '" title="Click to view full size"' : '') + '>' + imageInner +
-        '<span class="num-badge mono">' + esc(catalogNum(p)) + '</span>' +
         '<span class="price-tag">' + fmtPrice(p.price) + '</span>' +
         (p.sold ? '<div class="sold-slash"></div><div class="sold-stamp">Sold</div>' : '') +
         (thumbSrc ? '<span class="expand-hint"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 3H5a2 2 0 0 0-2 2v3m0 8v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3m0-8V5a2 2 0 0 0-2-2h-3"/></svg></span>' : '') +
         '</div>' +
         '<div class="card-body">' +
         '<div class="card-name"><span class="field-label">Name:</span> ' + esc(p.name || 'Untitled') + '</div>' +
+        '<div class="card-meta"><span class="field-label">Number:</span> <span class="mono">' + esc(catalogNum(p)) + '</span></div>' +
         '<div class="card-meta"><span class="field-label">Date:</span> <span class="mono">' + esc(fmtDate(p.date)) + '</span></div>' +
         (p.description ? '<div class="card-desc"><span class="field-label">Description:</span> ' + esc(p.description) + '</div>' : '') +
         '<div class="card-footer">' +
