@@ -467,6 +467,16 @@
     try { return window.self !== window.top; } catch (e) { return true; }
   })();
 
+  /* ---------------- site theme (admin-editable, applies for every visitor) ---------------- */
+  var THEME_VARS = [
+    { varName: '--canvas', label: 'Background' },
+    { varName: '--paper', label: 'Panels' },
+    { varName: '--paper-2', label: 'Cards' },
+    { varName: '--ink', label: 'Text' },
+    { varName: '--ochre', label: 'Accent' },
+    { varName: '--sold', label: 'Sold tag' }
+  ];
+
   /* ---------------- toast ---------------- */
   function toast(msg) {
     var root = document.getElementById('toastRoot');
@@ -581,10 +591,12 @@
 
     if (isAdmin) {
       el.innerHTML = printBtn +
+        '<button class="btn btn-ghost btn-sm" id="btnTheme" type="button" title="Change site colors">Theme</button>' +
         '<button class="btn btn-primary" id="btnAddPainting" type="button">' +
         '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>Add painting</button>' +
         '<span class="admin-pill"><span class="dot"></span>' + esc(currentUserEmail) + '</span>' +
         '<button class="btn btn-ghost btn-sm" id="btnSignOut" type="button">Sign out</button>';
+      document.getElementById('btnTheme').addEventListener('click', openThemeModal);
       document.getElementById('btnAddPainting').addEventListener('click', function () {
         if (!state.activeTabId) { openTabModal(); return; }
         openPaintingModal();
@@ -1010,9 +1022,74 @@
     });
   }
 
+  /* ---------------- site theme ---------------- */
+  function hexOfVar(varName) {
+    var v = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+    if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)) {
+      return v.length === 4 ? '#' + v[1] + v[1] + v[2] + v[2] + v[3] + v[3] : v;
+    }
+    return '#888888';
+  }
+  function applyThemeColors(colors) {
+    var rootStyle = document.documentElement.style;
+    THEME_VARS.forEach(function (v) {
+      if (colors && colors[v.varName]) rootStyle.setProperty(v.varName, colors[v.varName]);
+      else rootStyle.removeProperty(v.varName);
+    });
+  }
+  async function loadTheme() {
+    var res = await sb.from('site_theme').select('colors').eq('id', 1).maybeSingle();
+    if (!res.error && res.data && res.data.colors) applyThemeColors(res.data.colors);
+  }
+  function openThemeModal() {
+    var root = document.getElementById('modalRoot');
+    root.innerHTML = '<div class="modal-backdrop" id="themeBackdrop"><div class="modal">' +
+      '<h2>Site theme</h2>' +
+      '<p class="field-hint">Changes preview instantly and apply for every visitor — including the Wix embed — once you save.</p>' +
+      '<div class="tl-appcolors" id="themeColors" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0;">' +
+      THEME_VARS.map(function (v) {
+        return '<label style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:var(--ink-soft);text-align:center;">' +
+          '<input type="color" data-var="' + v.varName + '" value="' + hexOfVar(v.varName) + '" style="width:100%;height:30px;border:1px solid var(--line);border-radius:4px;padding:1px;background:var(--paper-2);cursor:pointer;">' +
+          '<span>' + v.label + '</span></label>';
+      }).join('') +
+      '</div>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" id="themeResetDefault" type="button">Reset to default</button>' +
+      '<button class="btn btn-ghost" id="themeCancel" type="button">Close</button>' +
+      '<button class="btn btn-primary" id="themeSave" type="button">Save for everyone</button></div>' +
+      '</div></div>';
+
+    var colorsEl = document.getElementById('themeColors');
+    colorsEl.addEventListener('input', function (e) {
+      var input = e.target.closest('input[data-var]');
+      if (!input) return;
+      document.documentElement.style.setProperty(input.getAttribute('data-var'), input.value);
+    });
+    document.getElementById('themeBackdrop').addEventListener('click', function (e) { if (e.target.id === 'themeBackdrop') closeModal(); });
+    document.getElementById('themeCancel').addEventListener('click', closeModal);
+    document.getElementById('themeResetDefault').addEventListener('click', async function () {
+      applyThemeColors(null);
+      colorsEl.querySelectorAll('input[data-var]').forEach(function (input) {
+        input.value = hexOfVar(input.getAttribute('data-var'));
+      });
+      var res = await sb.from('site_theme').delete().eq('id', 1);
+      if (res.error) toast('Could not clear the saved theme.');
+      else toast('Theme reset to default for everyone.');
+    });
+    document.getElementById('themeSave').addEventListener('click', async function () {
+      var colors = {};
+      colorsEl.querySelectorAll('input[data-var]').forEach(function (input) {
+        colors[input.getAttribute('data-var')] = input.value;
+      });
+      var res = await sb.from('site_theme').upsert({ id: 1, colors: colors, updated_at: new Date().toISOString() });
+      if (res.error) toast('Could not save theme: ' + res.error.message);
+      else { toast('Theme saved for everyone.'); closeModal(); }
+    });
+  }
+
   /* ---------------- init ---------------- */
   sb.auth.onAuthStateChange(function (_event, session) { refreshAuthFromSession(session); });
   sb.auth.getSession().then(function (res) { refreshAuthFromSession(res.data.session); });
+  loadTheme();
   loadAll();
 })();
 </script>
