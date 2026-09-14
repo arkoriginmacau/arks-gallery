@@ -12,6 +12,8 @@
     --paper: #faf7f0;
     --paper-2: #ffffff;
     --ink: #221f1c;
+    --ink-2: var(--ink);
+    --ink-on-accent: var(--paper-2);
     --ink-soft: #6b6459;
     --ink-faint: #9a9285;
     --line: #dbd1bd;
@@ -101,13 +103,13 @@
 
   .btn {
     display: inline-flex; align-items: center; gap: 7px;
-    border: 1px solid var(--line); background: var(--paper-2); color: var(--ink);
+    border: 1px solid var(--line); background: var(--paper-2); color: var(--ink-2);
     padding: 10px 16px; border-radius: 3px; font-size: 13.5px; font-weight: 600;
     cursor: pointer; line-height: 1; transition: border-color .15s, background .15s;
   }
   .btn:hover { border-color: var(--ochre); }
   .btn:focus-visible { outline: 2px solid var(--ochre); outline-offset: 2px; }
-  .btn-primary { background: var(--ochre); border-color: var(--ochre); color: var(--paper-2); }
+  .btn-primary { background: var(--ochre); border-color: var(--ochre); color: var(--ink-on-accent); }
   .btn-primary:hover { background: var(--ochre-ink); border-color: var(--ochre-ink); }
   .btn-ghost { background: transparent; border-color: transparent; padding: 10px 10px; }
   .btn-ghost:hover { border-color: var(--line); }
@@ -186,7 +188,7 @@
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 18px; }
 
   .card {
-    background: var(--paper-2); border: 1px solid var(--line); border-radius: 4px;
+    background: var(--paper-2); color: var(--ink-2); border: 1px solid var(--line); border-radius: 4px;
     overflow: hidden; display: flex; flex-direction: column;
   }
   .card-image {
@@ -313,7 +315,7 @@
   .field { margin-bottom: 14px; display: flex; flex-direction: column; gap: 5px; }
   .field label { font-size: 12px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .04em; }
   .field input[type="text"], .field input[type="number"], .field input[type="date"], .field textarea {
-    border: 1px solid var(--line); background: var(--paper-2); color: var(--ink);
+    border: 1px solid var(--line); background: var(--paper-2); color: var(--ink-2);
     border-radius: 3px; padding: 9px 10px; font-size: 14px; font-family: inherit; width: 100%;
   }
   .field textarea { resize: vertical; min-height: 60px; }
@@ -345,13 +347,13 @@
     font-size: 13px; font-weight: 600; cursor: pointer; border-right: 1px solid var(--line);
   }
   .seg button:last-child { border-right: none; }
-  .seg button.active { background: var(--ochre); color: var(--paper-2); }
+  .seg button.active { background: var(--ochre); color: var(--ink-on-accent); }
   .stepper { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
-  .stepper button { border: none; background: var(--paper-2); width: 30px; height: 34px; font-size: 15px; cursor: pointer; color: var(--ink); }
+  .stepper button { border: none; background: var(--paper-2); width: 30px; height: 34px; font-size: 15px; cursor: pointer; color: var(--ink-2); }
   .stepper button:hover { background: var(--ochre-bg); }
   .stepper span { width: 34px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 14px; }
   select.print-select {
-    border: 1px solid var(--line); background: var(--paper-2); color: var(--ink);
+    border: 1px solid var(--line); background: var(--paper-2); color: var(--ink-2);
     padding: 8px 10px; border-radius: 3px; font-size: 13px; font-family: inherit;
   }
 
@@ -1030,11 +1032,12 @@
     }
     return '#888888';
   }
+  var DERIVED_INK_VARS = ['--ink-2', '--ink-on-accent'];
   function applyThemeColors(colors) {
     var rootStyle = document.documentElement.style;
-    THEME_VARS.forEach(function (v) {
-      if (colors && colors[v.varName]) rootStyle.setProperty(v.varName, colors[v.varName]);
-      else rootStyle.removeProperty(v.varName);
+    THEME_VARS.map(function (v) { return v.varName; }).concat(DERIVED_INK_VARS).forEach(function (varName) {
+      if (colors && colors[varName]) rootStyle.setProperty(varName, colors[varName]);
+      else rootStyle.removeProperty(varName);
     });
   }
   /* -- contrast safety: Text (--ink) sits on top of Background/Panels/Cards, so
@@ -1060,28 +1063,36 @@
     var hi = Math.max(l1, l2), lo = Math.min(l1, l2);
     return (hi + 0.05) / (lo + 0.05);
   }
-  var TEXT_SURFACE_VARS = ['--canvas', '--paper', '--paper-2'];
   var READABLE_CONTRAST = 4.5;
-  function ensureReadableInk(colors) {
-    var get = function (v) { return (colors && colors[v]) || hexOfVar(v); };
-    var ink = get('--ink');
-    var surfaces = TEXT_SURFACE_VARS.map(get);
-    var failsAny = surfaces.some(function (s) { return contrastRatio(ink, s) < READABLE_CONTRAST; });
-    if (!failsAny) return ink;
-    /* Pick black or white based on how light or dark the surfaces are on the
-       whole, rather than chasing a single worst-case pairing — with three
-       independently-editable surfaces, a background picked at the opposite
-       extreme from the others can't be perfectly solved by one text color
-       either way, so this aims for "reads fine almost everywhere" rather
-       than a tie that quietly favors one surface over another. */
-    var avgLum = surfaces.reduce(function (sum, s) { return sum + relLuminance(s); }, 0) / surfaces.length;
+  /* Pick black or white based on how light or dark a group of surfaces is on
+     the whole, rather than chasing a single worst-case pairing. */
+  function pickReadableAgainst(candidate, surfaceHexes) {
+    var failsAny = surfaceHexes.some(function (s) { return contrastRatio(candidate, s) < READABLE_CONTRAST; });
+    if (!failsAny) return candidate;
+    var avgLum = surfaceHexes.reduce(function (sum, s) { return sum + relLuminance(s); }, 0) / surfaceHexes.length;
     return avgLum > 0.5 ? '#000000' : '#ffffff';
+  }
+  /* Three independent text/surface pairings exist in the app, and each is
+     corrected on its own: main text (--ink) sits on Background + Panels,
+     text inside cards/buttons/inputs (--ink-2) sits on Cards, and text on
+     the accent-filled primary button (--ink-on-accent) sits on Accent.
+     Correcting each pairing separately (rather than forcing one shared text
+     color to satisfy all of them) is what lets Panels and Cards be picked
+     as very different colors — even opposite extremes — without any of
+     them going unreadable. If a color already reads fine where it's used,
+     it's left exactly as picked. */
+  function deriveTextColors(colors) {
+    var get = function (v) { return (colors && colors[v]) || hexOfVar(v); };
+    return {
+      '--ink': pickReadableAgainst(get('--ink'), [get('--canvas'), get('--paper')]),
+      '--ink-2': pickReadableAgainst(get('--ink'), [get('--paper-2')]),
+      '--ink-on-accent': pickReadableAgainst(get('--paper-2'), [get('--ochre')])
+    };
   }
   async function loadTheme() {
     var res = await sb.from('site_theme').select('colors').eq('id', 1).maybeSingle();
     if (!res.error && res.data && res.data.colors) {
-      var colors = Object.assign({}, res.data.colors);
-      colors['--ink'] = ensureReadableInk(colors);
+      var colors = Object.assign({}, res.data.colors, deriveTextColors(res.data.colors));
       applyThemeColors(colors);
     }
   }
@@ -1110,18 +1121,21 @@
     }
     function reguardTextReadability() {
       var current = currentPickerColors();
-      var safeInk = ensureReadableInk(current);
-      if (safeInk !== current['--ink']) {
-        document.documentElement.style.setProperty('--ink', safeInk);
+      var derived = deriveTextColors(current);
+      var rootStyle = document.documentElement.style;
+      rootStyle.setProperty('--ink-2', derived['--ink-2']);
+      rootStyle.setProperty('--ink-on-accent', derived['--ink-on-accent']);
+      if (derived['--ink'] !== current['--ink']) {
+        rootStyle.setProperty('--ink', derived['--ink']);
         var inkInput = colorsEl.querySelector('input[data-var="--ink"]');
-        if (inkInput) inkInput.value = safeInk;
+        if (inkInput) inkInput.value = derived['--ink'];
       }
     }
     colorsEl.addEventListener('input', function (e) {
       var input = e.target.closest('input[data-var]');
       if (!input) return;
       document.documentElement.style.setProperty(input.getAttribute('data-var'), input.value);
-      if (input.getAttribute('data-var') !== '--ink') reguardTextReadability();
+      reguardTextReadability();
     });
     reguardTextReadability(); /* self-heal if the panel opened onto an already-unreadable preview */
     document.getElementById('themeBackdrop').addEventListener('click', function (e) { if (e.target.id === 'themeBackdrop') closeModal(); });
@@ -1138,7 +1152,8 @@
     document.getElementById('themeSave').addEventListener('click', async function () {
       var colors = currentPickerColors();
       var originalInk = colors['--ink'];
-      colors['--ink'] = ensureReadableInk(colors);
+      var derived = deriveTextColors(colors);
+      Object.assign(colors, derived);
       var adjusted = colors['--ink'] !== originalInk;
       applyThemeColors(colors);
       var res = await sb.from('site_theme').upsert({ id: 1, colors: colors, updated_at: new Date().toISOString() });
