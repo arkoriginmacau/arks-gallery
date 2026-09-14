@@ -1065,12 +1065,17 @@
   function ensureReadableInk(colors) {
     var get = function (v) { return (colors && colors[v]) || hexOfVar(v); };
     var ink = get('--ink');
-    var failsAny = TEXT_SURFACE_VARS.some(function (v) { return contrastRatio(ink, get(v)) < READABLE_CONTRAST; });
+    var surfaces = TEXT_SURFACE_VARS.map(get);
+    var failsAny = surfaces.some(function (s) { return contrastRatio(ink, s) < READABLE_CONTRAST; });
     if (!failsAny) return ink;
-    var worstCase = function (candidate) {
-      return Math.min.apply(null, TEXT_SURFACE_VARS.map(function (v) { return contrastRatio(candidate, get(v)); }));
-    };
-    return worstCase('#000000') >= worstCase('#ffffff') ? '#000000' : '#ffffff';
+    /* Pick black or white based on how light or dark the surfaces are on the
+       whole, rather than chasing a single worst-case pairing — with three
+       independently-editable surfaces, a background picked at the opposite
+       extreme from the others can't be perfectly solved by one text color
+       either way, so this aims for "reads fine almost everywhere" rather
+       than a tie that quietly favors one surface over another. */
+    var avgLum = surfaces.reduce(function (sum, s) { return sum + relLuminance(s); }, 0) / surfaces.length;
+    return avgLum > 0.5 ? '#000000' : '#ffffff';
   }
   async function loadTheme() {
     var res = await sb.from('site_theme').select('colors').eq('id', 1).maybeSingle();
