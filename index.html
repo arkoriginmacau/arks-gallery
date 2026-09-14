@@ -640,8 +640,7 @@
     var tab = tabById(state.activeTabId);
     document.getElementById('tabTitle').textContent = tab ? tab.name : (state.loaded ? 'No tabs yet' : 'Loading…');
     var items = state.paintings.filter(function (p) { return p.tab_id === state.activeTabId; });
-    document.getElementById('tabSub').textContent = items.length + (items.length === 1 ? ' piece' : ' pieces') +
-      (tab && tab.prefix ? ' · catalogued ' + tab.prefix + '#' : '');
+    document.getElementById('tabSub').textContent = items.length + (items.length === 1 ? ' piece' : ' pieces');
 
     var grid = document.getElementById('grid');
     if (!tab) {
