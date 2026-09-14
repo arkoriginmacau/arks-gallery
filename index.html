@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ark's Gallery</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --canvas: #f1ece1;
+    --paper: #faf7f0;
+    --paper-2: #ffffff;
+    --ink: #221f1c;
+    --ink-soft: #6b6459;
+    --ink-faint: #9a9285;
+    --line: #dbd1bd;
+    --line-soft: #e8e0d0;
+    --ochre: #a5661f;
+    --ochre-ink: #7d4c17;
+    --ochre-soft: #e9d6b2;
+    --ochre-bg: #f4e9d3;
+    --sold: #a53a2a;
+    --sold-ink: #7e2c20;
+    --sold-soft: #ecd2cb;
+    --sold-bg: #f7e3de;
+    --shadow: 220 20% 10%;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --canvas: #17130f;
+      --paper: #201a14;
+      --paper-2: #241e17;
+      --ink: #ece4d6;
+      --ink-soft: #b2a894;
+      --ink-faint: #7c7364;
+      --line: #392f24;
+      --line-soft: #2c251c;
+      --ochre: #dc9d4f;
+      --ochre-ink: #f0bd7d;
+      --ochre-soft: #4c3a20;
+      --ochre-bg: #33281a;
+      --sold: #d97158;
+      --sold-ink: #e8917a;
+      --sold-soft: #4a2721;
+      --sold-bg: #3a2019;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --canvas: #17130f;
+    --paper: #201a14;
+    --paper-2: #241e17;
+    --ink: #ece4d6;
+    --ink-soft: #b2a894;
+    --ink-faint: #7c7364;
+    --line: #392f24;
+    --line-soft: #2c251c;
+    --ochre: #dc9d4f;
+    --ochre-ink: #f0bd7d;
+    --ochre-soft: #4c3a20;
+    --ochre-bg: #33281a;
+    --sold: #d97158;
+    --sold-ink: #e8917a;
+    --sold-soft: #4a2721;
+    --sold-bg: #3a2019;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: 'Archivo', -apple-system, BlinkMacSystemFont, sans-serif;
+    padding: 0 20px 64px;
+    min-height: 100vh;
+  }
+  .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+  h1, h2, h3, .display { font-family: 'Fraunces', Georgia, serif; text-wrap: balance; }
+
+  a { color: inherit; }
+  button { font-family: inherit; }
+
+  /* ---------- shell ---------- */
+  .wrap { max-width: 1120px; margin: 0 auto; }
+
+  header.top {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap;
+    padding: 36px 0 22px;
+    border-bottom: 1px solid var(--line);
+  }
+  .brand-eyebrow {
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--ochre); font-weight: 600; margin: 0 0 6px;
+  }
+  header.top h1 { font-size: clamp(28px, 4vw, 38px); font-weight: 600; margin: 0; line-height: 1.05; }
+  .top-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    border: 1px solid var(--line); background: var(--paper-2); color: var(--ink);
+    padding: 10px 16px; border-radius: 3px; font-size: 13.5px; font-weight: 600;
+    cursor: pointer; line-height: 1; transition: border-color .15s, background .15s;
+  }
+  .btn:hover { border-color: var(--ochre); }
+  .btn:focus-visible { outline: 2px solid var(--ochre); outline-offset: 2px; }
+  .btn-primary { background: var(--ochre); border-color: var(--ochre); color: var(--paper-2); }
+  .btn-primary:hover { background: var(--ochre-ink); border-color: var(--ochre-ink); }
+  .btn-ghost { background: transparent; border-color: transparent; padding: 10px 10px; }
+  .btn-ghost:hover { border-color: var(--line); }
+  .btn-sm { padding: 7px 11px; font-size: 12.5px; }
+  .btn-danger { color: var(--sold); }
+  .btn[disabled] { opacity: .55; cursor: default; }
+  .btn[disabled]:hover { border-color: var(--line); }
+
+  /* ---------- admin / auth ---------- */
+  .admin-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12px; color: var(--ink-soft); background: var(--paper); border: 1px solid var(--line);
+    padding: 6px 10px; border-radius: 20px;
+  }
+  .admin-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: #4c8a5e; flex-shrink: 0; }
+  .toast-root { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 200; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .toast {
+    background: var(--ink); color: var(--canvas); font-size: 13px; font-weight: 500;
+    padding: 10px 18px; border-radius: 5px; box-shadow: 0 6px 24px rgba(0,0,0,.25);
+    animation: toastIn .18s ease-out;
+  }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .view-badge {
+    font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  /* ---------- tabs ---------- */
+  .tabbar {
+    display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+    padding: 18px 0; margin-bottom: 6px;
+  }
+  .tab {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 8px 9px 16px; border-radius: 3px 3px 0 0;
+    border: 1px solid transparent; border-bottom: none;
+    cursor: pointer; font-weight: 600; font-size: 14.5px; color: var(--ink-soft);
+    position: relative; top: 1px;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab.active {
+    color: var(--ink); background: var(--paper); border-color: var(--line);
+    box-shadow: 0 -1px 0 var(--paper);
+  }
+  .tab .prefix-chip {
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600;
+    color: var(--ochre-ink); background: var(--ochre-bg); border-radius: 3px;
+    padding: 2px 6px; letter-spacing: .02em;
+  }
+  .tab .count { color: var(--ink-faint); font-size: 12px; font-weight: 500; }
+  .tab-edit-btn {
+    border: none; background: none; color: var(--ink-faint); cursor: pointer;
+    padding: 3px; border-radius: 3px; display: flex;
+  }
+  .tab-edit-btn:hover { color: var(--ochre); background: var(--ochre-bg); }
+  .tab-add {
+    padding: 9px 14px; border-radius: 3px; border: 1px dashed var(--line);
+    background: none; color: var(--ink-faint); cursor: pointer; font-size: 13px; font-weight: 600;
+    margin-left: 4px;
+  }
+  .tab-add:hover { color: var(--ochre); border-color: var(--ochre); }
+
+  .panel {
+    background: var(--paper); border: 1px solid var(--line); border-radius: 4px;
+    padding: 24px; min-height: 200px;
+  }
+
+  /* ---------- grid ---------- */
+  .grid-toolbar {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    margin-bottom: 18px; flex-wrap: wrap;
+  }
+  .grid-toolbar .tab-title { font-size: 20px; font-weight: 600; margin: 0; }
+  .grid-toolbar .tab-sub { color: var(--ink-soft); font-size: 13px; margin-top: 2px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 18px; }
+
+  .card {
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 4px;
+    overflow: hidden; display: flex; flex-direction: column;
+  }
+  .card-image {
+    position: relative; aspect-ratio: 4/3; overflow: hidden;
+    border-bottom: 1px solid var(--line);
+  }
+  .card-image img, .card-image .swatch { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .card-image .swatch { display: flex; align-items: center; justify-content: center; }
+  .card-image .swatch span {
+    font-family: 'Fraunces', serif; font-size: 44px; color: rgba(255,255,255,.78);
+    font-weight: 500;
+  }
+  .price-tag {
+    position: absolute; left: 8px; bottom: 8px;
+    background: var(--paper-2); border: 1px solid var(--line);
+    font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; font-weight: 600;
+    padding: 3px 8px; border-radius: 3px; font-variant-numeric: tabular-nums;
+  }
+  .num-badge {
+    position: absolute; right: 8px; top: 8px;
+    background: rgba(34,31,28,.72); color: #f1ece1;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600;
+    padding: 3px 7px; border-radius: 3px; letter-spacing: .02em;
+  }
+  .sold-slash {
+    position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(135deg, transparent calc(50% - 1.6px), var(--sold) 50%, transparent calc(50% + 1.6px));
+    opacity: .85;
+  }
+  .sold-stamp {
+    position: absolute; left: 50%; top: 50%; pointer-events: none;
+    transform: translate(-50%, -50%) rotate(-11deg);
+    border: 3px solid var(--sold); color: var(--sold);
+    font-family: 'Archivo', sans-serif; font-weight: 700; font-size: 18px;
+    text-transform: uppercase;
+    letter-spacing: .14em; padding: 4px 14px 3px; border-radius: 4px;
+    background: #faf7f0;
+    box-shadow: 0 0 0 3px #faf7f0;
+  }
+
+  .expand-hint {
+    position: absolute; right: 8px; bottom: 8px; width: 24px; height: 24px; border-radius: 5px;
+    background: rgba(34,31,28,.55); color: #fff; display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity .12s; pointer-events: none;
+  }
+  .card-image:hover .expand-hint { opacity: 1; }
+
+  .lightbox-backdrop {
+    position: fixed; inset: 0; background: rgba(12, 10, 8, .92); z-index: 90;
+    display: flex; align-items: center; justify-content: center; padding: 5vh 5vw;
+  }
+  .lightbox-img { max-width: 100%; max-height: 90vh; object-fit: contain; border-radius: 3px; box-shadow: 0 10px 50px rgba(0,0,0,.5); }
+  .lightbox-close {
+    position: absolute; top: 22px; right: 26px; width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.28); color: #fff;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .lightbox-close:hover { background: rgba(255,255,255,.2); }
+  .lightbox-cap {
+    position: absolute; left: 26px; bottom: 22px; color: rgba(255,255,255,.75);
+    font-family: 'IBM Plex Mono', monospace; font-size: 12.5px;
+  }
+
+  .card-body { padding: 13px 14px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .card-name { font-family: 'Fraunces', serif; font-weight: 600; font-size: 16.5px; line-height: 1.25; }
+  .card-meta { display: flex; gap: 10px; color: var(--ink-soft); font-size: 12px; }
+  .card-meta .mono { font-variant-numeric: tabular-nums; }
+  .card-desc { font-size: 12.5px; color: var(--ink-soft); line-height: 1.45; }
+  .field-label {
+    font-family: 'Archivo', sans-serif; text-transform: uppercase; font-weight: 700;
+    font-size: 10px; letter-spacing: .05em; color: var(--ink-faint);
+  }
+  .card.is-sold .card-name, .card.is-sold .price-tag, .card.is-sold .card-meta { color: var(--sold); }
+  .card.is-sold .price-tag { border-color: var(--sold-soft); background: var(--sold-bg); }
+
+  .card-footer {
+    margin-top: auto; display: flex; align-items: center; justify-content: space-between;
+    padding-top: 10px; border-top: 1px solid var(--line-soft);
+  }
+  .sold-toggle {
+    display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+    font-size: 12px; font-weight: 600; color: var(--ink-soft); border: none; background: none; padding: 4px 2px;
+  }
+  .switch {
+    width: 32px; height: 18px; border-radius: 10px; background: var(--line);
+    position: relative; transition: background .15s; flex-shrink: 0;
+  }
+  .switch::after {
+    content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
+    border-radius: 50%; background: var(--paper-2); transition: transform .15s;
+    box-shadow: 0 1px 2px rgba(0,0,0,.25);
+  }
+  .is-sold .switch { background: var(--sold); }
+  .is-sold .switch::after { transform: translateX(14px); }
+  .card-actions { display: flex; gap: 2px; }
+  .icon-btn {
+    border: none; background: none; color: var(--ink-faint); cursor: pointer;
+    padding: 5px; border-radius: 3px; display: flex;
+  }
+  .icon-btn:hover { color: var(--ink); background: var(--line-soft); }
+  .icon-btn.danger:hover { color: var(--sold); background: var(--sold-bg); }
+  .sold-static {
+    font-size: 12px; font-weight: 600; color: var(--ink-faint);
+  }
+
+  .empty-state {
+    text-align: center; padding: 64px 20px; color: var(--ink-soft);
+  }
+  .empty-state h3 { margin: 0 0 6px; font-size: 19px; }
+  .empty-state p { margin: 0 0 18px; font-size: 13.5px; }
+
+  /* ---------- modal ---------- */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(23,19,15,.5);
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 6vh 16px; overflow-y: auto; z-index: 50;
+  }
+  .modal {
+    background: var(--paper); border: 1px solid var(--line); border-radius: 6px;
+    width: 100%; max-width: 440px; padding: 26px; margin-bottom: 40px;
+  }
+  .modal h2 { font-size: 19px; margin: 0 0 8px; font-weight: 600; }
+  .modal p.modal-sub { font-size: 12.5px; color: var(--ink-soft); margin: 0 0 18px; }
+  .field { margin-bottom: 14px; display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 12px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .04em; }
+  .field input[type="text"], .field input[type="number"], .field input[type="date"], .field textarea {
+    border: 1px solid var(--line); background: var(--paper-2); color: var(--ink);
+    border-radius: 3px; padding: 9px 10px; font-size: 14px; font-family: inherit; width: 100%;
+  }
+  .field textarea { resize: vertical; min-height: 60px; }
+  .field input:focus, .field textarea:focus { outline: 2px solid var(--ochre); outline-offset: 1px; }
+  .field-row { display: flex; gap: 10px; }
+  .field-row .field { flex: 1; }
+  .field-hint { font-size: 11.5px; color: var(--ink-faint); }
+  .upload-drop {
+    border: 1px dashed var(--line); border-radius: 4px; padding: 16px; text-align: center;
+    font-size: 13px; color: var(--ink-soft); cursor: pointer; background: var(--paper-2);
+  }
+  .upload-drop:hover { border-color: var(--ochre); color: var(--ink); }
+  .upload-preview { display: flex; align-items: center; gap: 10px; font-size: 12.5px; }
+  .upload-preview img { width: 44px; height: 44px; object-fit: cover; border-radius: 3px; border: 1px solid var(--line); }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+  .modal-close { position: absolute; }
+
+  /* ---------- print planner ---------- */
+  .print-toolbar {
+    display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-end;
+    padding: 18px 22px; background: var(--paper); border: 1px solid var(--line); border-radius: 4px;
+    margin-bottom: 22px;
+  }
+  .print-field { display: flex; flex-direction: column; gap: 6px; }
+  .print-field label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-soft); }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+  .seg button {
+    border: none; background: var(--paper-2); color: var(--ink-soft); padding: 8px 16px;
+    font-size: 13px; font-weight: 600; cursor: pointer; border-right: 1px solid var(--line);
+  }
+  .seg button:last-child { border-right: none; }
+  .seg button.active { background: var(--ochre); color: var(--paper-2); }
+  .stepper { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+  .stepper button { border: none; background: var(--paper-2); width: 30px; height: 34px; font-size: 15px; cursor: pointer; color: var(--ink); }
+  .stepper button:hover { background: var(--ochre-bg); }
+  .stepper span { width: 34px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 14px; }
+  select.print-select {
+    border: 1px solid var(--line); background: var(--paper-2); color: var(--ink);
+    padding: 8px 10px; border-radius: 3px; font-size: 13px; font-family: inherit;
+  }
+
+  .print-scroll { overflow-x: auto; padding-bottom: 8px; }
+  .page-stack { display: flex; flex-direction: column; align-items: center; gap: 28px; }
+  .print-page {
+    background: #fff; color: #1a1712; box-shadow: 0 2px 18px rgba(0,0,0,.18);
+    position: relative; flex-shrink: 0;
+  }
+  .print-page .p-header {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 12mm 12mm 4mm; border-bottom: 0.6mm solid #1a1712;
+  }
+  .print-page .p-header h3 { font-family: 'Fraunces', serif; font-size: 6.4mm; margin: 0; font-weight: 600; }
+  .print-page .p-header .p-meta { font-family: 'IBM Plex Mono', monospace; font-size: 3mm; color: #6b6459; }
+  .print-rows { padding: 0 12mm; }
+  .print-row {
+    display: flex; align-items: center; gap: 5mm;
+    border-bottom: 0.25mm solid #d9cfbc; padding: 3mm 0;
+  }
+  .print-row .p-thumb {
+    width: 16mm; height: 16mm; border-radius: 1mm; object-fit: cover; flex-shrink: 0; border: 0.25mm solid #d9cfbc;
+  }
+  .print-row .p-thumb.swatch { display: flex; align-items: center; justify-content: center; font-family: 'Fraunces', serif; color: rgba(255,255,255,.85); font-size: 5mm; }
+  .print-row .p-num { font-family: 'IBM Plex Mono', monospace; font-size: 3mm; font-weight: 600; width: 16mm; flex-shrink: 0; }
+  .print-row .p-info { flex: 1; min-width: 0; }
+  .print-row .p-name { font-family: 'Fraunces', serif; font-weight: 600; font-size: 3.8mm; }
+  .print-row .p-desc { font-size: 2.7mm; color: #6b6459; margin-top: 0.5mm; }
+  .print-row .p-date-line { font-family: 'IBM Plex Mono', monospace; font-size: 2.6mm; color: #6b6459; margin-top: 0.5mm; }
+  .print-row .p-label { font-family: 'Archivo', sans-serif; text-transform: uppercase; font-size: 2.2mm; letter-spacing: .04em; color: #9a9285; font-weight: 600; }
+  .print-row .p-price { font-family: 'IBM Plex Mono', monospace; font-size: 3.4mm; font-weight: 600; width: 20mm; text-align: right; flex-shrink: 0; }
+  .print-row.sold .p-name, .print-row.sold .p-price { color: #a53a2a; }
+  .print-row .p-sold-mark { font-size: 2.6mm; font-weight: 700; color: #a53a2a; letter-spacing: .06em; width: 14mm; text-align: right; flex-shrink: 0; }
+  .print-page .p-footer {
+    position: absolute; bottom: 6mm; right: 12mm; font-family: 'IBM Plex Mono', monospace; font-size: 2.6mm; color: #9a9285;
+  }
+
+  .a4 { width: 210mm; height: 297mm; }
+  .a3 { width: 297mm; height: 420mm; }
+
+  @media print {
+    body * { visibility: hidden; }
+    #printArea, #printArea * { visibility: visible; }
+    #printArea { position: absolute; left: 0; top: 0; margin: 0; padding: 0; }
+    .print-scroll { overflow: visible; }
+    .page-stack { gap: 0; align-items: flex-start; }
+    .print-page { box-shadow: none; page-break-after: always; }
+  }
+
+  #printPageStyle { display: none; }
+
+  @media (max-width: 640px) {
+    header.top { padding-top: 24px; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+    .print-toolbar { padding: 14px; gap: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap" id="app">
+  <header class="top">
+    <div>
+      <p class="brand-eyebrow">Arkorigin Studio</p>
+      <h1>Ark's Gallery</h1>
+    </div>
+    <div class="top-actions" id="topActions"></div>
+  </header>
+
+  <nav class="tabbar" id="tabbar"></nav>
+
+  <main class="panel" id="browseView">
+    <div class="grid-toolbar">
+      <div>
+        <p class="tab-title" id="tabTitle">&nbsp;</p>
+        <p class="tab-sub" id="tabSub"></p>
+      </div>
+    </div>
+    <div class="grid" id="grid"></div>
+  </main>
+
+  <main class="panel" id="printView" hidden></main>
+</div>
+
+<div id="modalRoot"></div>
+<div id="lightboxRoot"></div>
+<div class="toast-root" id="toastRoot"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ---------------- Supabase project config ----------------
+     Public URL + publishable (anon) key — safe to ship in client code.
+     All access control is enforced server-side by Postgres Row Level
+     Security: anyone can read, only a signed-in arkoriginmacau@gmail.com
+     session can write. */
+  var SUPABASE_URL = 'https://dmskenuvcnqiekbbbklt.supabase.co';
+  var SUPABASE_KEY = 'sb_publishable_BdPDUr4hx76oZqVwQcUdAw_Y2nF8hdK';
+  var ADMIN_EMAIL = 'arkoriginmacau@gmail.com';
+  var IMAGE_BUCKET = 'gallery-images';
+
+  var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  var state = { tabs: [], paintings: [], activeTabId: null, printMode: 'A4', printRows: 8, printScope: 'current', loaded: false };
+  var isAdmin = false;
+  var currentUserEmail = null;
+
+  /* ---------------- toast ---------------- */
+  function toast(msg) {
+    var root = document.getElementById('toastRoot');
+    var el = document.createElement('div');
+    el.className = 'toast';
+    el.textContent = msg;
+    root.appendChild(el);
+    setTimeout(function () { el.remove(); }, 3400);
+  }
+
+  /* ---------------- helpers ---------------- */
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmtPrice(n) {
+    if (n === '' || n == null || isNaN(n)) return '—';
+    return '$' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
+  }
+  function fmtDate(d) {
+    if (!d) return '—';
+    return String(d).replace(/-/g, '/');
+  }
+  function tabById(id) { return state.tabs.find(function (t) { return t.id === id; }); }
+  function catalogNum(p) {
+    var t = tabById(p.tab_id);
+    return ((t && t.prefix) || '') + (p.number || '');
+  }
+  function stripExt(name) { return name.replace(/\.[^.]+$/, ''); }
+  function publicImgUrl(path) {
+    if (!path) return null;
+    return sb.storage.from(IMAGE_BUCKET).getPublicUrl(path).data.publicUrl;
+  }
+  function swatchGradient(hue) {
+    return 'linear-gradient(135deg, hsl(' + hue + ' 46% 42%), hsl(' + ((hue + 40) % 360) + ' 40% 28%))';
+  }
+
+  /* Downscale a photo to a small JPEG for the card/list thumbnail, so browsing
+     never has to load full-resolution camera photos. The original file is kept
+     untouched and uploaded separately for the click-to-enlarge view. */
+  function makeThumbnail(file, maxDim, quality) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function () {
+        var w = img.naturalWidth, h = img.naturalHeight;
+        var scale = Math.min(1, maxDim / Math.max(w, h));
+        var cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+        var canvas = document.createElement('canvas');
+        canvas.width = cw; canvas.height = ch;
+        canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
+        canvas.toBlob(function (blob) {
+          URL.revokeObjectURL(url);
+          if (blob) resolve(blob); else reject(new Error('thumbnail encode failed'));
+        }, 'image/jpeg', quality || 0.72);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('image decode failed')); };
+      img.src = url;
+    });
+  }
+
+  /* ---------------- data load ---------------- */
+  async function fetchTabs() {
+    var res = await sb.from('tabs').select('*').order('order', { ascending: true });
+    if (res.error) { toast('Could not load tabs.'); return; }
+    state.tabs = res.data || [];
+    if (!state.activeTabId && state.tabs.length) state.activeTabId = state.tabs[0].id;
+  }
+  async function fetchPaintings() {
+    var res = await sb.from('paintings').select('*').order('created_at', { ascending: false });
+    if (res.error) { toast('Could not load paintings.'); return; }
+    state.paintings = res.data || [];
+  }
+  async function loadAll() {
+    await Promise.all([fetchTabs(), fetchPaintings()]);
+    state.loaded = true;
+    renderAll();
+  }
+
+  /* ---------------- auth ---------------- */
+  async function sendAdminLink() {
+    var btn = document.getElementById('btnAdminSignIn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+    var res = await sb.auth.signInWithOtp({
+      email: ADMIN_EMAIL,
+      options: { emailRedirectTo: window.location.origin + window.location.pathname }
+    });
+    if (res.error) {
+      toast('Could not send sign-in link: ' + res.error.message);
+    } else {
+      toast('Sign-in link sent to ' + ADMIN_EMAIL + ' — check that inbox.');
+    }
+    if (btn) { btn.disabled = false; renderTopActions(); }
+  }
+  async function signOut() {
+    await sb.auth.signOut();
+  }
+  function refreshAuthFromSession(session) {
+    var user = session && session.user;
+    currentUserEmail = user ? user.email : null;
+    isAdmin = !!user && user.email === ADMIN_EMAIL;
+    renderAll();
+  }
+
+  /* ---------------- render: header ---------------- */
+  function renderTopActions() {
+    var el = document.getElementById('topActions');
+    var printBtn = '<button class="btn" id="btnPrintView" type="button">' +
+      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg>' +
+      'Print &amp; export</button>';
+
+    if (isAdmin) {
+      el.innerHTML = printBtn +
+        '<button class="btn btn-primary" id="btnAddPainting" type="button">' +
+        '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>Add painting</button>' +
+        '<span class="admin-pill"><span class="dot"></span>' + esc(currentUserEmail) + '</span>' +
+        '<button class="btn btn-ghost btn-sm" id="btnSignOut" type="button">Sign out</button>';
+      document.getElementById('btnAddPainting').addEventListener('click', function () {
+        if (!state.activeTabId) { openTabModal(); return; }
+        openPaintingModal();
+      });
+      document.getElementById('btnSignOut').addEventListener('click', signOut);
+    } else {
+      el.innerHTML = printBtn +
+        '<span class="view-badge">Viewing gallery</span>' +
+        '<button class="btn btn-ghost btn-sm" id="btnAdminSignIn" type="button" title="Studio admin sign-in">Admin</button>';
+      document.getElementById('btnAdminSignIn').addEventListener('click', sendAdminLink);
+    }
+    document.getElementById('btnPrintView').addEventListener('click', function () {
+      if (document.getElementById('printView').hidden) showPrint(); else showBrowse();
+    });
+  }
+
+  /* ---------------- render: tabs ---------------- */
+  function renderTabs() {
+    var bar = document.getElementById('tabbar');
+    var list = state.tabs;
+    var html = list.map(function (t) {
+      var count = state.paintings.filter(function (p) { return p.tab_id === t.id; }).length;
+      var active = t.id === state.activeTabId;
+      return '<div class="tab' + (active ? ' active' : '') + '" data-tab="' + t.id + '">' +
+        '<span>' + esc(t.name) + '</span>' +
+        (t.prefix ? '<span class="prefix-chip">' + esc(t.prefix) + '</span>' : '') +
+        '<span class="count">' + count + '</span>' +
+        (isAdmin ? '<button class="tab-edit-btn" data-edit-tab="' + t.id + '" title="Rename / set prefix" aria-label="Edit tab">' +
+        '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>' +
+        '</button>' : '') + '</div>';
+    }).join('');
+    if (isAdmin) html += '<button class="tab-add" id="btnAddTab" type="button">+ Tab</button>';
+    bar.innerHTML = html;
+  }
+
+  /* ---------------- render: grid ---------------- */
+  function renderGrid() {
+    var tab = tabById(state.activeTabId);
+    document.getElementById('tabTitle').textContent = tab ? tab.name : (state.loaded ? 'No tabs yet' : 'Loading…');
+    var items = state.paintings.filter(function (p) { return p.tab_id === state.activeTabId; });
+    document.getElementById('tabSub').textContent = items.length + (items.length === 1 ? ' piece' : ' pieces') +
+      (tab && tab.prefix ? ' · catalogued ' + tab.prefix + '#' : '');
+
+    var grid = document.getElementById('grid');
+    if (!tab) {
+      if (!state.loaded) { grid.innerHTML = ''; return; }
+      grid.innerHTML = isAdmin
+        ? '<div class="empty-state" style="grid-column:1/-1"><h3>No tabs yet</h3><p>Create a tab for the first material you work in — Oil, Watercolour, Sketch…</p>' +
+          '<button class="btn btn-primary" id="emptyAddTab" type="button">+ Add a tab</button></div>'
+        : '<div class="empty-state" style="grid-column:1/-1"><h3>Gallery is being set up</h3><p>Check back soon.</p></div>';
+      var b = document.getElementById('emptyAddTab');
+      if (b) b.addEventListener('click', openTabModal);
+      return;
+    }
+    if (!items.length) {
+      grid.innerHTML = isAdmin
+        ? '<div class="empty-state" style="grid-column:1/-1"><h3>Nothing catalogued in ' + esc(tab.name) + ' yet</h3>' +
+          '<p>Add your first piece — its photo\'s filename can double as the catalogue number.</p>' +
+          '<button class="btn btn-primary" id="emptyAddPainting" type="button">+ Add painting</button></div>'
+        : '<div class="empty-state" style="grid-column:1/-1"><h3>Nothing in ' + esc(tab.name) + ' yet</h3><p>More work is on its way.</p></div>';
+      var b2 = document.getElementById('emptyAddPainting');
+      if (b2) b2.addEventListener('click', openPaintingModal);
+      return;
+    }
+
+    grid.innerHTML = items.map(function (p) {
+      var thumbSrc = publicImgUrl(p.thumb_path) || publicImgUrl(p.image_path);
+      var fullSrc = publicImgUrl(p.image_path) || thumbSrc;
+      var imageInner = thumbSrc
+        ? '<img src="' + esc(thumbSrc) + '" alt="' + esc(p.name) + '" loading="lazy" decoding="async">'
+        : '<div class="swatch" style="background:' + swatchGradient(p.hue || 30) + '"><span>' + esc((p.name || '?').charAt(0).toUpperCase()) + '</span></div>';
+      return '<div class="card' + (p.sold ? ' is-sold' : '') + '" data-card="' + p.id + '">' +
+        '<div class="card-image"' + (thumbSrc ? ' data-lightbox="' + esc(fullSrc) + '" title="Click to view full size"' : '') + '>' + imageInner +
+        '<span class="num-badge mono">' + esc(catalogNum(p)) + '</span>' +
+        '<span class="price-tag">' + fmtPrice(p.price) + '</span>' +
+        (p.sold ? '<div class="sold-slash"></div><div class="sold-stamp">Sold</div>' : '') +
+        (thumbSrc ? '<span class="expand-hint"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 3H5a2 2 0 0 0-2 2v3m0 8v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3m0-8V5a2 2 0 0 0-2-2h-3"/></svg></span>' : '') +
+        '</div>' +
+        '<div class="card-body">' +
+        '<div class="card-name"><span class="field-label">Name:</span> ' + esc(p.name || 'Untitled') + '</div>' +
+        '<div class="card-meta"><span class="field-label">Date:</span> <span class="mono">' + esc(fmtDate(p.date)) + '</span></div>' +
+        (p.description ? '<div class="card-desc"><span class="field-label">Description:</span> ' + esc(p.description) + '</div>' : '') +
+        '<div class="card-footer">' +
+        (isAdmin
+          ? '<button class="sold-toggle" data-toggle-sold="' + p.id + '"><span class="switch"></span>' + (p.sold ? 'Sold' : 'Mark sold') + '</button>' +
+            '<div class="card-actions">' +
+            '<button class="icon-btn" data-edit-painting="' + p.id + '" aria-label="Edit" title="Edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' +
+            '<button class="icon-btn danger" data-del-painting="' + p.id + '" aria-label="Delete" title="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg></button>' +
+            '</div>'
+          : '<span class="sold-static">' + (p.sold ? 'Sold' : '') + '</span><span></span>') +
+        '</div></div></div>';
+    }).join('');
+  }
+
+  /* ---------------- render: print planner ---------------- */
+  function pageDims() { return state.printMode === 'A3' ? { w: 297, h: 420, cls: 'a3' } : { w: 210, h: 297, cls: 'a4' }; }
+
+  function printSourceItems() {
+    var list = state.paintings;
+    if (state.printScope === 'current') {
+      return list.filter(function (p) { return p.tab_id === state.activeTabId; })
+        .map(function (p) { return { p: p, tabName: (tabById(p.tab_id) || {}).name || '' }; });
+    }
+    return state.tabs.reduce(function (acc, t) {
+      var items = list.filter(function (p) { return p.tab_id === t.id; });
+      return acc.concat(items.map(function (p) { return { p: p, tabName: t.name }; }));
+    }, []);
+  }
+
+  function renderPrint() {
+    var view = document.getElementById('printView');
+    var dims = pageDims();
+    var items = printSourceItems();
+    var rows = state.printRows;
+    var pages = [];
+    for (var i = 0; i < items.length; i += rows) pages.push(items.slice(i, i + rows));
+    if (!pages.length) pages = [[]];
+
+    var toolbar = '<div class="print-toolbar">' +
+      '<div class="print-field"><label>Page size</label><div class="seg" id="segPage">' +
+      '<button data-page="A4" class="' + (state.printMode === 'A4' ? 'active' : '') + '">A4</button>' +
+      '<button data-page="A3" class="' + (state.printMode === 'A3' ? 'active' : '') + '">A3</button>' +
+      '</div></div>' +
+      '<div class="print-field"><label>Rows per page</label><div class="stepper">' +
+      '<button id="rowMinus" type="button">–</button><span id="rowVal">' + rows + '</span><button id="rowPlus" type="button">+</button>' +
+      '</div></div>' +
+      '<div class="print-field"><label>Include</label><select class="print-select" id="printScopeSel">' +
+      '<option value="current"' + (state.printScope === 'current' ? ' selected' : '') + '>' + esc((tabById(state.activeTabId) || {}).name || 'Current tab') + ' only</option>' +
+      '<option value="all"' + (state.printScope === 'all' ? ' selected' : '') + '>All tabs</option>' +
+      '</select></div>' +
+      '<div class="print-field"><label>&nbsp;</label><button class="btn btn-primary" id="btnDoPrint" type="button">Print / Save as PDF</button></div>' +
+      '<div class="print-field"><label>&nbsp;</label><button class="btn btn-ghost" id="btnClosePrint" type="button">Back to gallery</button></div>' +
+      '</div>';
+
+    var pagesHtml = pages.map(function (rowsOnPage, pageIdx) {
+      var rowsHtml = rowsOnPage.map(function (entry) {
+        var p = entry.p;
+        var thumbSrc = publicImgUrl(p.thumb_path) || publicImgUrl(p.image_path);
+        var thumb = thumbSrc
+          ? '<img class="p-thumb" src="' + esc(thumbSrc) + '" alt="">'
+          : '<div class="p-thumb swatch" style="background:' + swatchGradient(p.hue || 30) + '">' + esc((p.name || '?').charAt(0).toUpperCase()) + '</div>';
+        return '<div class="print-row' + (p.sold ? ' sold' : '') + '">' + thumb +
+          '<div class="p-num">' + esc(catalogNum(p)) + '</div>' +
+          '<div class="p-info"><div class="p-name"><span class="p-label">Name:</span> ' + esc(p.name || 'Untitled') + '</div>' +
+          (p.description ? '<div class="p-desc"><span class="p-label">Description:</span> ' + esc(p.description) + '</div>' : '') +
+          '<div class="p-date-line"><span class="p-label">Date:</span> ' + esc(fmtDate(p.date)) + '</div></div>' +
+          '<div class="p-price">' + fmtPrice(p.price) + '</div>' +
+          '<div class="p-sold-mark">' + (p.sold ? 'SOLD' : '') + '</div>' +
+          '</div>';
+      }).join('') || '<p style="color:#9a9285;font-size:12px;padding:8mm 0;">No pieces to list yet.</p>';
+
+      var headerLabel = state.printScope === 'all' ? 'Full catalogue' : ((tabById(state.activeTabId) || {}).name || '');
+      return '<div class="print-page ' + dims.cls + '">' +
+        '<div class="p-header"><h3>Ark\'s Gallery — ' + esc(headerLabel) + '</h3><span class="p-meta">' + dims.w + '×' + dims.h + 'mm</span></div>' +
+        '<div class="print-rows">' + rowsHtml + '</div>' +
+        '<div class="p-footer">Page ' + (pageIdx + 1) + ' / ' + pages.length + '</div>' +
+        '</div>';
+    }).join('');
+
+    view.innerHTML = toolbar + '<div class="print-scroll"><div class="page-stack" id="printArea">' + pagesHtml + '</div></div>';
+
+    document.getElementById('segPage').addEventListener('click', function (e) {
+      var btn = e.target.closest('button[data-page]');
+      if (!btn) return;
+      state.printMode = btn.getAttribute('data-page');
+      renderPrint();
+    });
+    document.getElementById('rowMinus').addEventListener('click', function () { state.printRows = Math.max(1, state.printRows - 1); renderPrint(); });
+    document.getElementById('rowPlus').addEventListener('click', function () { state.printRows = Math.min(30, state.printRows + 1); renderPrint(); });
+    document.getElementById('printScopeSel').addEventListener('change', function (e) { state.printScope = e.target.value; renderPrint(); });
+    document.getElementById('btnClosePrint').addEventListener('click', function () { showBrowse(); });
+    document.getElementById('btnDoPrint').addEventListener('click', function () { doPrint(dims); });
+  }
+
+  function doPrint(dims) {
+    var style = document.getElementById('printPageStyle');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'printPageStyle';
+      document.head.appendChild(style);
+    }
+    style.textContent = '@page { size: ' + dims.w + 'mm ' + dims.h + 'mm; margin: 0; }';
+    window.print();
+  }
+
+  function showBrowse() {
+    document.getElementById('browseView').hidden = false;
+    document.getElementById('printView').hidden = true;
+    var pv = document.getElementById('btnPrintView');
+    if (pv) pv.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg> Print & export';
+  }
+  function showPrint() {
+    document.getElementById('browseView').hidden = true;
+    document.getElementById('printView').hidden = false;
+    renderPrint();
+  }
+
+  function renderAll() {
+    renderTopActions();
+    renderTabs();
+    if (!document.getElementById('printView').hidden) renderPrint();
+    else renderGrid();
+    bindGridEvents();
+    bindTabEvents();
+  }
+
+  /* ---------------- events: tabs / grid ---------------- */
+  function bindTabEvents() {
+    var bar = document.getElementById('tabbar');
+    bar.querySelectorAll('[data-tab]').forEach(function (el) {
+      el.addEventListener('click', function (e) {
+        if (e.target.closest('[data-edit-tab]')) return;
+        state.activeTabId = el.getAttribute('data-tab');
+        renderAll();
+      });
+    });
+    bar.querySelectorAll('[data-edit-tab]').forEach(function (el) {
+      el.addEventListener('click', function (e) {
+        e.stopPropagation();
+        openTabModal(el.getAttribute('data-edit-tab'));
+      });
+    });
+    var addBtn = document.getElementById('btnAddTab');
+    if (addBtn) addBtn.addEventListener('click', function () { openTabModal(); });
+  }
+
+  function bindGridEvents() {
+    var grid = document.getElementById('grid');
+    if (!grid) return;
+    grid.querySelectorAll('[data-toggle-sold]').forEach(function (el) {
+      el.addEventListener('click', function () { toggleSold(el.getAttribute('data-toggle-sold')); });
+    });
+    grid.querySelectorAll('[data-edit-painting]').forEach(function (el) {
+      el.addEventListener('click', function () { openPaintingModal(el.getAttribute('data-edit-painting')); });
+    });
+    grid.querySelectorAll('[data-del-painting]').forEach(function (el) {
+      el.addEventListener('click', function () { confirmDelete(el); });
+    });
+    grid.querySelectorAll('[data-lightbox]').forEach(function (el) {
+      el.addEventListener('click', function () { openLightbox(el.getAttribute('data-lightbox'), el); });
+    });
+  }
+
+  /* ---------------- lightbox (full-size view, never affects card layout) ---------------- */
+  function lightboxEscHandler(e) { if (e.key === 'Escape') closeLightbox(); }
+  function openLightbox(src, sourceEl) {
+    var root = document.getElementById('lightboxRoot');
+    var cardEl = sourceEl ? sourceEl.closest('[data-card]') : null;
+    var nameEl = cardEl ? cardEl.querySelector('.card-name') : null;
+    var caption = nameEl ? nameEl.textContent.replace(/^Name:\s*/, '') : '';
+    root.innerHTML = '<div class="lightbox-backdrop" id="lbBackdrop">' +
+      '<button class="lightbox-close" id="lbClose" type="button" aria-label="Close full-size view">' +
+      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>' +
+      '<img class="lightbox-img" src="' + esc(src) + '" alt="">' +
+      (caption ? '<div class="lightbox-cap">' + esc(caption) + '</div>' : '') +
+      '</div>';
+    document.getElementById('lbBackdrop').addEventListener('click', function (e) {
+      if (e.target.id === 'lbBackdrop' || e.target.closest('#lbClose')) closeLightbox();
+    });
+    document.addEventListener('keydown', lightboxEscHandler);
+  }
+  function closeLightbox() {
+    document.getElementById('lightboxRoot').innerHTML = '';
+    document.removeEventListener('keydown', lightboxEscHandler);
+  }
+
+  function confirmDelete(btn) {
+    var id = btn.getAttribute('data-del-painting');
+    if (btn.dataset.confirming) {
+      deletePainting(id);
+      return;
+    }
+    btn.dataset.confirming = '1';
+    btn.title = 'Click again to confirm';
+    btn.style.color = 'var(--sold)';
+    setTimeout(function () { btn.dataset.confirming = ''; btn.title = 'Delete'; btn.style.color = ''; }, 2500);
+  }
+
+  async function toggleSold(id) {
+    var p = state.paintings.find(function (x) { return x.id === id; });
+    if (!p) return;
+    var next = !p.sold;
+    p.sold = next; renderAll(); // optimistic
+    var res = await sb.from('paintings').update({ sold: next }).eq('id', id);
+    if (res.error) { p.sold = !next; renderAll(); toast('Could not update — try again.'); }
+  }
+  async function deletePainting(id) {
+    var idx = state.paintings.findIndex(function (x) { return x.id === id; });
+    if (idx === -1) return;
+    var removed = state.paintings[idx];
+    state.paintings.splice(idx, 1); renderAll(); // optimistic
+    var res = await sb.from('paintings').delete().eq('id', id);
+    if (res.error) { state.paintings.splice(idx, 0, removed); renderAll(); toast('Could not delete — try again.'); return; }
+    // best-effort cleanup of stored images; ignore failures
+    var paths = [removed.image_path, removed.thumb_path].filter(Boolean);
+    if (paths.length) sb.storage.from(IMAGE_BUCKET).remove(paths).catch(function () {});
+  }
+
+  /* ---------------- modals ---------------- */
+  function closeModal() { document.getElementById('modalRoot').innerHTML = ''; }
+
+  function openTabModal(tabId) {
+    var t = tabId ? tabById(tabId) : null;
+    var root = document.getElementById('modalRoot');
+    root.innerHTML = '<div class="modal-backdrop" id="tabBackdrop"><div class="modal">' +
+      '<h2>' + (t ? 'Edit tab' : 'New tab') + '</h2>' +
+      '<div class="field"><label for="tabName">Material / tab name</label><input type="text" id="tabName" value="' + esc(t ? t.name : '') + '" placeholder="e.g. Watercolour"></div>' +
+      '<div class="field"><label for="tabPrefix">Prefix</label><input type="text" id="tabPrefix" value="' + esc(t ? t.prefix : '') + '" placeholder="e.g. W- (leave blank for none)"></div>' +
+      '<p class="field-hint">The prefix applies to every piece in this tab — past and future — so changing it updates all of them.</p>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" id="tabCancel" type="button">Cancel</button>' +
+      '<button class="btn btn-primary" id="tabSave" type="button">' + (t ? 'Save' : 'Create tab') + '</button></div>' +
+      '</div></div>';
+
+    document.getElementById('tabBackdrop').addEventListener('click', function (e) { if (e.target.id === 'tabBackdrop') closeModal(); });
+    document.getElementById('tabCancel').addEventListener('click', closeModal);
+    document.getElementById('tabSave').addEventListener('click', async function () {
+      var name = document.getElementById('tabName').value.trim();
+      var prefix = document.getElementById('tabPrefix').value.trim();
+      if (!name) return;
+      if (t) {
+        t.name = name; t.prefix = prefix; renderAll();
+        var res = await sb.from('tabs').update({ name: name, prefix: prefix }).eq('id', t.id);
+        if (res.error) toast('Could not save tab.');
+      } else {
+        var order = state.tabs.length;
+        var res2 = await sb.from('tabs').insert({ name: name, prefix: prefix, order: order }).select().single();
+        if (res2.error) { toast('Could not create tab.'); }
+        else { state.tabs.push(res2.data); state.activeTabId = res2.data.id; renderAll(); }
+      }
+      closeModal();
+    });
+  }
+
+  function openPaintingModal(paintingId) {
+    var p = paintingId ? state.paintings.find(function (x) { return x.id === paintingId; }) : null;
+    var root = document.getElementById('modalRoot');
+    var tab = tabById(state.activeTabId);
+    var pendingFile = null;
+
+    root.innerHTML = '<div class="modal-backdrop" id="pBackdrop"><div class="modal">' +
+      '<h2>' + (p ? 'Edit painting' : 'Add painting · ' + esc(tab ? tab.name : '')) + '</h2>' +
+      '<div class="field"><label>Photo</label>' +
+      '<div class="upload-drop" id="uploadDrop">' +
+      (p && (p.thumb_path || p.image_path)
+        ? '<div class="upload-preview"><img src="' + esc(publicImgUrl(p.thumb_path) || publicImgUrl(p.image_path)) + '"><span>Click to replace photo</span></div>'
+        : 'Click to choose a photo — its file name will fill the number field below') +
+      '</div><input type="file" id="fileInput" accept="image/*" style="display:none"></div>' +
+      '<div class="field-row"><div class="field"><label for="pNumber">Number</label><input type="text" id="pNumber" value="' + esc(p ? p.number : '') + '" placeholder="88"></div>' +
+      '<div class="field"><label>Prefix</label><input type="text" value="' + esc(tab ? tab.prefix : '') + '" disabled></div></div>' +
+      '<div class="field"><label for="pName">Painting name</label><input type="text" id="pName" value="' + esc(p ? p.name : '') + '" placeholder="Low Tide, Taipa"></div>' +
+      '<div class="field-row"><div class="field"><label for="pDate">Date</label><input type="date" id="pDate" value="' + esc(p ? p.date : new Date().toISOString().slice(0, 10)) + '"></div>' +
+      '<div class="field"><label for="pPrice">Price</label><input type="number" id="pPrice" min="0" step="1" value="' + esc(p ? p.price : '') + '" placeholder="620"></div></div>' +
+      '<div class="field"><label for="pDesc">Description <span style="text-transform:none;font-weight:400">(optional)</span></label><textarea id="pDesc">' + esc(p ? p.description : '') + '</textarea></div>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" id="pCancel" type="button">Cancel</button>' +
+      '<button class="btn btn-primary" id="pSave" type="button">' + (p ? 'Save' : 'Add painting') + '</button></div>' +
+      '</div></div>';
+
+    document.getElementById('pBackdrop').addEventListener('click', function (e) { if (e.target.id === 'pBackdrop') closeModal(); });
+    document.getElementById('pCancel').addEventListener('click', closeModal);
+    document.getElementById('uploadDrop').addEventListener('click', function () { document.getElementById('fileInput').click(); });
+    document.getElementById('fileInput').addEventListener('change', function (e) {
+      var f = e.target.files[0];
+      if (!f) return;
+      pendingFile = f;
+      var numField = document.getElementById('pNumber');
+      if (!numField.value) numField.value = stripExt(f.name);
+      document.getElementById('uploadDrop').innerHTML =
+        '<div class="upload-preview"><img src="' + URL.createObjectURL(f) + '"><span>' + esc(f.name) + '</span></div>';
+    });
+
+    document.getElementById('pSave').addEventListener('click', async function () {
+      var saveBtn = this;
+      var name = document.getElementById('pName').value.trim();
+      var number = document.getElementById('pNumber').value.trim();
+      var date = document.getElementById('pDate').value;
+      var price = parseFloat(document.getElementById('pPrice').value);
+      var description = document.getElementById('pDesc').value.trim();
+      if (!name) { document.getElementById('pName').focus(); return; }
+
+      var data = {
+        tab_id: state.activeTabId, name: name, number: number, date: date || null,
+        price: isNaN(price) ? 0 : price, description: description,
+        sold: p ? !!p.sold : false, hue: p ? p.hue : Math.floor(Math.random() * 360)
+      };
+
+      if (pendingFile) {
+        saveBtn.textContent = 'Uploading…'; saveBtn.disabled = true;
+        try {
+          var uid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
+          var thumbBlob = await makeThumbnail(pendingFile, 480, 0.72).catch(function () { return null; });
+          var fullPath = 'full/' + uid + '-' + (pendingFile.name || 'photo.jpg');
+          var thumbPath = 'thumb/' + uid + '.jpg';
+          var uploads = [sb.storage.from(IMAGE_BUCKET).upload(fullPath, pendingFile, { upsert: true })];
+          if (thumbBlob) uploads.push(sb.storage.from(IMAGE_BUCKET).upload(thumbPath, thumbBlob, { upsert: true, contentType: 'image/jpeg' }));
+          var results = await Promise.all(uploads);
+          if (results[0].error) throw results[0].error;
+          data.image_path = fullPath;
+          data.thumb_path = (results[1] && !results[1].error) ? thumbPath : fullPath;
+        } catch (e) {
+          toast('Photo upload failed — saved without it.');
+          saveBtn.disabled = false;
+        }
+      } else if (p) {
+        data.image_path = p.image_path || null;
+        data.thumb_path = p.thumb_path || null;
+      }
+
+      saveBtn.textContent = p ? 'Save' : 'Add painting'; saveBtn.disabled = false;
+
+      if (p) {
+        var res = await sb.from('paintings').update(data).eq('id', p.id).select().single();
+        if (res.error) { toast('Could not save painting.'); }
+        else { Object.assign(p, res.data); renderAll(); }
+      } else {
+        var res2 = await sb.from('paintings').insert(data).select().single();
+        if (res2.error) { toast('Could not add painting.'); }
+        else { state.paintings.unshift(res2.data); renderAll(); }
+      }
+      closeModal();
+    });
+  }
+
+  /* ---------------- init ---------------- */
+  sb.auth.onAuthStateChange(function (_event, session) { refreshAuthFromSession(session); });
+  sb.auth.getSession().then(function (res) { refreshAuthFromSession(res.data.session); });
+  loadAll();
+})();
+</script>
+</body>
+</html>
