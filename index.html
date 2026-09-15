@@ -125,7 +125,8 @@
   .btn-ghost { background: transparent; border-color: transparent; padding: 10px 10px; }
   .btn-ghost:hover { border-color: var(--line); }
   .btn-sm { padding: 7px 11px; font-size: 12.5px; }
-  .btn-danger { color: var(--sold-2); }
+  .btn-danger { background: var(--sold-bg); border-color: var(--sold-2); color: var(--sold-2); }
+  .btn-danger:hover { background: var(--sold-2); border-color: var(--sold-2); color: var(--paper); }
   .btn[disabled] { opacity: .55; cursor: default; }
   .btn[disabled]:hover { border-color: var(--line); }
 
@@ -952,14 +953,24 @@
 
   function confirmDelete(btn) {
     var id = btn.getAttribute('data-del-painting');
-    if (btn.dataset.confirming) {
+    var p = state.paintings.find(function (x) { return x.id === id; });
+    openDeleteModal(id, p ? p.name : '');
+  }
+
+  function openDeleteModal(id, name) {
+    var root = document.getElementById('modalRoot');
+    root.innerHTML = '<div class="modal-backdrop" id="delBackdrop"><div class="modal">' +
+      '<h2>Delete painting?</h2>' +
+      '<p class="field-hint">' + (name ? '"' + esc(name) + '" will be permanently removed. ' : 'This piece will be permanently removed. ') + 'This cannot be undone.</p>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" id="delCancel" type="button">Cancel</button>' +
+      '<button class="btn btn-danger" id="delConfirm" type="button">Delete</button></div>' +
+      '</div></div>';
+    document.getElementById('delBackdrop').addEventListener('click', function (e) { if (e.target.id === 'delBackdrop') closeModal(); });
+    document.getElementById('delCancel').addEventListener('click', closeModal);
+    document.getElementById('delConfirm').addEventListener('click', function () {
+      closeModal();
       deletePainting(id);
-      return;
-    }
-    btn.dataset.confirming = '1';
-    btn.title = 'Click again to confirm';
-    btn.style.color = 'var(--sold)';
-    setTimeout(function () { btn.dataset.confirming = ''; btn.title = 'Delete'; btn.style.color = ''; }, 2500);
+    });
   }
 
   async function toggleSold(id) {
