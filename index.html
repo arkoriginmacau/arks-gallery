@@ -760,6 +760,7 @@
         '<div class="card-name"><span class="field-label">Name:</span> ' + esc(p.name || 'Untitled') + '</div>' +
         '<div class="card-meta"><span class="field-label">Number:</span> <span class="mono">' + esc(catalogNum(p)) + '</span></div>' +
         '<div class="card-meta"><span class="field-label">Date:</span> <span class="mono">' + esc(fmtDate(p.date)) + '</span></div>' +
+        (p.size ? '<div class="card-meta"><span class="field-label">Size:</span> <span class="mono">' + esc(p.size) + '</span></div>' : '') +
         (p.description ? '<div class="card-desc"><span class="field-label">Description:</span> ' + esc(p.description) + '</div>' : '') +
         '<div class="card-footer">' +
         (isAdmin
@@ -1057,6 +1058,7 @@
       '<div class="field"><label for="pName">Painting name</label><input type="text" id="pName" value="' + esc(p ? p.name : '') + '" placeholder="Low Tide, Taipa"></div>' +
       '<div class="field-row"><div class="field"><label for="pDate">Date</label><input type="date" id="pDate" value="' + esc(p ? p.date : new Date().toISOString().slice(0, 10)) + '"></div>' +
       '<div class="field"><label for="pPrice">Price</label><input type="number" id="pPrice" min="0" step="1" value="' + esc(p ? p.price : '') + '" placeholder="620"></div></div>' +
+      '<div class="field"><label for="pSize">Size <span style="text-transform:none;font-weight:400">(optional)</span></label><input type="text" id="pSize" value="' + esc(p ? p.size : '') + '" placeholder="60 x 80 cm"></div>' +
       '<div class="field"><label for="pDesc">Description <span style="text-transform:none;font-weight:400">(optional)</span></label><textarea id="pDesc">' + esc(p ? p.description : '') + '</textarea></div>' +
       '<div class="modal-actions"><button class="btn btn-ghost" id="pCancel" type="button">Cancel</button>' +
       '<button class="btn btn-primary" id="pSave" type="button">' + (p ? 'Save' : 'Add painting') + '</button></div>' +
@@ -1082,12 +1084,13 @@
       var number = document.getElementById('pNumber').value.trim();
       var date = document.getElementById('pDate').value;
       var price = parseFloat(document.getElementById('pPrice').value);
+      var size = document.getElementById('pSize').value.trim();
       var description = document.getElementById('pDesc').value.trim();
       if (!name) { document.getElementById('pName').focus(); return; }
 
       var data = {
         tab_id: state.activeTabId, name: name, number: number, date: date || null,
-        price: isNaN(price) ? 0 : price, description: description,
+        price: isNaN(price) ? 0 : price, size: size, description: description,
         sold: p ? !!p.sold : false, not_for_sale: p ? !!p.not_for_sale : false,
         hue: p ? p.hue : Math.floor(Math.random() * 360)
       };
