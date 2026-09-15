@@ -860,7 +860,7 @@
         ? '<img src="' + esc(thumbSrc) + '" alt="' + esc(p.name) + '" loading="lazy" decoding="async">'
         : '<div class="swatch" style="background:' + swatchGradient(p.hue || 30) + '"><span>' + esc((p.name || '?').charAt(0).toUpperCase()) + '</span></div>';
       return '<div class="card' + (p.sold ? ' is-sold' : '') + '" data-card="' + p.id + '">' +
-        '<div class="card-image"' + (thumbSrc ? ' data-lightbox="' + esc(fullSrc) + '" title="Click to view full size"' : '') + '>' + imageInner +
+        '<div class="card-image"' + (thumbSrc ? ' data-lightbox="' + esc(fullSrc) + '" title="' + (isEmbedded ? 'Click to view full size (opens in a new tab)' : 'Click to view full size') + '"' : '') + '>' + imageInner +
         (p.price ? '<span class="price-tag">' + fmtPrice(p.price) + '</span>' : '') +
         (p.sold
           ? '<div class="sold-slash"></div><div class="sold-stamp">Sold</div>'
@@ -1041,7 +1041,19 @@
       el.addEventListener('click', function () { confirmDelete(el); });
     });
     grid.querySelectorAll('[data-lightbox]').forEach(function (el) {
-      el.addEventListener('click', function () { openLightbox(el.getAttribute('data-lightbox'), el); });
+      el.addEventListener('click', function () {
+        var src = el.getAttribute('data-lightbox');
+        /* When embedded in someone else's page (e.g. the Wix site), this app
+           only occupies whatever box the host page gave its iframe — often
+           much smaller than the visitor's actual screen, and we have no way
+           to resize a cross-origin host's iframe from in here. A "fullscreen"
+           overlay confined to that small box just looks like a cropped,
+           broken zoom. Opening the photo in its own browser tab sidesteps
+           the whole problem: the browser's native image view always shows
+           the complete picture, however the visitor zooms. */
+        if (isEmbedded) { window.open(src, '_blank', 'noopener'); return; }
+        openLightbox(src, el);
+      });
     });
   }
 
