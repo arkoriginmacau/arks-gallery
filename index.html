@@ -524,6 +524,19 @@
     if (!m) return null;
     return parseInt(m[0], 10);
   }
+  /* Display order follows the catalogue number, not upload order —
+     editing a piece's number moves it to match, wherever it's listed.
+     Pieces with no parseable number sort after numbered ones, keeping
+     their relative order. */
+  function sortByNumber(list) {
+    return list.slice().sort(function (a, b) {
+      var na = initialNumber(a.number), nb = initialNumber(b.number);
+      if (na === null && nb === null) return 0;
+      if (na === null) return 1;
+      if (nb === null) return -1;
+      return na - nb;
+    });
+  }
   function nextNumberForTab(tabId) {
     var max = null;
     state.paintings.forEach(function (p) {
@@ -666,7 +679,7 @@
   function renderGrid() {
     var tab = tabById(state.activeTabId);
     document.getElementById('tabTitle').textContent = tab ? tab.name : (state.loaded ? 'No tabs yet' : 'Loading…');
-    var items = state.paintings.filter(function (p) { return p.tab_id === state.activeTabId; });
+    var items = sortByNumber(state.paintings.filter(function (p) { return p.tab_id === state.activeTabId; }));
     document.getElementById('tabSub').textContent = items.length + (items.length === 1 ? ' piece' : ' pieces');
 
     var grid = document.getElementById('grid');
@@ -726,11 +739,11 @@
   function printSourceItems() {
     var list = state.paintings;
     if (state.printScope === 'current') {
-      return list.filter(function (p) { return p.tab_id === state.activeTabId; })
+      return sortByNumber(list.filter(function (p) { return p.tab_id === state.activeTabId; }))
         .map(function (p) { return { p: p, tabName: (tabById(p.tab_id) || {}).name || '' }; });
     }
     return state.tabs.reduce(function (acc, t) {
-      var items = list.filter(function (p) { return p.tab_id === t.id; });
+      var items = sortByNumber(list.filter(function (p) { return p.tab_id === t.id; }));
       return acc.concat(items.map(function (p) { return { p: p, tabName: t.name }; }));
     }, []);
   }
