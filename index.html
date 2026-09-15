@@ -861,7 +861,7 @@
         : '<div class="swatch" style="background:' + swatchGradient(p.hue || 30) + '"><span>' + esc((p.name || '?').charAt(0).toUpperCase()) + '</span></div>';
       return '<div class="card' + (p.sold ? ' is-sold' : '') + '" data-card="' + p.id + '">' +
         '<div class="card-image"' + (thumbSrc ? ' data-lightbox="' + esc(fullSrc) + '" title="Click to view full size"' : '') + '>' + imageInner +
-        '<span class="price-tag">' + fmtPrice(p.price) + '</span>' +
+        (p.price ? '<span class="price-tag">' + fmtPrice(p.price) + '</span>' : '') +
         (p.sold
           ? '<div class="sold-slash"></div><div class="sold-stamp">Sold</div>'
           : (p.not_for_sale ? '<div class="notforsale-slash"></div><div class="notforsale-stamp">Not for sale</div>' : '')) +
@@ -942,7 +942,7 @@
           '<div class="p-info"><div class="p-name"><span class="p-label">Name:</span> ' + esc(p.name || 'Untitled') + '</div>' +
           (p.description ? '<div class="p-desc"><span class="p-label">Description:</span> ' + esc(p.description) + '</div>' : '') +
           '<div class="p-date-line"><span class="p-label">Date:</span> ' + esc(fmtDate(p.date)) + '</div></div>' +
-          '<div class="p-price">' + fmtPrice(p.price) + '</div>' +
+          '<div class="p-price">' + (p.price ? fmtPrice(p.price) : '') + '</div>' +
           '<div class="p-sold-mark">' + (p.sold ? 'SOLD' : '') + '</div>' +
           '</div>';
       }).join('') || '<p style="color:#9a9285;font-size:12px;padding:8mm 0;">No pieces to list yet.</p>';
