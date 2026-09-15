@@ -272,8 +272,19 @@
   .lightbox-backdrop {
     position: fixed; inset: 0; background: rgba(12, 10, 8, .92); z-index: 90;
     display: flex; align-items: center; justify-content: center; padding: 5vh 5vw;
+    overflow: hidden;
   }
-  .lightbox-img { max-width: 100%; max-height: 90vh; object-fit: contain; border-radius: 3px; box-shadow: 0 10px 50px rgba(0,0,0,.5); }
+  .lightbox-img {
+    max-width: 100%; max-height: 90vh; object-fit: contain; border-radius: 3px;
+    box-shadow: 0 10px 50px rgba(0,0,0,.5); cursor: zoom-in;
+    transition: transform .18s ease; transform-origin: center center;
+  }
+  .lightbox-img.zoomed { cursor: zoom-out; }
+  .lightbox-zoom-hint {
+    position: absolute; right: 26px; bottom: 22px; color: rgba(255,255,255,.55);
+    font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; letter-spacing: .02em;
+    pointer-events: none;
+  }
   .lightbox-close {
     position: absolute; top: 22px; right: 26px; width: 40px; height: 40px; border-radius: 50%;
     background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.28); color: #fff;
@@ -613,16 +624,28 @@
     return 'linear-gradient(135deg, hsl(' + hue + ' 46% 42%), hsl(' + ((hue + 40) % 360) + ' 40% 28%))';
   }
 
+  /* Maps a blob's MIME type to the file extension that actually matches its
+     bytes, so a downloaded file never lies about its own format. */
+  function extForType(mimeType, fallbackName) {
+    if (mimeType === 'image/webp') return '.webp';
+    if (mimeType === 'image/jpeg') return '.jpg';
+    if (mimeType === 'image/png') return '.png';
+    var m = String(fallbackName || '').match(/\.[^.]+$/);
+    return m ? m[0] : '.jpg';
+  }
+
   /* Decodes a photo once and produces two uploads from it:
        - thumb: a small JPEG for the grid/list view (unchanged behaviour).
        - full: the SAME pixel dimensions as the original, but re-encoded
-         through canvas as a tightly-compressed JPEG. Camera-original photos
-         are routinely 30-60MB even though the pixel count doesn't need
-         anywhere near that many bytes — that bloat is almost always bulky
-         EXIF/ICC/embedded-preview data plus a conservative camera encoder,
-         and re-encoding at quality 0.9 strips all of that while keeping
-         resolution identical. If a photo has extreme megapixels the quality
-         is stepped down (never the dimensions) until it's a sane upload
+         through canvas as WebP (falling back to JPEG if the browser can't
+         produce a WebP blob). Camera-original photos are routinely
+         30-60MB even though the pixel count doesn't need anywhere near
+         that many bytes — that bloat is almost always bulky EXIF/ICC/
+         embedded-preview data plus a conservative camera encoder, and
+         WebP's own compression is typically 25-35% smaller than JPEG at
+         the same visual quality on top of that. Resolution is never
+         touched. If a photo has extreme megapixels the quality is
+         stepped down (never the dimensions) until it's a sane upload
          size. Falls back to the original file untouched if re-encoding
          fails (e.g. HEIC the browser can't decode) or doesn't actually
          save space. */
@@ -650,25 +673,31 @@
         thumbCanvas.getContext('2d').drawImage(img, 0, 0, tw, th);
 
         var MAX_FULL_BYTES = 15 * 1024 * 1024;
+        function finishFull(fullBlob) {
+          thumbCanvas.toBlob(function (thumbBlob) {
+            URL.revokeObjectURL(url);
+            var reencoded = !!fullBlob && fullBlob.size < file.size;
+            resolve({
+              fullBlob: reencoded ? fullBlob : file,
+              thumbBlob: thumbBlob || null,
+              reencoded: reencoded
+            });
+          }, 'image/jpeg', thumbQuality || 0.72);
+        }
+        function encodeFullJpegFallback() {
+          fullCanvas.toBlob(function (jpegBlob) { finishFull(jpegBlob); }, 'image/jpeg', 0.9);
+        }
         function encodeFull(quality, attempts) {
           fullCanvas.toBlob(function (fullBlob) {
-            if (!fullBlob) { URL.revokeObjectURL(url); resolve(fallback); return; }
+            if (!fullBlob) { encodeFullJpegFallback(); return; } // browser can't encode WebP — fall back to JPEG
             if (fullBlob.size > MAX_FULL_BYTES && quality > 0.6 && attempts < 4) {
               encodeFull(quality - 0.1, attempts + 1);
               return;
             }
-            thumbCanvas.toBlob(function (thumbBlob) {
-              URL.revokeObjectURL(url);
-              var reencoded = fullBlob.size < file.size;
-              resolve({
-                fullBlob: reencoded ? fullBlob : file,
-                thumbBlob: thumbBlob || null,
-                reencoded: reencoded
-              });
-            }, 'image/jpeg', thumbQuality || 0.72);
-          }, 'image/jpeg', quality);
+            finishFull(fullBlob);
+          }, 'image/webp', quality);
         }
-        encodeFull(0.9, 0);
+        encodeFull(0.85, 0);
       };
       img.onerror = function () { URL.revokeObjectURL(url); resolve(fallback); };
       img.src = url;
@@ -1025,13 +1054,52 @@
     root.innerHTML = '<div class="lightbox-backdrop" id="lbBackdrop">' +
       '<button class="lightbox-close" id="lbClose" type="button" aria-label="Close full-size view">' +
       '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>' +
-      '<img class="lightbox-img" src="' + esc(src) + '" alt="">' +
+      '<img class="lightbox-img" id="lbImg" src="' + esc(src) + '" alt="">' +
       (caption ? '<div class="lightbox-cap">' + esc(caption) + '</div>' : '') +
+      '<div class="lightbox-zoom-hint" id="lbZoomHint">Click image to zoom</div>' +
       '</div>';
     document.getElementById('lbBackdrop').addEventListener('click', function (e) {
       if (e.target.id === 'lbBackdrop' || e.target.closest('#lbClose')) closeLightbox();
     });
     document.addEventListener('keydown', lightboxEscHandler);
+
+    /* Click to zoom toward the clicked point (transform-origin does the work),
+       then move the mouse (or drag a finger) over the zoomed image to pan
+       around and inspect detail — no separate pan gesture to learn. */
+    var lbImg = document.getElementById('lbImg');
+    var hintEl = document.getElementById('lbZoomHint');
+    var ZOOM_SCALE = 2.5;
+    var zoomed = false;
+    function setOriginFromPoint(clientX, clientY) {
+      var rect = lbImg.getBoundingClientRect();
+      var px = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+      var py = Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100));
+      lbImg.style.transformOrigin = px + '% ' + py + '%';
+    }
+    lbImg.addEventListener('click', function (e) {
+      if (!zoomed) {
+        setOriginFromPoint(e.clientX, e.clientY);
+        lbImg.classList.add('zoomed');
+        lbImg.style.transform = 'scale(' + ZOOM_SCALE + ')';
+        zoomed = true;
+        if (hintEl) hintEl.textContent = 'Move to explore · click to reset';
+      } else {
+        lbImg.classList.remove('zoomed');
+        lbImg.style.transform = 'scale(1)';
+        lbImg.style.transformOrigin = 'center center';
+        zoomed = false;
+        if (hintEl) hintEl.textContent = 'Click image to zoom';
+      }
+    });
+    lbImg.addEventListener('mousemove', function (e) {
+      if (zoomed) setOriginFromPoint(e.clientX, e.clientY);
+    });
+    lbImg.addEventListener('touchmove', function (e) {
+      if (zoomed && e.touches && e.touches[0]) {
+        setOriginFromPoint(e.touches[0].clientX, e.touches[0].clientY);
+        e.preventDefault();
+      }
+    }, { passive: false });
   }
   function closeLightbox() {
     document.getElementById('lightboxRoot').innerHTML = '';
@@ -1184,7 +1252,8 @@
         try {
           var uid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
           var processed = await processPhoto(pendingFile, 480, 0.72);
-          var fullPath = 'full/' + uid + '-' + (pendingFile.name || 'photo.jpg');
+          var fullBase = (pendingFile.name || 'photo').replace(/\.[^.]+$/, '');
+          var fullPath = 'full/' + uid + '-' + fullBase + extForType(processed.fullBlob.type, pendingFile.name);
           var thumbPath = 'thumb/' + uid + '.jpg';
           var uploads = [sb.storage.from(IMAGE_BUCKET).upload(fullPath, processed.fullBlob, { upsert: true, contentType: processed.fullBlob.type || pendingFile.type || 'image/jpeg' })];
           if (processed.thumbBlob) uploads.push(sb.storage.from(IMAGE_BUCKET).upload(thumbPath, processed.thumbBlob, { upsert: true, contentType: 'image/jpeg' }));
@@ -1259,7 +1328,8 @@
       try {
         var uid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
         var processed = await processPhoto(f, 480, 0.72);
-        var fullPath = 'full/' + uid + '-' + (f.name || 'photo.jpg');
+        var fullBase = (f.name || 'photo').replace(/\.[^.]+$/, '');
+        var fullPath = 'full/' + uid + '-' + fullBase + extForType(processed.fullBlob.type, f.name);
         var thumbPath = 'thumb/' + uid + '.jpg';
         var uploads = [sb.storage.from(IMAGE_BUCKET).upload(fullPath, processed.fullBlob, { upsert: true, contentType: processed.fullBlob.type || f.type || 'image/jpeg' })];
         if (processed.thumbBlob) uploads.push(sb.storage.from(IMAGE_BUCKET).upload(thumbPath, processed.thumbBlob, { upsert: true, contentType: 'image/jpeg' }));
