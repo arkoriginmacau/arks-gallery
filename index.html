@@ -613,26 +613,64 @@
     return 'linear-gradient(135deg, hsl(' + hue + ' 46% 42%), hsl(' + ((hue + 40) % 360) + ' 40% 28%))';
   }
 
-  /* Downscale a photo to a small JPEG for the card/list thumbnail, so browsing
-     never has to load full-resolution camera photos. The original file is kept
-     untouched and uploaded separately for the click-to-enlarge view. */
-  function makeThumbnail(file, maxDim, quality) {
-    return new Promise(function (resolve, reject) {
+  /* Decodes a photo once and produces two uploads from it:
+       - thumb: a small JPEG for the grid/list view (unchanged behaviour).
+       - full: the SAME pixel dimensions as the original, but re-encoded
+         through canvas as a tightly-compressed JPEG. Camera-original photos
+         are routinely 30-60MB even though the pixel count doesn't need
+         anywhere near that many bytes — that bloat is almost always bulky
+         EXIF/ICC/embedded-preview data plus a conservative camera encoder,
+         and re-encoding at quality 0.9 strips all of that while keeping
+         resolution identical. If a photo has extreme megapixels the quality
+         is stepped down (never the dimensions) until it's a sane upload
+         size. Falls back to the original file untouched if re-encoding
+         fails (e.g. HEIC the browser can't decode) or doesn't actually
+         save space. */
+  function processPhoto(file, thumbMaxDim, thumbQuality) {
+    return new Promise(function (resolve) {
+      var fallback = { fullBlob: file, thumbBlob: null, reencoded: false };
+      if (!file || !/^image\//.test(file.type) || file.type === 'image/gif' || file.type === 'image/svg+xml') {
+        resolve(fallback);
+        return;
+      }
       var img = new Image();
       var url = URL.createObjectURL(file);
       img.onload = function () {
         var w = img.naturalWidth, h = img.naturalHeight;
-        var scale = Math.min(1, maxDim / Math.max(w, h));
-        var cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
-        var canvas = document.createElement('canvas');
-        canvas.width = cw; canvas.height = ch;
-        canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
-        canvas.toBlob(function (blob) {
-          URL.revokeObjectURL(url);
-          if (blob) resolve(blob); else reject(new Error('thumbnail encode failed'));
-        }, 'image/jpeg', quality || 0.72);
+        if (!w || !h) { URL.revokeObjectURL(url); resolve(fallback); return; }
+
+        var fullCanvas = document.createElement('canvas');
+        fullCanvas.width = w; fullCanvas.height = h;
+        fullCanvas.getContext('2d').drawImage(img, 0, 0, w, h);
+
+        var tScale = Math.min(1, thumbMaxDim / Math.max(w, h));
+        var tw = Math.max(1, Math.round(w * tScale)), th = Math.max(1, Math.round(h * tScale));
+        var thumbCanvas = document.createElement('canvas');
+        thumbCanvas.width = tw; thumbCanvas.height = th;
+        thumbCanvas.getContext('2d').drawImage(img, 0, 0, tw, th);
+
+        var MAX_FULL_BYTES = 15 * 1024 * 1024;
+        function encodeFull(quality, attempts) {
+          fullCanvas.toBlob(function (fullBlob) {
+            if (!fullBlob) { URL.revokeObjectURL(url); resolve(fallback); return; }
+            if (fullBlob.size > MAX_FULL_BYTES && quality > 0.6 && attempts < 4) {
+              encodeFull(quality - 0.1, attempts + 1);
+              return;
+            }
+            thumbCanvas.toBlob(function (thumbBlob) {
+              URL.revokeObjectURL(url);
+              var reencoded = fullBlob.size < file.size;
+              resolve({
+                fullBlob: reencoded ? fullBlob : file,
+                thumbBlob: thumbBlob || null,
+                reencoded: reencoded
+              });
+            }, 'image/jpeg', thumbQuality || 0.72);
+          }, 'image/jpeg', quality);
+        }
+        encodeFull(0.9, 0);
       };
-      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('image decode failed')); };
+      img.onerror = function () { URL.revokeObjectURL(url); resolve(fallback); };
       img.src = url;
     });
   }
@@ -1145,11 +1183,11 @@
         saveBtn.textContent = 'Uploading…'; saveBtn.disabled = true;
         try {
           var uid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
-          var thumbBlob = await makeThumbnail(pendingFile, 480, 0.72).catch(function () { return null; });
+          var processed = await processPhoto(pendingFile, 480, 0.72);
           var fullPath = 'full/' + uid + '-' + (pendingFile.name || 'photo.jpg');
           var thumbPath = 'thumb/' + uid + '.jpg';
-          var uploads = [sb.storage.from(IMAGE_BUCKET).upload(fullPath, pendingFile, { upsert: true })];
-          if (thumbBlob) uploads.push(sb.storage.from(IMAGE_BUCKET).upload(thumbPath, thumbBlob, { upsert: true, contentType: 'image/jpeg' }));
+          var uploads = [sb.storage.from(IMAGE_BUCKET).upload(fullPath, processed.fullBlob, { upsert: true, contentType: processed.fullBlob.type || pendingFile.type || 'image/jpeg' })];
+          if (processed.thumbBlob) uploads.push(sb.storage.from(IMAGE_BUCKET).upload(thumbPath, processed.thumbBlob, { upsert: true, contentType: 'image/jpeg' }));
           var results = await Promise.all(uploads);
           if (results[0].error) throw results[0].error;
           data.image_path = fullPath;
@@ -1220,11 +1258,11 @@
       if (fillEl) fillEl.style.width = Math.round((i / total) * 100) + '%';
       try {
         var uid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
-        var thumbBlob = await makeThumbnail(f, 480, 0.72).catch(function () { return null; });
+        var processed = await processPhoto(f, 480, 0.72);
         var fullPath = 'full/' + uid + '-' + (f.name || 'photo.jpg');
         var thumbPath = 'thumb/' + uid + '.jpg';
-        var uploads = [sb.storage.from(IMAGE_BUCKET).upload(fullPath, f, { upsert: true })];
-        if (thumbBlob) uploads.push(sb.storage.from(IMAGE_BUCKET).upload(thumbPath, thumbBlob, { upsert: true, contentType: 'image/jpeg' }));
+        var uploads = [sb.storage.from(IMAGE_BUCKET).upload(fullPath, processed.fullBlob, { upsert: true, contentType: processed.fullBlob.type || f.type || 'image/jpeg' })];
+        if (processed.thumbBlob) uploads.push(sb.storage.from(IMAGE_BUCKET).upload(thumbPath, processed.thumbBlob, { upsert: true, contentType: 'image/jpeg' }));
         var results = await Promise.all(uploads);
         if (results[0].error) throw results[0].error;
         var data = {
