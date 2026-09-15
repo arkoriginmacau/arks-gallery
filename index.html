@@ -190,6 +190,12 @@
     display: flex; justify-content: space-between; align-items: center; gap: 12px;
     margin-bottom: 18px; flex-wrap: wrap;
   }
+  /* .btn-ghost's default text color is tuned for the --paper-2 (card)
+     surface; buttons here sit directly on the --paper panel instead,
+     so they need the ink shade tuned for that surface or they can turn
+     invisible on light themes. */
+  .grid-toolbar .btn-ghost { color: var(--ink-soft); border-color: var(--line); }
+  .grid-toolbar .btn-ghost:hover { border-color: var(--ochre); color: var(--ink); }
   .grid-toolbar .tab-title { font-size: 20px; font-weight: 600; margin: 0; }
   .grid-toolbar .tab-sub { color: var(--ink-soft); font-size: 13px; margin-top: 2px; }
 
