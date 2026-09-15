@@ -270,12 +270,13 @@
   .nfs-toggle.active { background: var(--not-for-sale); border-color: var(--not-for-sale); }
 
   .lightbox-backdrop {
-    position: fixed; inset: 0; background: rgba(12, 10, 8, .92); z-index: 90;
-    display: flex; align-items: center; justify-content: center; padding: 5vh 5vw;
+    position: fixed; left: 0; top: 0; width: 100%; height: 100%; box-sizing: border-box;
+    background: rgba(12, 10, 8, .92); z-index: 90;
+    display: flex; align-items: center; justify-content: center; padding: 5%;
     overflow: hidden;
   }
   .lightbox-img {
-    max-width: 100%; max-height: 90vh; object-fit: contain; border-radius: 3px;
+    max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 3px;
     box-shadow: 0 10px 50px rgba(0,0,0,.5); cursor: zoom-in;
     transition: transform .18s ease; transform-origin: center center;
   }
@@ -1046,6 +1047,27 @@
 
   /* ---------------- lightbox (full-size view, never affects card layout) ---------------- */
   function lightboxEscHandler(e) { if (e.key === 'Escape') closeLightbox(); }
+  /* Mobile browsers (iOS Safari in particular) keep a "fixed" element pinned
+     to the layout viewport, not the visual one — so once the page is pinch-
+     zoomed, a plain position:fixed;inset:0 overlay drifts out of alignment
+     and only part of it (and so only part of the painting) stays on screen.
+     Actively sizing/positioning the backdrop from window.visualViewport
+     keeps it exactly matching whatever is actually visible, at any zoom
+     level, on any device. */
+  function syncLightboxToViewport() {
+    var backdrop = document.getElementById('lbBackdrop');
+    if (!backdrop) return;
+    var vv = window.visualViewport;
+    if (vv) {
+      backdrop.style.width = vv.width + 'px';
+      backdrop.style.height = vv.height + 'px';
+      backdrop.style.left = vv.offsetLeft + 'px';
+      backdrop.style.top = vv.offsetTop + 'px';
+    } else {
+      backdrop.style.width = '100%'; backdrop.style.height = '100%';
+      backdrop.style.left = '0'; backdrop.style.top = '0';
+    }
+  }
   function openLightbox(src, sourceEl) {
     var root = document.getElementById('lightboxRoot');
     var cardEl = sourceEl ? sourceEl.closest('[data-card]') : null;
@@ -1062,6 +1084,11 @@
       if (e.target.id === 'lbBackdrop' || e.target.closest('#lbClose')) closeLightbox();
     });
     document.addEventListener('keydown', lightboxEscHandler);
+    syncLightboxToViewport();
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', syncLightboxToViewport);
+      window.visualViewport.addEventListener('scroll', syncLightboxToViewport);
+    }
 
     /* Click to zoom toward the clicked point (transform-origin does the work),
        then move the mouse (or drag a finger) over the zoomed image to pan
@@ -1104,6 +1131,10 @@
   function closeLightbox() {
     document.getElementById('lightboxRoot').innerHTML = '';
     document.removeEventListener('keydown', lightboxEscHandler);
+    if (window.visualViewport) {
+      window.visualViewport.removeEventListener('resize', syncLightboxToViewport);
+      window.visualViewport.removeEventListener('scroll', syncLightboxToViewport);
+    }
   }
 
   function confirmDelete(btn) {
