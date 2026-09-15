@@ -513,6 +513,26 @@
     var t = tabById(p.tab_id);
     return ((t && t.prefix) || '') + (p.number || '');
   }
+
+  /* Numbers are usually plain ("13"), but some pieces use a compound
+     format like "06-1-1-4" (initial number 06, set 1, piece 1 of 4).
+     For sequencing we only care about that leading initial number —
+     the set/piece parts are ignored for now. */
+  function initialNumber(raw) {
+    if (raw === null || raw === undefined) return null;
+    var m = String(raw).match(/\d+/);
+    if (!m) return null;
+    return parseInt(m[0], 10);
+  }
+  function nextNumberForTab(tabId) {
+    var max = null;
+    state.paintings.forEach(function (p) {
+      if (p.tab_id !== tabId) return;
+      var n = initialNumber(p.number);
+      if (n !== null && (max === null || n > max)) max = n;
+    });
+    return max === null ? '1' : String(max + 1);
+  }
   function stripExt(name) { return name.replace(/\.[^.]+$/, ''); }
   function publicImgUrl(path) {
     if (!path) return null;
@@ -944,6 +964,7 @@
     var root = document.getElementById('modalRoot');
     var tab = tabById(state.activeTabId);
     var pendingFile = null;
+    var suggestedNumber = p ? '' : nextNumberForTab(state.activeTabId);
 
     root.innerHTML = '<div class="modal-backdrop" id="pBackdrop"><div class="modal">' +
       '<h2>' + (p ? 'Edit painting' : 'Add painting · ' + esc(tab ? tab.name : '')) + '</h2>' +
@@ -953,7 +974,7 @@
         ? '<div class="upload-preview"><img src="' + esc(publicImgUrl(p.thumb_path) || publicImgUrl(p.image_path)) + '"><span>Click to replace photo</span></div>'
         : 'Click to choose a photo — its file name will fill the number field below') +
       '</div><input type="file" id="fileInput" accept="image/*" style="display:none"></div>' +
-      '<div class="field-row"><div class="field"><label for="pNumber">Number</label><input type="text" id="pNumber" value="' + esc(p ? p.number : '') + '" placeholder="88"></div>' +
+      '<div class="field-row"><div class="field"><label for="pNumber">Number</label><input type="text" id="pNumber" value="' + esc(p ? p.number : suggestedNumber) + '" data-auto="' + (p ? '0' : '1') + '" placeholder="88"></div>' +
       '<div class="field"><label>Prefix</label><input type="text" value="' + esc(tab ? tab.prefix : '') + '" disabled></div></div>' +
       '<div class="field"><label for="pName">Painting name</label><input type="text" id="pName" value="' + esc(p ? p.name : '') + '" placeholder="Low Tide, Taipa"></div>' +
       '<div class="field-row"><div class="field"><label for="pDate">Date</label><input type="date" id="pDate" value="' + esc(p ? p.date : new Date().toISOString().slice(0, 10)) + '"></div>' +
@@ -966,12 +987,13 @@
     document.getElementById('pBackdrop').addEventListener('click', function (e) { if (e.target.id === 'pBackdrop') closeModal(); });
     document.getElementById('pCancel').addEventListener('click', closeModal);
     document.getElementById('uploadDrop').addEventListener('click', function () { document.getElementById('fileInput').click(); });
+    document.getElementById('pNumber').addEventListener('input', function () { this.dataset.auto = '0'; });
     document.getElementById('fileInput').addEventListener('change', function (e) {
       var f = e.target.files[0];
       if (!f) return;
       pendingFile = f;
       var numField = document.getElementById('pNumber');
-      if (!numField.value) numField.value = stripExt(f.name);
+      if (!numField.value || numField.dataset.auto === '1') numField.value = stripExt(f.name);
       document.getElementById('uploadDrop').innerHTML =
         '<div class="upload-preview"><img src="' + URL.createObjectURL(f) + '"><span>' + esc(f.name) + '</span></div>';
     });
