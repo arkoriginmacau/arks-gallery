@@ -346,6 +346,26 @@
     background: var(--paper); border: 1px solid var(--line); border-radius: 6px;
     width: 100%; max-width: 440px; padding: 26px; margin-bottom: 40px;
   }
+  .modal.modal-wide { max-width: 720px; }
+  .pdf-diff-scroll {
+    max-height: 320px; overflow-y: auto; border: 1px solid var(--line);
+    border-radius: 4px; margin-bottom: 4px;
+  }
+  .pdf-diff-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .pdf-diff-table th, .pdf-diff-table td {
+    padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top;
+  }
+  .pdf-diff-table th {
+    position: sticky; top: 0; background: var(--paper); font-size: 11px;
+    text-transform: uppercase; letter-spacing: .04em; color: var(--ink-soft);
+  }
+  .pdf-diff-old { display: block; color: var(--ink-soft); text-decoration: line-through; }
+  .pdf-diff-new { display: block; color: var(--ink-2); font-weight: 600; }
+  .bulk-progress-track {
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 4px;
+    height: 10px; overflow: hidden; margin: 4px 0 4px;
+  }
+  .bulk-progress-fill { background: var(--ochre); height: 100%; transition: width .2s ease; }
   .modal h2 { font-size: 19px; margin: 0 0 8px; font-weight: 600; }
   .modal p.modal-sub { font-size: 12.5px; color: var(--ink-soft); margin: 0 0 18px; }
   .field { margin-bottom: 14px; display: flex; flex-direction: column; gap: 5px; }
@@ -480,6 +500,7 @@
 <div class="toast-root" id="toastRoot"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
 (function () {
   "use strict";
@@ -495,6 +516,9 @@
   var IMAGE_BUCKET = 'gallery-images';
 
   var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
 
   var state = { tabs: [], paintings: [], activeTabId: null, printMode: 'A4', printRows: 8, printScope: 'current', loaded: false };
   var isAdmin = false;
@@ -666,6 +690,10 @@
     if (isAdmin) {
       el.innerHTML = printBtn +
         '<button class="btn btn-ghost btn-sm" id="btnTheme" type="button" title="Change site colors">Theme</button>' +
+        '<button class="btn btn-ghost btn-sm" id="btnBulkUpload" type="button" title="Add several photos at once">Bulk upload</button>' +
+        '<input type="file" id="bulkFileInput" accept="image/*" multiple style="display:none">' +
+        '<button class="btn btn-ghost btn-sm" id="btnPdfSync" type="button" title="Fill in names and sizes from an inventory PDF">Update from PDF</button>' +
+        '<input type="file" id="pdfFileInput" accept="application/pdf" style="display:none">' +
         '<button class="btn btn-primary" id="btnAddPainting" type="button">' +
         '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>Add painting</button>' +
         '<span class="admin-pill"><span class="dot"></span>' + esc(currentUserEmail) + '</span>' +
@@ -674,6 +702,25 @@
       document.getElementById('btnAddPainting').addEventListener('click', function () {
         if (!state.activeTabId) { openTabModal(); return; }
         openPaintingModal();
+      });
+      document.getElementById('btnBulkUpload').addEventListener('click', function () {
+        if (!state.activeTabId) { openTabModal(); return; }
+        document.getElementById('bulkFileInput').click();
+      });
+      document.getElementById('bulkFileInput').addEventListener('change', function (e) {
+        var files = Array.prototype.slice.call(e.target.files || []);
+        e.target.value = '';
+        if (!files.length) return;
+        openBulkConfirmModal(files);
+      });
+      document.getElementById('btnPdfSync').addEventListener('click', function () {
+        document.getElementById('pdfFileInput').click();
+      });
+      document.getElementById('pdfFileInput').addEventListener('change', function (e) {
+        var f = e.target.files[0];
+        e.target.value = '';
+        if (!f) return;
+        runPdfSync(f);
       });
       document.getElementById('btnSignOut').addEventListener('click', signOut);
     } else if (isEmbedded) {
@@ -1055,7 +1102,7 @@
       '</div><input type="file" id="fileInput" accept="image/*" style="display:none"></div>' +
       '<div class="field-row"><div class="field"><label for="pNumber">Number</label><input type="text" id="pNumber" value="' + esc(p ? p.number : suggestedNumber) + '" data-auto="' + (p ? '0' : '1') + '" placeholder="88"></div>' +
       '<div class="field"><label>Prefix</label><input type="text" value="' + esc(tab ? tab.prefix : '') + '" disabled></div></div>' +
-      '<div class="field"><label for="pName">Painting name</label><input type="text" id="pName" value="' + esc(p ? p.name : '') + '" placeholder="Low Tide, Taipa"></div>' +
+      '<div class="field"><label for="pName">Painting name <span style="text-transform:none;font-weight:400">(optional)</span></label><input type="text" id="pName" value="' + esc(p ? p.name : '') + '" placeholder="Low Tide, Taipa"></div>' +
       '<div class="field-row"><div class="field"><label for="pDate">Date</label><input type="date" id="pDate" value="' + esc(p ? p.date : new Date().toISOString().slice(0, 10)) + '"></div>' +
       '<div class="field"><label for="pPrice">Price</label><input type="number" id="pPrice" min="0" step="1" value="' + esc(p ? p.price : '') + '" placeholder="620"></div></div>' +
       '<div class="field"><label for="pSize">Size <span style="text-transform:none;font-weight:400">(optional)</span></label><input type="text" id="pSize" value="' + esc(p ? p.size : '') + '" placeholder="60 x 80 cm"></div>' +
@@ -1086,7 +1133,6 @@
       var price = parseFloat(document.getElementById('pPrice').value);
       var size = document.getElementById('pSize').value.trim();
       var description = document.getElementById('pDesc').value.trim();
-      if (!name) { document.getElementById('pName').focus(); return; }
 
       var data = {
         tab_id: state.activeTabId, name: name, number: number, date: date || null,
@@ -1130,6 +1176,239 @@
       }
       closeModal();
     });
+  }
+
+  /* ---------------- bulk upload ---------------- */
+  function openBulkConfirmModal(files) {
+    var tab = tabById(state.activeTabId);
+    var root = document.getElementById('modalRoot');
+    root.innerHTML = '<div class="modal-backdrop" id="bulkConfirmBackdrop"><div class="modal">' +
+      '<h2>Bulk upload ' + files.length + ' photo' + (files.length === 1 ? '' : 's') + '?</h2>' +
+      '<p class="field-hint">Each photo will be added as a new painting in "' + esc(tab ? tab.name : '') +
+      '", using its file name as the catalogue number. No name will be set — use "Update from PDF" ' +
+      'afterwards, or edit each piece by hand, to fill in the name and size.</p>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" id="bulkConfirmCancel" type="button">Cancel</button>' +
+      '<button class="btn btn-primary" id="bulkConfirmGo" type="button">Upload</button></div>' +
+      '</div></div>';
+    document.getElementById('bulkConfirmBackdrop').addEventListener('click', function (e) { if (e.target.id === 'bulkConfirmBackdrop') closeModal(); });
+    document.getElementById('bulkConfirmCancel').addEventListener('click', closeModal);
+    document.getElementById('bulkConfirmGo').addEventListener('click', function () { runBulkUpload(files); });
+  }
+
+  async function runBulkUpload(files) {
+    var tabId = state.activeTabId;
+    var total = files.length;
+    var cancelled = false;
+    var root = document.getElementById('modalRoot');
+    root.innerHTML = '<div class="modal-backdrop" id="bulkBackdrop"><div class="modal">' +
+      '<h2>Uploading photos…</h2>' +
+      '<p class="field-hint" id="bulkStatus">Starting…</p>' +
+      '<div class="bulk-progress-track"><div class="bulk-progress-fill" id="bulkProgressFill" style="width:0%"></div></div>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" id="bulkStop" type="button">Stop</button></div>' +
+      '</div></div>';
+    document.getElementById('bulkStop').addEventListener('click', function () {
+      cancelled = true; this.disabled = true; this.textContent = 'Stopping…';
+    });
+
+    var added = 0, failed = 0;
+    for (var i = 0; i < total; i++) {
+      if (cancelled) break;
+      var f = files[i];
+      var statusEl = document.getElementById('bulkStatus');
+      if (statusEl) statusEl.textContent = 'Uploading ' + (i + 1) + ' of ' + total + ' — ' + f.name;
+      var fillEl = document.getElementById('bulkProgressFill');
+      if (fillEl) fillEl.style.width = Math.round((i / total) * 100) + '%';
+      try {
+        var uid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
+        var thumbBlob = await makeThumbnail(f, 480, 0.72).catch(function () { return null; });
+        var fullPath = 'full/' + uid + '-' + (f.name || 'photo.jpg');
+        var thumbPath = 'thumb/' + uid + '.jpg';
+        var uploads = [sb.storage.from(IMAGE_BUCKET).upload(fullPath, f, { upsert: true })];
+        if (thumbBlob) uploads.push(sb.storage.from(IMAGE_BUCKET).upload(thumbPath, thumbBlob, { upsert: true, contentType: 'image/jpeg' }));
+        var results = await Promise.all(uploads);
+        if (results[0].error) throw results[0].error;
+        var data = {
+          tab_id: tabId, name: '', number: stripExt(f.name), date: null,
+          price: 0, size: '', description: '', sold: false, not_for_sale: false,
+          hue: Math.floor(Math.random() * 360),
+          image_path: fullPath,
+          thumb_path: (results[1] && !results[1].error) ? thumbPath : fullPath
+        };
+        var res = await sb.from('paintings').insert(data).select().single();
+        if (res.error) throw res.error;
+        state.paintings.unshift(res.data);
+        added++;
+      } catch (e) {
+        failed++;
+      }
+    }
+    var fillEl2 = document.getElementById('bulkProgressFill');
+    if (fillEl2) fillEl2.style.width = '100%';
+    closeModal();
+    renderAll();
+    toast(added + ' photo' + (added === 1 ? '' : 's') + ' added' +
+      (failed ? ', ' + failed + ' failed' : '') +
+      (cancelled ? ' (stopped early)' : '') + '.');
+  }
+
+  /* ---------------- update from PDF ----------------
+     The inventory PDF lists rows like "O-06-1.1/4  Some Painting Name  60 x 80 cm",
+     one per line once the page text is reconstructed. Some rows have no usable
+     size ("Dont Exist", "not done", trailing placeholder dashes) — those are still
+     parsed and kept (with size: null) rather than skipped, since they're still
+     part of the list and may still carry a name correction. */
+  async function extractPdfLines(file) {
+    var buf = await file.arrayBuffer();
+    var pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    var lines = [];
+    for (var pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      var page = await pdf.getPage(pageNum);
+      var content = await page.getTextContent();
+      var current = '';
+      content.items.forEach(function (item) {
+        current += item.str;
+        if (item.hasEOL) { lines.push(current); current = ''; }
+      });
+      if (current) lines.push(current);
+    }
+    return lines;
+  }
+
+  function parseInventoryLines(lines) {
+    var numberLineRe = /^([A-Za-z]+-[A-Za-z0-9.\-\/]*\d)\s+(.*)$/;
+    var sizeRe = /(\d+)\s*[x×]\s*(\d+)\s*cm(\s*\(thick\))?\s*$/i;
+    var rows = [];
+    lines.forEach(function (line) {
+      var trimmed = String(line).trim();
+      if (!trimmed) return;
+      var m = trimmed.match(numberLineRe);
+      if (!m) return;
+      var number = m[1];
+      var rest = m[2].trim();
+      var sizeMatch = rest.match(sizeRe);
+      var size = null, name = rest;
+      if (sizeMatch) {
+        size = sizeMatch[1] + ' x ' + sizeMatch[2] + ' cm' + (sizeMatch[3] ? ' (thick)' : '');
+        name = rest.slice(0, sizeMatch.index).trim();
+      }
+      /* No size match: row is still kept in full, name is whatever text remains
+         (e.g. "Dont Exist", "not done—") — never dropped. */
+      rows.push({ number: number, name: name, size: size });
+    });
+    return rows;
+  }
+
+  /* Reconciles differing number formats (PDF: "O-06-1.1/4", app: "06-1-1-4")
+     by extracting just the digit runs and joining them, ignoring prefix
+     letters and punctuation differences. */
+  function normalizeNumKey(raw) {
+    var m = String(raw === null || raw === undefined ? '' : raw).match(/\d+/g);
+    return m ? m.join('-') : '';
+  }
+
+  async function runPdfSync(file) {
+    if (!window.pdfjsLib) { toast('PDF reader failed to load — check your connection and try again.'); return; }
+    toast('Reading PDF…');
+    try {
+      var lines = await extractPdfLines(file);
+      var rows = parseInventoryLines(lines);
+      if (!rows.length) { toast('Could not find any inventory rows in that PDF.'); return; }
+
+      var byKey = {};
+      rows.forEach(function (r) {
+        var prefixMatch = String(r.number).match(/^([A-Za-z]+)-/);
+        var prefixLetter = prefixMatch ? prefixMatch[1] : '';
+        byKey[prefixLetter + ':' + normalizeNumKey(r.number)] = r;
+      });
+
+      var changes = [];
+      var unmatchedCount = 0;
+      state.paintings.forEach(function (p) {
+        var tab = tabById(p.tab_id);
+        var prefixLetter = (tab && tab.prefix ? tab.prefix : '').replace(/[^A-Za-z]/g, '');
+        var row = byKey[prefixLetter + ':' + normalizeNumKey(p.number)];
+        if (!row) { unmatchedCount++; return; }
+        var newName = row.name || '';
+        var newSize = row.size; /* null = PDF has no usable size — never overwrite existing size with it */
+        var nameChanged = newName !== (p.name || '');
+        var sizeChanged = newSize !== null && newSize !== (p.size || '');
+        if (nameChanged || sizeChanged) {
+          changes.push({
+            id: p.id, catalog: catalogNum(p),
+            oldName: p.name || '', newName: newName,
+            oldSize: p.size || '', newSize: sizeChanged ? newSize : (p.size || ''),
+            nameChanged: nameChanged, sizeChanged: sizeChanged
+          });
+        }
+      });
+
+      openPdfPreviewModal(changes, unmatchedCount, rows.length);
+    } catch (e) {
+      toast('Could not read that PDF — is it a valid inventory PDF?');
+    }
+  }
+
+  function openPdfPreviewModal(changes, unmatchedCount, totalPdfRows) {
+    var root = document.getElementById('modalRoot');
+    var rowsHtml = changes.map(function (c) {
+      return '<tr>' +
+        '<td>' + esc(c.catalog) + '</td>' +
+        '<td>' + (c.nameChanged
+          ? '<span class="pdf-diff-old">' + esc(c.oldName || '—') + '</span><span class="pdf-diff-new">' + esc(c.newName || '—') + '</span>'
+          : esc(c.oldName || '—')) + '</td>' +
+        '<td>' + (c.sizeChanged
+          ? '<span class="pdf-diff-old">' + esc(c.oldSize || '—') + '</span><span class="pdf-diff-new">' + esc(c.newSize || '—') + '</span>'
+          : esc(c.oldSize || '—')) + '</td>' +
+        '</tr>';
+    }).join('');
+
+    root.innerHTML = '<div class="modal-backdrop" id="pdfPreviewBackdrop"><div class="modal modal-wide">' +
+      '<h2>Update from PDF</h2>' +
+      '<p class="field-hint">' + totalPdfRows + ' row' + (totalPdfRows === 1 ? '' : 's') + ' read from the PDF. ' +
+      (changes.length
+        ? changes.length + ' painting' + (changes.length === 1 ? '' : 's') + ' will be updated.'
+        : 'No differences found — nothing to update.') +
+      (unmatchedCount
+        ? ' ' + unmatchedCount + ' existing painting' + (unmatchedCount === 1 ? '' : 's') + ' had no matching number in the PDF and will be left as-is.'
+        : '') +
+      '</p>' +
+      (changes.length
+        ? '<div class="pdf-diff-scroll"><table class="pdf-diff-table"><thead><tr><th>Number</th><th>Name</th><th>Size</th></tr></thead><tbody>' + rowsHtml + '</tbody></table></div>'
+        : '') +
+      '<div class="modal-actions"><button class="btn btn-ghost" id="pdfPreviewCancel" type="button">Cancel</button>' +
+      (changes.length ? '<button class="btn btn-primary" id="pdfPreviewApply" type="button">Apply ' + changes.length + ' update' + (changes.length === 1 ? '' : 's') + '</button>' : '') +
+      '</div></div></div>';
+
+    document.getElementById('pdfPreviewBackdrop').addEventListener('click', function (e) { if (e.target.id === 'pdfPreviewBackdrop') closeModal(); });
+    document.getElementById('pdfPreviewCancel').addEventListener('click', closeModal);
+    var applyBtn = document.getElementById('pdfPreviewApply');
+    if (applyBtn) applyBtn.addEventListener('click', function () { applyPdfChanges(changes, applyBtn); });
+  }
+
+  async function applyPdfChanges(changes, btn) {
+    btn.disabled = true;
+    var cancelBtn = document.getElementById('pdfPreviewCancel');
+    if (cancelBtn) cancelBtn.disabled = true;
+    var ok = 0, failed = 0;
+    for (var i = 0; i < changes.length; i++) {
+      var c = changes[i];
+      btn.textContent = 'Updating ' + (i + 1) + ' of ' + changes.length + '…';
+      var patch = {};
+      if (c.nameChanged) patch.name = c.newName;
+      if (c.sizeChanged) patch.size = c.newSize;
+      try {
+        var res = await sb.from('paintings').update(patch).eq('id', c.id).select().single();
+        if (res.error) throw res.error;
+        var p = state.paintings.find(function (x) { return x.id === c.id; });
+        if (p) Object.assign(p, res.data);
+        ok++;
+      } catch (e) {
+        failed++;
+      }
+    }
+    closeModal();
+    renderAll();
+    toast(ok + ' painting' + (ok === 1 ? '' : 's') + ' updated from PDF' + (failed ? ', ' + failed + ' failed' : '') + '.');
   }
 
   /* ---------------- site theme ---------------- */
