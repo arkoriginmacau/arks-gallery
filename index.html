@@ -190,12 +190,6 @@
     display: flex; justify-content: space-between; align-items: center; gap: 12px;
     margin-bottom: 18px; flex-wrap: wrap;
   }
-  /* .btn-ghost's default text color is tuned for the --paper-2 (card)
-     surface; buttons here sit directly on the --paper panel instead,
-     so they need the ink shade tuned for that surface or they can turn
-     invisible on light themes. */
-  .grid-toolbar .btn-ghost { color: var(--ink-soft); border-color: var(--line); }
-  .grid-toolbar .btn-ghost:hover { border-color: var(--ochre); color: var(--ink); }
   .grid-toolbar .tab-title { font-size: 20px; font-weight: 600; margin: 0; }
   .grid-toolbar .tab-sub { color: var(--ink-soft); font-size: 13px; margin-top: 2px; }
 
@@ -441,7 +435,6 @@
         <p class="tab-title" id="tabTitle">&nbsp;</p>
         <p class="tab-sub" id="tabSub"></p>
       </div>
-      <div id="tabToolbarActions"></div>
     </div>
     <div class="grid" id="grid"></div>
   </main>
@@ -675,15 +668,6 @@
     document.getElementById('tabTitle').textContent = tab ? tab.name : (state.loaded ? 'No tabs yet' : 'Loading…');
     var items = state.paintings.filter(function (p) { return p.tab_id === state.activeTabId; });
     document.getElementById('tabSub').textContent = items.length + (items.length === 1 ? ' piece' : ' pieces');
-
-    var toolbarActions = document.getElementById('tabToolbarActions');
-    if (isAdmin && tab && items.length > 1) {
-      toolbarActions.innerHTML = '<button class="btn btn-ghost btn-sm" id="btnRenumber" type="button" ' +
-        'title="Reassign 1, 2, 3… in current-number order">Renumber</button>';
-      document.getElementById('btnRenumber').addEventListener('click', function () { confirmRenumber(this, tab.id); });
-    } else {
-      toolbarActions.innerHTML = '';
-    }
 
     var grid = document.getElementById('grid');
     if (!tab) {
@@ -938,64 +922,6 @@
     // best-effort cleanup of stored images; ignore failures
     var paths = [removed.image_path, removed.thumb_path].filter(Boolean);
     if (paths.length) sb.storage.from(IMAGE_BUCKET).remove(paths).catch(function () {});
-  }
-
-  /* Reassign 1, 2, 3… to every piece in a tab, ordered by each piece's
-     current initial number (compound numbers like "06-1-1-4" sort by
-     their leading 06). Pieces with no parseable number sort last and
-     keep their relative order. */
-  function confirmRenumber(btn, tabId) {
-    if (btn.dataset.confirming) {
-      btn.dataset.confirming = '';
-      btn.textContent = 'Renumber';
-      btn.style.color = '';
-      renumberTab(tabId);
-      return;
-    }
-    btn.dataset.confirming = '1';
-    btn.textContent = 'Click again to confirm';
-    btn.style.color = 'var(--sold)';
-    setTimeout(function () {
-      if (btn.isConnected && btn.dataset.confirming) {
-        btn.dataset.confirming = ''; btn.textContent = 'Renumber'; btn.style.color = '';
-      }
-    }, 2500);
-  }
-  async function renumberTab(tabId) {
-    var items = state.paintings.filter(function (p) { return p.tab_id === tabId; });
-    var ordered = items.slice().sort(function (a, b) {
-      var na = initialNumber(a.number), nb = initialNumber(b.number);
-      if (na === null && nb === null) return 0;
-      if (na === null) return 1;
-      if (nb === null) return -1;
-      return na - nb;
-    });
-    var updates = ordered.map(function (p, i) { return { id: p.id, number: String(i + 1) }; })
-      .filter(function (u) {
-        var p = state.paintings.find(function (x) { return x.id === u.id; });
-        return p && p.number !== u.number;
-      });
-    if (!updates.length) { toast('Already in order — nothing to renumber.'); return; }
-    var prevNumbers = {};
-    updates.forEach(function (u) {
-      var p = state.paintings.find(function (x) { return x.id === u.id; });
-      if (p) { prevNumbers[u.id] = p.number; p.number = u.number; }
-    });
-    renderAll(); // optimistic
-    try {
-      var results = await Promise.all(updates.map(function (u) {
-        return sb.from('paintings').update({ number: u.number }).eq('id', u.id);
-      }));
-      if (results.some(function (r) { return r.error; })) throw new Error('partial failure');
-      toast('Renumbered ' + updates.length + (updates.length === 1 ? ' piece.' : ' pieces.'));
-    } catch (e) {
-      updates.forEach(function (u) {
-        var p = state.paintings.find(function (x) { return x.id === u.id; });
-        if (p) p.number = prevNumbers[u.id];
-      });
-      renderAll();
-      toast('Could not renumber — try again.');
-    }
   }
 
   /* ---------------- modals ---------------- */
