@@ -1271,7 +1271,10 @@
     var root = document.getElementById('modalRoot');
     var tab = tabById(state.activeTabId);
     var pendingFile = null;
-    var suggestedNumber = p ? '' : nextNumberForTab(state.activeTabId);
+    /* A no-prefix tab has no catalogue-number sequence to continue, so a
+       new piece there starts as "N/A" instead of grabbing whatever the
+       photo's file name happens to be. */
+    var suggestedNumber = p ? '' : ((tab && !tab.prefix) ? 'N/A' : nextNumberForTab(state.activeTabId));
     /* Tabs with no catalogue prefix (e.g. "Drawings") have no PDF-based
        catalogue sync to fill in names later, so a new piece there defaults
        its name to the tab's own name instead of sitting blank/"Untitled"
@@ -1307,7 +1310,11 @@
       if (!f) return;
       pendingFile = f;
       var numField = document.getElementById('pNumber');
-      if (!numField.value || numField.dataset.auto === '1') numField.value = stripExt(f.name);
+      if (tab && !tab.prefix) {
+        if (!numField.value) numField.value = 'N/A';
+      } else if (!numField.value || numField.dataset.auto === '1') {
+        numField.value = stripExt(f.name);
+      }
       document.getElementById('uploadDrop').innerHTML =
         '<div class="upload-preview"><img src="' + URL.createObjectURL(f) + '"><span>' + esc(f.name) + '</span></div>';
     });
@@ -1423,7 +1430,7 @@
         var results = await Promise.all(uploads);
         if (results[0].error) throw results[0].error;
         var data = {
-          tab_id: tabId, name: defaultName, number: stripExt(f.name), date: null,
+          tab_id: tabId, name: defaultName, number: (tab && !tab.prefix) ? 'N/A' : stripExt(f.name), date: null,
           price: 0, size: '', description: '', sold: false, not_for_sale: false,
           hue: Math.floor(Math.random() * 360),
           image_path: fullPath,
