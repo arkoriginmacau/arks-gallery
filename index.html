@@ -1272,6 +1272,12 @@
     var tab = tabById(state.activeTabId);
     var pendingFile = null;
     var suggestedNumber = p ? '' : nextNumberForTab(state.activeTabId);
+    /* Tabs with no catalogue prefix (e.g. "Drawings") have no PDF-based
+       catalogue sync to fill in names later, so a new piece there defaults
+       its name to the tab's own name instead of sitting blank/"Untitled"
+       until someone remembers to edit it — still just a starting value,
+       free to change before or after saving. */
+    var suggestedName = p ? p.name : ((tab && !tab.prefix) ? tab.name : '');
 
     root.innerHTML = '<div class="modal-backdrop" id="pBackdrop"><div class="modal">' +
       '<h2>' + (p ? 'Edit painting' : 'Add painting · ' + esc(tab ? tab.name : '')) + '</h2>' +
@@ -1283,7 +1289,7 @@
       '</div><input type="file" id="fileInput" accept="image/*" style="display:none"></div>' +
       '<div class="field-row"><div class="field"><label for="pNumber">Number</label><input type="text" id="pNumber" value="' + esc(p ? p.number : suggestedNumber) + '" data-auto="' + (p ? '0' : '1') + '" placeholder="88"></div>' +
       '<div class="field"><label>Prefix</label><input type="text" value="' + esc(tab ? tab.prefix : '') + '" disabled></div></div>' +
-      '<div class="field"><label for="pName">Painting name <span style="text-transform:none;font-weight:400">(optional)</span></label><input type="text" id="pName" value="' + esc(p ? p.name : '') + '" placeholder="Low Tide, Taipa"></div>' +
+      '<div class="field"><label for="pName">Painting name <span style="text-transform:none;font-weight:400">(optional)</span></label><input type="text" id="pName" value="' + esc(suggestedName) + '" placeholder="Low Tide, Taipa"></div>' +
       '<div class="field-row"><div class="field"><label for="pDate">Date</label><input type="date" id="pDate" value="' + esc(p ? p.date : new Date().toISOString().slice(0, 10)) + '"></div>' +
       '<div class="field"><label for="pPrice">Price</label><input type="number" id="pPrice" min="0" step="1" value="' + esc(p ? p.price : '') + '" placeholder="620"></div></div>' +
       '<div class="field"><label for="pSize">Size <span style="text-transform:none;font-weight:400">(optional)</span></label><input type="text" id="pSize" value="' + esc(p ? p.size : '') + '" placeholder="60 x 80 cm"></div>' +
@@ -1379,6 +1385,12 @@
 
   async function runBulkUpload(files) {
     var tabId = state.activeTabId;
+    var tab = tabById(tabId);
+    /* Same reasoning as the single "Add painting" form: a no-prefix tab has
+       no catalogue numbers for a PDF sync to match against later, so give
+       each bulk-uploaded piece the tab's name as a starting Name rather
+       than leaving it blank forever. */
+    var defaultName = (tab && !tab.prefix) ? tab.name : '';
     var total = files.length;
     var cancelled = false;
     var root = document.getElementById('modalRoot');
@@ -1411,7 +1423,7 @@
         var results = await Promise.all(uploads);
         if (results[0].error) throw results[0].error;
         var data = {
-          tab_id: tabId, name: '', number: stripExt(f.name), date: null,
+          tab_id: tabId, name: defaultName, number: stripExt(f.name), date: null,
           price: 0, size: '', description: '', sold: false, not_for_sale: false,
           hue: Math.floor(Math.random() * 360),
           image_path: fullPath,
