@@ -579,6 +579,15 @@
     return String(d).replace(/-/g, '/');
   }
   function tabById(id) { return state.tabs.find(function (t) { return t.id === id; }); }
+  /* No-prefix tabs only ever collect a year (see openPaintingModal), stored
+     as Jan 1 of that year since the database needs a full date — so when
+     displaying a piece from one of those tabs, show just the year rather
+     than a misleading "2024/01/01". */
+  function fmtPieceDate(p) {
+    var t = tabById(p.tab_id);
+    if (t && !t.prefix) return p.date ? String(p.date).slice(0, 4) : '—';
+    return fmtDate(p.date);
+  }
   function catalogNum(p) {
     var t = tabById(p.tab_id);
     return ((t && t.prefix) || '') + (p.number || '');
@@ -906,7 +915,7 @@
         '<div class="card-body">' +
         '<div class="card-name"><span class="field-label">Name:</span> ' + esc(p.name || 'Untitled') + '</div>' +
         '<div class="card-meta"><span class="field-label">Number:</span> <span class="mono">' + esc(catalogNum(p)) + '</span></div>' +
-        '<div class="card-meta"><span class="field-label">Date:</span> <span class="mono">' + esc(fmtDate(p.date)) + '</span></div>' +
+        '<div class="card-meta"><span class="field-label">Date:</span> <span class="mono">' + esc(fmtPieceDate(p)) + '</span></div>' +
         (p.size ? '<div class="card-meta"><span class="field-label">Size:</span> <span class="mono">' + esc(p.size) + '</span></div>' : '') +
         (p.description ? '<div class="card-desc"><span class="field-label">Description:</span> ' + esc(p.description) + '</div>' : '') +
         '<div class="card-footer">' +
@@ -973,7 +982,7 @@
           '<div class="p-num">' + esc(catalogNum(p)) + '</div>' +
           '<div class="p-info"><div class="p-name"><span class="p-label">Name:</span> ' + esc(p.name || 'Untitled') + '</div>' +
           (p.description ? '<div class="p-desc"><span class="p-label">Description:</span> ' + esc(p.description) + '</div>' : '') +
-          '<div class="p-date-line"><span class="p-label">Date:</span> ' + esc(fmtDate(p.date)) + '</div></div>' +
+          '<div class="p-date-line"><span class="p-label">Date:</span> ' + esc(fmtPieceDate(p)) + '</div></div>' +
           '<div class="p-price">' + (p.price ? fmtPrice(p.price) : '') + '</div>' +
           '<div class="p-sold-mark">' + (p.sold ? 'SOLD' : '') + '</div>' +
           '</div>';
@@ -1281,6 +1290,14 @@
        until someone remembers to edit it — still just a starting value,
        free to change before or after saving. */
     var suggestedName = p ? p.name : ((tab && !tab.prefix) ? tab.name : '');
+    /* No-prefix tabs (sketchbook-style work with no catalogue sequence)
+       often don't have an exact day the piece was made — just the year —
+       so their Date field collects a bare year instead of a full
+       day/month/year date. Stored as Jan 1 of that year underneath (dates
+       still need a real day to save to the database) and displayed back
+       as just the year everywhere it's shown. */
+    var isYearOnlyTab = !!(tab && !tab.prefix);
+    var suggestedYear = p ? (p.date ? String(p.date).slice(0, 4) : '') : String(new Date().getFullYear());
 
     root.innerHTML = '<div class="modal-backdrop" id="pBackdrop"><div class="modal">' +
       '<h2>' + (p ? 'Edit painting' : 'Add painting · ' + esc(tab ? tab.name : '')) + '</h2>' +
@@ -1293,7 +1310,10 @@
       '<div class="field-row"><div class="field"><label for="pNumber">Number</label><input type="text" id="pNumber" value="' + esc(p ? p.number : suggestedNumber) + '" data-auto="' + (p ? '0' : '1') + '" placeholder="88"></div>' +
       '<div class="field"><label>Prefix</label><input type="text" value="' + esc(tab ? tab.prefix : '') + '" disabled></div></div>' +
       '<div class="field"><label for="pName">Painting name <span style="text-transform:none;font-weight:400">(optional)</span></label><input type="text" id="pName" value="' + esc(suggestedName) + '" placeholder="Low Tide, Taipa"></div>' +
-      '<div class="field-row"><div class="field"><label for="pDate">Date</label><input type="date" id="pDate" value="' + esc(p ? p.date : new Date().toISOString().slice(0, 10)) + '"></div>' +
+      '<div class="field-row">' +
+      (isYearOnlyTab
+        ? '<div class="field"><label for="pDate">Year</label><input type="number" id="pDate" min="1000" max="9999" step="1" value="' + esc(suggestedYear) + '" placeholder="2024"></div>'
+        : '<div class="field"><label for="pDate">Date</label><input type="date" id="pDate" value="' + esc(p ? p.date : new Date().toISOString().slice(0, 10)) + '"></div>') +
       '<div class="field"><label for="pPrice">Price</label><input type="number" id="pPrice" min="0" step="1" value="' + esc(p ? p.price : '') + '" placeholder="620"></div></div>' +
       '<div class="field"><label for="pSize">Size <span style="text-transform:none;font-weight:400">(optional)</span></label><input type="text" id="pSize" value="' + esc(p ? p.size : '') + '" placeholder="60 x 80 cm"></div>' +
       '<div class="field"><label for="pDesc">Description <span style="text-transform:none;font-weight:400">(optional)</span></label><textarea id="pDesc">' + esc(p ? p.description : '') + '</textarea></div>' +
@@ -1323,13 +1343,16 @@
       var saveBtn = this;
       var name = document.getElementById('pName').value.trim();
       var number = document.getElementById('pNumber').value.trim();
-      var date = document.getElementById('pDate').value;
+      var dateRaw = document.getElementById('pDate').value.trim();
+      var date = isYearOnlyTab
+        ? (/^\d{4}$/.test(dateRaw) ? (dateRaw + '-01-01') : null)
+        : (dateRaw || null);
       var price = parseFloat(document.getElementById('pPrice').value);
       var size = document.getElementById('pSize').value.trim();
       var description = document.getElementById('pDesc').value.trim();
 
       var data = {
-        tab_id: state.activeTabId, name: name, number: number, date: date || null,
+        tab_id: state.activeTabId, name: name, number: number, date: date,
         price: isNaN(price) ? 0 : price, size: size, description: description,
         sold: p ? !!p.sold : false, not_for_sale: p ? !!p.not_for_sale : false,
         hue: p ? p.hue : Math.floor(Math.random() * 360)
