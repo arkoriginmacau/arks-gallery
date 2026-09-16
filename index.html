@@ -650,6 +650,40 @@
          size. Falls back to the original file untouched if re-encoding
          fails (e.g. HEIC the browser can't decode) or doesn't actually
          save space. */
+  /* Downscales a large source (an <img> or canvas) to an exact target size
+     without the moiré/interference banding a single big-ratio drawImage()
+     produces. A camera photo is routinely 3000-6000px on its long edge; a
+     480px thumbnail is a 6-12x reduction in one step. Canvas2D's bilinear
+     filter only samples a small neighbourhood around each output pixel, so
+     at that ratio it skips most of the source pixels instead of averaging
+     them — fine repeating detail (woven canvas texture, hair, fabric weave)
+     aliases into false, wavy stripes, exactly like a camera filming a TV
+     screen. Repeatedly halving (each step is a safe ~2x ratio that the
+     browser's high-quality smoothing *can* properly box-filter) removes the
+     high-frequency detail gradually instead of skipping over it, so the
+     final resize has nothing left to alias. */
+  function drawHQDownscale(source, srcW, srcH, destW, destH) {
+    var curSource = source, curW = srcW, curH = srcH;
+    while (curW * 0.5 > destW && curH * 0.5 > destH) {
+      var nextW = Math.max(1, Math.round(curW * 0.5));
+      var nextH = Math.max(1, Math.round(curH * 0.5));
+      var stepCanvas = document.createElement('canvas');
+      stepCanvas.width = nextW; stepCanvas.height = nextH;
+      var sctx = stepCanvas.getContext('2d');
+      sctx.imageSmoothingEnabled = true;
+      sctx.imageSmoothingQuality = 'high';
+      sctx.drawImage(curSource, 0, 0, curW, curH, 0, 0, nextW, nextH);
+      curSource = stepCanvas; curW = nextW; curH = nextH;
+    }
+    var finalCanvas = document.createElement('canvas');
+    finalCanvas.width = destW; finalCanvas.height = destH;
+    var fctx = finalCanvas.getContext('2d');
+    fctx.imageSmoothingEnabled = true;
+    fctx.imageSmoothingQuality = 'high';
+    fctx.drawImage(curSource, 0, 0, curW, curH, 0, 0, destW, destH);
+    return finalCanvas;
+  }
+
   function processPhoto(file, thumbMaxDim, thumbQuality) {
     return new Promise(function (resolve) {
       var fallback = { fullBlob: file, thumbBlob: null, reencoded: false };
@@ -669,9 +703,7 @@
 
         var tScale = Math.min(1, thumbMaxDim / Math.max(w, h));
         var tw = Math.max(1, Math.round(w * tScale)), th = Math.max(1, Math.round(h * tScale));
-        var thumbCanvas = document.createElement('canvas');
-        thumbCanvas.width = tw; thumbCanvas.height = th;
-        thumbCanvas.getContext('2d').drawImage(img, 0, 0, tw, th);
+        var thumbCanvas = drawHQDownscale(img, w, h, tw, th);
 
         var MAX_FULL_BYTES = 15 * 1024 * 1024;
         function finishFull(fullBlob) {
