@@ -391,6 +391,12 @@
   .field-row { display: flex; gap: 10px; }
   .field-row .field { flex: 1; }
   .field-hint { font-size: 11.5px; color: var(--ink-faint); }
+  .field-label-row { display: flex; align-items: center; justify-content: space-between; }
+  .field-label-row label { margin: 0; }
+  .date-add-btn { padding: 2px 9px; font-size: 13px; line-height: 1.5; }
+  .extra-date-row { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+  .extra-date-row input { flex: 1; }
+  .extra-date-remove { padding: 2px 9px; font-size: 14px; line-height: 1.4; }
   .upload-drop {
     border: 1px dashed var(--line); border-radius: 4px; padding: 16px; text-align: center;
     font-size: 13px; color: var(--ink-soft-2); cursor: pointer; background: var(--paper-2);
@@ -585,8 +591,14 @@
      than a misleading "2024/01/01". */
   function fmtPieceDate(p) {
     var t = tabById(p.tab_id);
-    if (t && !t.prefix) return p.date ? String(p.date).slice(0, 4) : '—';
-    return fmtDate(p.date);
+    var isYearOnly = !!(t && !t.prefix);
+    var all = [p.date].concat(Array.isArray(p.extra_dates) ? p.extra_dates : []).filter(Boolean);
+    if (!all.length) return '—';
+    all.sort();
+    var parts = all.map(function (d) { return isYearOnly ? String(d).slice(0, 4) : fmtDate(d); });
+    var seen = {};
+    parts = parts.filter(function (s) { if (seen[s]) return false; seen[s] = true; return true; });
+    return parts.join(', ');
   }
   function catalogNum(p) {
     var t = tabById(p.tab_id);
@@ -1275,6 +1287,18 @@
     });
   }
 
+  /* Builds one row for an additional date/year in the painting form —
+     mirrors the main Date/Year field so extra entries look and behave
+     the same way. */
+  function extraDateRowHTML(isYearOnlyTab, value) {
+    return '<div class="extra-date-row">' +
+      (isYearOnlyTab
+        ? '<input type="number" class="extra-date-input" min="1000" max="9999" step="1" value="' + esc(value || '') + '" placeholder="2024">'
+        : '<input type="date" class="extra-date-input" value="' + esc(value || '') + '">') +
+      '<button class="btn btn-ghost extra-date-remove" type="button" title="Remove this date">&times;</button>' +
+      '</div>';
+  }
+
   function openPaintingModal(paintingId) {
     var p = paintingId ? state.paintings.find(function (x) { return x.id === paintingId; }) : null;
     var root = document.getElementById('modalRoot');
@@ -1312,8 +1336,8 @@
       '<div class="field"><label for="pName">Painting name <span style="text-transform:none;font-weight:400">(optional)</span></label><input type="text" id="pName" value="' + esc(suggestedName) + '" placeholder="Low Tide, Taipa"></div>' +
       '<div class="field-row">' +
       (isYearOnlyTab
-        ? '<div class="field"><label for="pDate">Year</label><input type="number" id="pDate" min="1000" max="9999" step="1" value="' + esc(suggestedYear) + '" placeholder="2024"></div>'
-        : '<div class="field"><label for="pDate">Date</label><input type="date" id="pDate" value="' + esc(p ? p.date : new Date().toISOString().slice(0, 10)) + '"></div>') +
+        ? '<div class="field"><div class="field-label-row"><label for="pDate">Year</label><button class="btn btn-ghost date-add-btn" id="btnAddDate" type="button" title="Add another year">+</button></div><input type="number" id="pDate" min="1000" max="9999" step="1" value="' + esc(suggestedYear) + '" placeholder="2024"><div id="extraDatesWrap"></div></div>'
+        : '<div class="field"><div class="field-label-row"><label for="pDate">Date</label><button class="btn btn-ghost date-add-btn" id="btnAddDate" type="button" title="Add another date">+</button></div><input type="date" id="pDate" value="' + esc(p ? p.date : new Date().toISOString().slice(0, 10)) + '"><div id="extraDatesWrap"></div></div>') +
       '<div class="field"><label for="pPrice">Price</label><input type="number" id="pPrice" min="0" step="1" value="' + esc(p ? p.price : '') + '" placeholder="620"></div></div>' +
       '<div class="field"><label for="pSize">Size <span style="text-transform:none;font-weight:400">(optional)</span></label><input type="text" id="pSize" value="' + esc(p ? p.size : '') + '" placeholder="60 x 80 cm"></div>' +
       '<div class="field"><label for="pDesc">Description <span style="text-transform:none;font-weight:400">(optional)</span></label><textarea id="pDesc">' + esc(p ? p.description : '') + '</textarea></div>' +
@@ -1324,6 +1348,24 @@
     document.getElementById('pBackdrop').addEventListener('click', function (e) { if (e.target.id === 'pBackdrop') closeModal(); });
     document.getElementById('pCancel').addEventListener('click', closeModal);
     document.getElementById('uploadDrop').addEventListener('click', function () { document.getElementById('fileInput').click(); });
+
+    /* Extra dates: a piece can have more than one date (e.g. started vs.
+       finished, or several sitting days) — the "+" next to the main
+       Date/Year field adds another one, each removable on its own. */
+    var extraDatesWrap = document.getElementById('extraDatesWrap');
+    var existingExtraDates = (p && Array.isArray(p.extra_dates)) ? p.extra_dates : [];
+    existingExtraDates.forEach(function (d) {
+      var val = isYearOnlyTab ? (d ? String(d).slice(0, 4) : '') : (d || '');
+      extraDatesWrap.insertAdjacentHTML('beforeend', extraDateRowHTML(isYearOnlyTab, val));
+    });
+    document.getElementById('btnAddDate').addEventListener('click', function () {
+      extraDatesWrap.insertAdjacentHTML('beforeend', extraDateRowHTML(isYearOnlyTab, ''));
+    });
+    extraDatesWrap.addEventListener('click', function (e) {
+      if (e.target.classList.contains('extra-date-remove')) {
+        e.target.closest('.extra-date-row').remove();
+      }
+    });
     document.getElementById('pNumber').addEventListener('input', function () { this.dataset.auto = '0'; });
     document.getElementById('fileInput').addEventListener('change', function (e) {
       var f = e.target.files[0];
@@ -1347,12 +1389,22 @@
       var date = isYearOnlyTab
         ? (/^\d{4}$/.test(dateRaw) ? (dateRaw + '-01-01') : null)
         : (dateRaw || null);
+      var extraDates = Array.prototype.map.call(
+        document.querySelectorAll('#extraDatesWrap .extra-date-input'),
+        function (inp) {
+          var raw = inp.value.trim();
+          if (!raw) return null;
+          return isYearOnlyTab ? (/^\d{4}$/.test(raw) ? (raw + '-01-01') : null) : raw;
+        }
+      ).filter(function (d) { return d && d !== date; });
+      // De-duplicate in case the same date was added twice.
+      extraDates = extraDates.filter(function (d, i) { return extraDates.indexOf(d) === i; });
       var price = parseFloat(document.getElementById('pPrice').value);
       var size = document.getElementById('pSize').value.trim();
       var description = document.getElementById('pDesc').value.trim();
 
       var data = {
-        tab_id: state.activeTabId, name: name, number: number, date: date,
+        tab_id: state.activeTabId, name: name, number: number, date: date, extra_dates: extraDates,
         price: isNaN(price) ? 0 : price, size: size, description: description,
         sold: p ? !!p.sold : false, not_for_sale: p ? !!p.not_for_sale : false,
         hue: p ? p.hue : Math.floor(Math.random() * 360)
