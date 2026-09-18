@@ -367,6 +367,18 @@
   .card-meta { display: flex; gap: 10px; color: var(--ink-soft-2); font-size: 12px; }
   .card-meta .mono { font-variant-numeric: tabular-nums; }
   .card-desc { font-size: 12.5px; color: var(--ink-soft-2); line-height: 1.45; }
+  /* A suffix is a small admin-managed vocabulary of colored tags (see
+     openSuffixManagerModal) — "Painting set" is the first, more follow
+     later, each with its own color, Diablo-rarity style. A piece carries
+     at most one. The color itself always comes from the suffix record, so
+     recoloring or renaming one updates every card wearing it at once. */
+  .suffix-tag {
+    text-align: center; font-size: 12.5px; font-weight: 600; letter-spacing: .01em;
+  }
+  .suffix-swatch {
+    width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+    border: 1px solid var(--line); box-sizing: border-box;
+  }
   .field-label {
     font-family: 'Archivo', sans-serif; text-transform: uppercase; font-weight: 700;
     font-size: 10px; letter-spacing: .05em; color: var(--ink-faint-2);
@@ -603,7 +615,7 @@
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
 
-  var state = { tabs: [], paintings: [], activeTabId: null, printMode: 'A4', printRows: 8, printScope: 'current', loaded: false };
+  var state = { tabs: [], paintings: [], suffixes: [], activeTabId: null, printMode: 'A4', printRows: 8, printScope: 'current', loaded: false };
   var isAdmin = false;
   var currentUserEmail = null;
   /* When this page is loaded inside someone else's site (e.g. embedded on the
@@ -852,8 +864,22 @@
     if (res.error) { toast('Could not load paintings.'); return; }
     state.paintings = res.data || [];
   }
+  /* Suffixes: small admin-managed vocabulary of colored tags (start with
+     "Painting set", more to follow) — a piece carries at most one, like a
+     Diablo-style rarity label. Kept as their own table (rather than a
+     free-typed color per piece) so renaming or recoloring one suffix
+     updates every piece wearing it at once. */
+  async function fetchSuffixes() {
+    var res = await sb.from('suffixes').select('*').order('sort_order', { ascending: true });
+    if (res.error) { toast('Could not load suffixes.'); return; }
+    state.suffixes = res.data || [];
+  }
+  function suffixById(id) {
+    if (!id) return null;
+    return state.suffixes.find(function (s) { return s.id === id; }) || null;
+  }
   async function loadAll() {
-    await Promise.all([fetchTabs(), fetchPaintings()]);
+    await Promise.all([fetchTabs(), fetchPaintings(), fetchSuffixes()]);
     state.loaded = true;
     renderAll();
   }
@@ -893,6 +919,7 @@
     if (isAdmin) {
       el.innerHTML = printBtn +
         '<button class="btn btn-ghost btn-sm" id="btnTheme" type="button" title="Change site colors">Theme</button>' +
+        '<button class="btn btn-ghost btn-sm" id="btnSuffixes" type="button" title="Manage colored tags like &quot;Painting set&quot;">Suffixes</button>' +
         '<button class="btn btn-ghost btn-sm" id="btnBulkUpload" type="button" title="Add several photos at once">Bulk upload</button>' +
         '<input type="file" id="bulkFileInput" accept="image/*" multiple style="display:none">' +
         '<button class="btn btn-ghost btn-sm" id="btnPdfSync" type="button" title="Fill in names and sizes from an inventory PDF">Update from PDF</button>' +
@@ -902,6 +929,7 @@
         '<span class="admin-pill"><span class="dot"></span>' + esc(currentUserEmail) + '</span>' +
         '<button class="btn btn-ghost btn-sm" id="btnSignOut" type="button">Sign out</button>';
       document.getElementById('btnTheme').addEventListener('click', openThemeModal);
+      document.getElementById('btnSuffixes').addEventListener('click', openSuffixManagerModal);
       document.getElementById('btnAddPainting').addEventListener('click', function () {
         if (!state.activeTabId) { openTabModal(); return; }
         openPaintingModal();
@@ -995,6 +1023,7 @@
         ? '<img src="' + esc(thumbSrc) + '" alt="' + esc(p.name) + '" loading="lazy" decoding="async">'
         : '<div class="swatch" style="background:' + swatchGradient(p.hue || 30) + '"><span>' + esc((p.name || '?').charAt(0).toUpperCase()) + '</span></div>';
       var setMates = setMembers(p);
+      var suffix = suffixById(p.suffix_id);
       return '<div class="card' + (p.sold ? ' is-sold' : '') + '" data-card="' + p.id + '">' +
         '<div class="card-image"' + (thumbSrc ? ' data-lightbox="' + esc(fullSrc) + '" title="' + (isEmbedded ? 'Click to view full size (opens in a new tab)' : 'Click to view full size') + '"' : '') + '>' + imageInner +
         (p.price ? '<span class="price-tag">' + fmtPrice(p.price) + '</span>' : '') +
@@ -1018,6 +1047,7 @@
         '<div class="card-meta"><span class="field-label">Date:</span> <span class="mono">' + esc(fmtPieceDate(p)) + '</span></div>' +
         (p.size ? '<div class="card-meta"><span class="field-label">Size:</span> <span class="mono">' + esc(p.size) + '</span></div>' : '') +
         (p.description ? '<div class="card-desc"><span class="field-label">Description:</span> ' + esc(p.description) + '</div>' : '') +
+        (suffix ? '<div class="suffix-tag" style="color:' + esc(suffix.color) + '">' + esc(suffix.label) + '</div>' : '') +
         '<div class="card-footer">' +
         (isAdmin
           ? '<button class="sold-toggle" data-toggle-sold="' + p.id + '"><span class="switch"></span>' + (p.sold ? 'Sold' : 'Mark sold') + '</button>' +
@@ -1537,6 +1567,15 @@
       '<div class="field"><label for="pPrice">Price</label><input type="number" id="pPrice" min="0" step="1" value="' + esc(p ? p.price : '') + '" placeholder="620"></div></div>' +
       '<div class="field"><label for="pSize">Size <span style="text-transform:none;font-weight:400">(optional)</span></label><input type="text" id="pSize" value="' + esc(p ? p.size : '') + '" placeholder="60 x 80 cm"></div>' +
       '<div class="field"><label for="pDesc">Description <span style="text-transform:none;font-weight:400">(optional)</span></label><textarea id="pDesc">' + esc(p ? p.description : '') + '</textarea></div>' +
+      '<div class="field"><label for="pSuffix">Suffix <span style="text-transform:none;font-weight:400">(optional)</span></label>' +
+      '<div style="display:flex;align-items:center;gap:8px;">' +
+      '<span class="suffix-swatch" id="pSuffixSwatch"></span>' +
+      '<select id="pSuffix" style="flex:1;">' +
+      '<option value="">— none —</option>' +
+      state.suffixes.map(function (s) {
+        return '<option value="' + esc(s.id) + '"' + (p && p.suffix_id === s.id ? ' selected' : '') + '>' + esc(s.label) + '</option>';
+      }).join('') +
+      '</select></div></div>' +
       '<div class="modal-actions"><button class="btn btn-ghost" id="pCancel" type="button">Cancel</button>' +
       '<button class="btn btn-primary" id="pSave" type="button">' + (p ? 'Save' : 'Add painting') + '</button></div>' +
       '</div></div>';
@@ -1563,6 +1602,15 @@
       }
     });
     document.getElementById('pNumber').addEventListener('input', function () { this.dataset.auto = '0'; });
+    var pSuffixSelect = document.getElementById('pSuffix');
+    var pSuffixSwatch = document.getElementById('pSuffixSwatch');
+    function refreshSuffixSwatch() {
+      var s = suffixById(pSuffixSelect.value);
+      pSuffixSwatch.style.background = s ? s.color : 'transparent';
+      pSuffixSwatch.style.borderStyle = s ? 'solid' : 'dashed';
+    }
+    pSuffixSelect.addEventListener('change', refreshSuffixSwatch);
+    refreshSuffixSwatch();
     document.getElementById('fileInput').addEventListener('change', function (e) {
       var f = e.target.files[0];
       if (!f) return;
@@ -1598,12 +1646,14 @@
       var price = parseFloat(document.getElementById('pPrice').value);
       var size = document.getElementById('pSize').value.trim();
       var description = document.getElementById('pDesc').value.trim();
+      var suffixId = pSuffixSelect.value || null;
 
       var data = {
         tab_id: state.activeTabId, name: name, number: number, date: date, extra_dates: extraDates,
         price: isNaN(price) ? 0 : price, size: size, description: description,
         sold: p ? !!p.sold : false, not_for_sale: p ? !!p.not_for_sale : false,
-        hue: p ? p.hue : Math.floor(Math.random() * 360)
+        hue: p ? p.hue : Math.floor(Math.random() * 360),
+        suffix_id: suffixId
       };
 
       if (pendingFile) {
@@ -2038,6 +2088,110 @@
       var res = await sb.from('site_theme').upsert({ id: 1, colors: colors, updated_at: new Date().toISOString() });
       if (res.error) toast('Could not save theme: ' + res.error.message);
       else { toast(adjusted ? 'Saved — text color adjusted to stay readable.' : 'Theme saved for everyone.'); closeModal(); }
+    });
+  }
+
+  /* Suffix manager: a small admin-editable list of colored tags (label +
+     color), Diablo-rarity style — "Painting set" is the first, more get
+     added here over time. Rows are edited in place and only written to
+     Supabase on Save, diffed against what was loaded (new rows insert,
+     changed rows update, removed rows delete — deleting a suffix still in
+     use is safe: paintings.suffix_id just falls back to null via the
+     column's ON DELETE SET NULL). */
+  function openSuffixManagerModal() {
+    var rows = state.suffixes.map(function (s) { return { id: s.id, label: s.label, color: s.color }; });
+    var nextTempId = 1;
+    var root = document.getElementById('modalRoot');
+
+    function rowHTML(row, i) {
+      return '<div class="suffix-row" data-row="' + i + '" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
+        '<input type="color" class="suffix-row-color" value="' + esc(row.color) + '" style="width:36px;height:32px;border:1px solid var(--line);border-radius:4px;padding:1px;background:var(--paper-2);cursor:pointer;flex-shrink:0;">' +
+        '<input type="text" class="suffix-row-label" value="' + esc(row.label) + '" placeholder="Suffix name" style="flex:1;">' +
+        '<button class="icon-btn danger suffix-row-remove" type="button" aria-label="Remove" title="Remove">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>' +
+        '</button></div>';
+    }
+    function renderRows() {
+      document.getElementById('suffixRows').innerHTML = rows.length
+        ? rows.map(rowHTML).join('')
+        : '<p class="field-hint">No suffixes yet — add one below.</p>';
+      wireRowEvents();
+    }
+    function wireRowEvents() {
+      var wrap = document.getElementById('suffixRows');
+      wrap.querySelectorAll('[data-row]').forEach(function (rowEl) {
+        var i = parseInt(rowEl.getAttribute('data-row'), 10);
+        rowEl.querySelector('.suffix-row-color').addEventListener('input', function () { rows[i].color = this.value; });
+        rowEl.querySelector('.suffix-row-label').addEventListener('input', function () { rows[i].label = this.value; });
+        rowEl.querySelector('.suffix-row-remove').addEventListener('click', function () { rows.splice(i, 1); renderRows(); });
+      });
+    }
+
+    root.innerHTML = '<div class="modal-backdrop" id="suffixBackdrop"><div class="modal">' +
+      '<h2>Suffixes</h2>' +
+      '<p class="field-hint" style="margin-bottom:14px;">Colored tags any piece can wear, one at a time — pick the color, ' +
+      'the label shows on the card in that color. Removing one here clears it from any piece wearing it, nothing else changes.</p>' +
+      '<div id="suffixRows"></div>' +
+      '<button class="btn btn-ghost" id="suffixAddRow" type="button" style="margin-top:2px;">+ Add suffix</button>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" id="suffixCancel" type="button">Cancel</button>' +
+      '<button class="btn btn-primary" id="suffixSave" type="button">Save</button></div>' +
+      '</div></div>';
+
+    renderRows();
+    document.getElementById('suffixBackdrop').addEventListener('click', function (e) { if (e.target.id === 'suffixBackdrop') closeModal(); });
+    document.getElementById('suffixCancel').addEventListener('click', closeModal);
+    document.getElementById('suffixAddRow').addEventListener('click', function () {
+      rows.push({ id: 'new-' + (nextTempId++), label: '', color: '#2f9e56' });
+      renderRows();
+    });
+    document.getElementById('suffixSave').addEventListener('click', async function () {
+      var saveBtn = this;
+      var cleaned = rows.map(function (r) { return { id: r.id, label: r.label.trim(), color: r.color }; })
+        .filter(function (r) { return r.label; });
+      if (rows.some(function (r) { return !r.label.trim(); }) && cleaned.length !== rows.length) {
+        toast('Blank suffix names were dropped.');
+      }
+      saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+
+      var original = state.suffixes;
+      // ids of rows that survived the edit and already existed server-side
+      var keptExistingIds = cleaned.filter(function (r) { return original.some(function (o) { return o.id === r.id; }); })
+        .map(function (r) { return r.id; });
+      var toDelete = original.filter(function (o) { return keptExistingIds.indexOf(o.id) === -1; });
+      var toInsert = cleaned.filter(function (r) { return String(r.id).indexOf('new-') === 0; });
+      var toUpdate = cleaned.filter(function (r) {
+        if (String(r.id).indexOf('new-') === 0) return false;
+        var orig = original.find(function (o) { return o.id === r.id; });
+        return orig && (orig.label !== r.label || orig.color !== r.color);
+      });
+
+      var ok = true;
+      for (var i = 0; i < toDelete.length; i++) {
+        var res = await sb.from('suffixes').delete().eq('id', toDelete[i].id);
+        if (res.error) { ok = false; toast('Could not remove "' + toDelete[i].label + '".'); }
+      }
+      for (var j = 0; j < toUpdate.length; j++) {
+        var r2 = toUpdate[j];
+        var res2 = await sb.from('suffixes').update({ label: r2.label, color: r2.color }).eq('id', r2.id);
+        if (res2.error) { ok = false; toast('Could not update "' + r2.label + '".'); }
+      }
+      if (toInsert.length) {
+        var startOrder = cleaned.length - toInsert.length;
+        var payload = toInsert.map(function (r, idx) { return { label: r.label, color: r.color, sort_order: startOrder + idx }; });
+        var res3 = await sb.from('suffixes').insert(payload);
+        if (res3.error) { ok = false; toast(res3.error.message.indexOf('duplicate') !== -1 ? 'A suffix with that name already exists.' : 'Could not add new suffix.'); }
+      }
+      // Reorder to match the on-screen list order (cheap: only the ones that moved).
+      var reorderTargets = cleaned.filter(function (r) { return String(r.id).indexOf('new-') !== 0; });
+      for (var k = 0; k < reorderTargets.length; k++) {
+        var orig2 = original.find(function (o) { return o.id === reorderTargets[k].id; });
+        if (orig2 && orig2.sort_order !== k) await sb.from('suffixes').update({ sort_order: k }).eq('id', reorderTargets[k].id);
+      }
+
+      await fetchSuffixes();
+      renderAll();
+      saveBtn.disabled = false; saveBtn.textContent = 'Save';
+      if (ok) { toast('Suffixes saved.'); closeModal(); }
     });
   }
 
