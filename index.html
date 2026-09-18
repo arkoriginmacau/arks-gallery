@@ -762,16 +762,15 @@
 
   /* Decodes a photo once and produces two uploads from it:
        - thumb: a small JPEG for the grid/list view (unchanged behaviour).
-       - full: the SAME pixel dimensions as the original, but re-encoded
-         through canvas as WebP (falling back to JPEG if the browser can't
-         produce a WebP blob). Camera-original photos are routinely
-         30-60MB even though the pixel count doesn't need anywhere near
-         that many bytes — that bloat is almost always bulky EXIF/ICC/
-         embedded-preview data plus a conservative camera encoder, and
-         WebP's own compression is typically 25-35% smaller than JPEG at
-         the same visual quality on top of that. Resolution is never
-         touched. If a photo has extreme megapixels the quality is
-         stepped down (never the dimensions) until it's a sane upload
+       - full: the "zoom" image shown in the lightbox, downscaled (see
+         ZOOM_MAX_DIM below) and re-encoded through canvas as WebP
+         (falling back to JPEG if the browser can't produce a WebP blob).
+         Camera-original photos are routinely 6000-8000px on the long
+         edge and several MB even after re-encoding — no screen benefits
+         from that, it just makes the zoom view slow to load, so the
+         dimensions are capped as well as the encoding. If an already-
+         capped photo still comes out oversized the quality is stepped
+         down further (never the dimensions) until it's a sane upload
          size. Falls back to the original file untouched if re-encoding
          fails (e.g. HEIC the browser can't decode) or doesn't actually
          save space. */
@@ -822,9 +821,18 @@
         var w = img.naturalWidth, h = img.naturalHeight;
         if (!w || !h) { URL.revokeObjectURL(url); resolve(fallback); return; }
 
-        var fullCanvas = document.createElement('canvas');
-        fullCanvas.width = w; fullCanvas.height = h;
-        fullCanvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        /* The "full" image is what the lightbox zoom view serves — it is
+           NOT the untouched camera original. Camera photos routinely land
+           at 6000-8000px on the long edge (40-60+ megapixels); no screen
+           can show anywhere near that, and downloading it just to view a
+           painting zoomed in was the actual cause of the slow zoom load.
+           Cap it at a size that still shows individual brushstrokes
+           clearly on any display (including a 2x/3x retina screen) while
+           being a fraction of the download. */
+        var ZOOM_MAX_DIM = 1600;
+        var fScale = Math.min(1, ZOOM_MAX_DIM / Math.max(w, h));
+        var fw = Math.max(1, Math.round(w * fScale)), fh = Math.max(1, Math.round(h * fScale));
+        var fullCanvas = drawHQDownscale(img, w, h, fw, fh);
 
         var tScale = Math.min(1, thumbMaxDim / Math.max(w, h));
         var tw = Math.max(1, Math.round(w * tScale)), th = Math.max(1, Math.round(h * tScale));
