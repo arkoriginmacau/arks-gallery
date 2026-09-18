@@ -374,7 +374,17 @@
      recoloring or renaming one updates every card wearing it at once. */
   .suffix-tag {
     text-align: center; font-size: 12.5px; font-weight: 600; letter-spacing: .01em;
+    margin-top: 6px;
   }
+  /* Wraps the optional suffix tag + the footer as one unit and pins the
+     whole unit to the bottom of the card body (instead of putting
+     margin-top: auto on the tag itself, which would split the leftover
+     space between two separate auto-margins and let the tag drift to a
+     different height per card). This keeps the tag — when present — and
+     the footer divider at the same fixed distance from the bottom on
+     every card, so they line up across a grid row regardless of how long
+     the description above happens to be. */
+  .card-bottom { margin-top: auto; }
   .suffix-swatch {
     width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
     border: 1px solid var(--line); box-sizing: border-box;
@@ -387,7 +397,7 @@
   .card.is-sold .price-tag { border-color: var(--sold-soft); background: var(--sold-bg); color: var(--sold-on-bg); }
 
   .card-footer {
-    margin-top: auto; display: flex; align-items: center; justify-content: space-between;
+    display: flex; align-items: center; justify-content: space-between;
     padding-top: 10px; border-top: 1px solid var(--line-soft);
   }
   .sold-toggle {
@@ -1047,6 +1057,7 @@
         '<div class="card-meta"><span class="field-label">Date:</span> <span class="mono">' + esc(fmtPieceDate(p)) + '</span></div>' +
         (p.size ? '<div class="card-meta"><span class="field-label">Size:</span> <span class="mono">' + esc(p.size) + '</span></div>' : '') +
         (p.description ? '<div class="card-desc"><span class="field-label">Description:</span> ' + esc(p.description) + '</div>' : '') +
+        '<div class="card-bottom">' +
         (suffix ? '<div class="suffix-tag" style="color:' + esc(suffix.color) + '">' + esc(suffix.label) + '</div>' : '') +
         '<div class="card-footer">' +
         (isAdmin
@@ -1058,7 +1069,7 @@
             '</div>'
           : '<span class="sold-static' + (p.sold ? ' is-sold' : (p.not_for_sale ? ' is-nfs' : '')) + '">' +
             (p.sold ? 'Sold' : (p.not_for_sale ? 'Not for sale' : 'Available')) + '</span>') +
-        '</div></div></div>';
+        '</div></div></div></div>';
     }).join('');
   }
 
