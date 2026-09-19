@@ -647,23 +647,105 @@
 <div id="lightboxRoot"></div>
 <div class="toast-root" id="toastRoot"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
 (function () {
   "use strict";
 
-  /* ---------------- Supabase project config ----------------
-     Public URL + publishable (anon) key — safe to ship in client code.
-     All access control is enforced server-side by Postgres Row Level
-     Security: anyone can read, only a signed-in arkoriginmacau@gmail.com
-     session can write. */
-  var SUPABASE_URL = 'https://dmskenuvcnqiekbbbklt.supabase.co';
-  var SUPABASE_KEY = 'sb_publishable_BdPDUr4hx76oZqVwQcUdAw_Y2nF8hdK';
+  /* ---------------- Cloudflare backend config ----------------
+     One Cloudflare Worker serves everything: photos (R2), data (D1) and
+     the admin password login. Reads are public; every write needs the
+     admin session token issued at login. */
   var ADMIN_EMAIL = 'arkoriginmacau@gmail.com';
-  var IMAGE_BUCKET = 'gallery-images';
+  var IMAGE_BASE = 'https://arks-gallery-images.arkoriginmacau.workers.dev';
+  var SESSION_KEY = 'arks_admin_session';
 
-  var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  /* Small client that keeps the same call shape the rest of this file
+     already uses (sb.from(...).select/insert/update/delete, sb.auth...). */
+  var sb = (function () {
+    var listeners = [];
+    function readSession() {
+      try {
+        var raw = localStorage.getItem(SESSION_KEY);
+        if (!raw) return null;
+        var s = JSON.parse(raw);
+        if (!s || !s.token || !s.expires_at || s.expires_at < Date.now() / 1000) return null;
+        return { access_token: s.token, expires_at: s.expires_at, user: { email: ADMIN_EMAIL } };
+      } catch (e) { return null; }
+    }
+    function notify() { var s = readSession(); listeners.forEach(function (cb) { try { cb('CHANGED', s); } catch (e) {} }); }
+
+    function Query(table) {
+      this.table = table; this.op = null; this.values = null; this.filters = [];
+      this.orderBy = null; this.returning = false; this.mode = null;
+    }
+    Query.prototype.select = function () { if (this.op) this.returning = true; else this.op = 'select'; return this; };
+    Query.prototype.insert = function (v) { this.op = 'insert'; this.values = v; return this; };
+    Query.prototype.update = function (v) { this.op = 'update'; this.values = v; return this; };
+    Query.prototype.upsert = function (v) { this.op = 'upsert'; this.values = v; return this; };
+    Query.prototype.delete = function () { this.op = 'delete'; return this; };
+    Query.prototype.eq = function (col, val) { this.filters.push({ col: col, val: val }); return this; };
+    Query.prototype.order = function (col, opts) { this.orderBy = { col: col, ascending: !(opts && opts.ascending === false) }; return this; };
+    Query.prototype.single = function () { this.mode = 'single'; return this; };
+    Query.prototype.maybeSingle = function () { this.mode = 'maybe'; return this; };
+    Query.prototype.run = async function () {
+      try {
+        var headers = { 'Content-Type': 'application/json' };
+        var sess = readSession();
+        if (sess) headers.Authorization = 'Bearer ' + sess.access_token;
+        var res = await fetch(IMAGE_BASE + '/api/db', {
+          method: 'POST', headers: headers,
+          body: JSON.stringify({ table: this.table, op: this.op, values: this.values, filters: this.filters,
+            order: this.orderBy, returning: this.returning })
+        });
+        var body = await res.json().catch(function () { return {}; });
+        if (!res.ok) return { data: null, error: { message: body.error || ('Request failed (' + res.status + ')') } };
+        var rows = body.rows || [];
+        if (this.op === 'select' || this.returning) {
+          if (this.mode === 'single') {
+            if (rows.length !== 1) return { data: null, error: { message: 'Expected one row, got ' + rows.length } };
+            return { data: rows[0], error: null };
+          }
+          if (this.mode === 'maybe') return { data: rows[0] || null, error: null };
+          return { data: rows, error: null };
+        }
+        return { data: null, error: null };
+      } catch (e) { return { data: null, error: { message: e.message || String(e) } }; }
+    };
+    Query.prototype.then = function (resolve, reject) { return this.run().then(resolve, reject); };
+
+    return {
+      from: function (table) { return new Query(table); },
+      auth: {
+        getSession: function () { return Promise.resolve({ data: { session: readSession() } }); },
+        onAuthStateChange: function (cb) { listeners.push(cb); },
+        requestLink: async function () {
+          try {
+            var res = await fetch(IMAGE_BASE + '/api/auth/request', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ origin: window.location.origin })
+            });
+            var body = await res.json().catch(function () { return {}; });
+            if (!res.ok) return { error: { message: body.error || 'Could not send the sign-in link' } };
+            return { error: null };
+          } catch (e) { return { error: { message: e.message || String(e) } }; }
+        },
+        verifyLink: async function (token) {
+          try {
+            var res = await fetch(IMAGE_BASE + '/api/auth/verify', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token })
+            });
+            var body = await res.json().catch(function () { return {}; });
+            if (!res.ok || !body.token) return { error: { message: body.error || 'Sign-in failed' } };
+            localStorage.setItem(SESSION_KEY, JSON.stringify({ token: body.token, expires_at: body.expires_at }));
+            notify();
+            return { error: null };
+          } catch (e) { return { error: { message: e.message || String(e) } }; }
+        },
+        signOut: async function () { try { localStorage.removeItem(SESSION_KEY); } catch (e) {} notify(); }
+      }
+    };
+  })();
   if (window.pdfjsLib) {
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
@@ -785,9 +867,36 @@
     return max === null ? '1' : String(max + 1);
   }
   function stripExt(name) { return name.replace(/\.[^.]+$/, ''); }
+  function encodePath(path) {
+    return String(path).split('/').map(encodeURIComponent).join('/');
+  }
   function publicImgUrl(path) {
     if (!path) return null;
-    return sb.storage.from(IMAGE_BUCKET).getPublicUrl(path).data.publicUrl;
+    return IMAGE_BASE + '/' + encodePath(path);
+  }
+  async function r2AuthHeader() {
+    var sess = await sb.auth.getSession();
+    var token = sess && sess.data && sess.data.session && sess.data.session.access_token;
+    return token ? { Authorization: 'Bearer ' + token } : null;
+  }
+  /* Same shape as the old Supabase call: resolves to { error } (null on success). */
+  async function r2Upload(path, blob, contentType) {
+    try {
+      var auth = await r2AuthHeader();
+      if (!auth) return { error: new Error('Not signed in') };
+      var headers = { 'Content-Type': contentType || 'application/octet-stream' };
+      headers.Authorization = auth.Authorization;
+      var res = await fetch(IMAGE_BASE + '/' + encodePath(path), { method: 'PUT', headers: headers, body: blob });
+      if (!res.ok) return { error: new Error('Upload failed (' + res.status + ')') };
+      return { error: null };
+    } catch (e) { return { error: e }; }
+  }
+  async function r2Remove(paths) {
+    var auth = await r2AuthHeader();
+    if (!auth) return;
+    await Promise.all(paths.map(function (p) {
+      return fetch(IMAGE_BASE + '/' + encodePath(p), { method: 'DELETE', headers: auth }).catch(function () {});
+    }));
   }
   function swatchGradient(hue) {
     return 'linear-gradient(135deg, hsl(' + hue + ' 46% 42%), hsl(' + ((hue + 40) % 360) + ' 40% 28%))';
@@ -964,10 +1073,7 @@
   async function sendAdminLink() {
     var btn = document.getElementById('btnAdminSignIn');
     if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
-    var res = await sb.auth.signInWithOtp({
-      email: ADMIN_EMAIL,
-      options: { emailRedirectTo: window.location.origin + window.location.pathname }
-    });
+    var res = await sb.auth.requestLink();
     if (res.error) {
       toast('Could not send sign-in link: ' + res.error.message);
     } else {
@@ -1478,7 +1584,7 @@
     if (res.error) { state.paintings.splice(idx, 0, removed); renderAll(); toast('Could not delete — try again.'); return; }
     // best-effort cleanup of stored images; ignore failures
     var paths = [removed.image_path, removed.thumb_path].filter(Boolean);
-    if (paths.length) sb.storage.from(IMAGE_BUCKET).remove(paths).catch(function () {});
+    if (paths.length) r2Remove(paths).catch(function () {});
   }
 
   async function saveSetBucket(id, bucketRaw) {
@@ -1766,8 +1872,8 @@
           var fullBase = (pendingFile.name || 'photo').replace(/\.[^.]+$/, '');
           var fullPath = 'full/' + uid + '-' + fullBase + extForType(processed.fullBlob.type, pendingFile.name);
           var thumbPath = 'thumb/' + uid + '.jpg';
-          var uploads = [sb.storage.from(IMAGE_BUCKET).upload(fullPath, processed.fullBlob, { upsert: true, contentType: processed.fullBlob.type || pendingFile.type || 'image/jpeg' })];
-          if (processed.thumbBlob) uploads.push(sb.storage.from(IMAGE_BUCKET).upload(thumbPath, processed.thumbBlob, { upsert: true, contentType: 'image/jpeg' }));
+          var uploads = [r2Upload(fullPath, processed.fullBlob, processed.fullBlob.type || pendingFile.type || 'image/jpeg')];
+          if (processed.thumbBlob) uploads.push(r2Upload(thumbPath, processed.thumbBlob, 'image/jpeg'));
           var results = await Promise.all(uploads);
           if (results[0].error) throw results[0].error;
           data.image_path = fullPath;
@@ -1848,8 +1954,8 @@
         var fullBase = (f.name || 'photo').replace(/\.[^.]+$/, '');
         var fullPath = 'full/' + uid + '-' + fullBase + extForType(processed.fullBlob.type, f.name);
         var thumbPath = 'thumb/' + uid + '.jpg';
-        var uploads = [sb.storage.from(IMAGE_BUCKET).upload(fullPath, processed.fullBlob, { upsert: true, contentType: processed.fullBlob.type || f.type || 'image/jpeg' })];
-        if (processed.thumbBlob) uploads.push(sb.storage.from(IMAGE_BUCKET).upload(thumbPath, processed.thumbBlob, { upsert: true, contentType: 'image/jpeg' }));
+        var uploads = [r2Upload(fullPath, processed.fullBlob, processed.fullBlob.type || f.type || 'image/jpeg')];
+        if (processed.thumbBlob) uploads.push(r2Upload(thumbPath, processed.thumbBlob, 'image/jpeg'));
         var results = await Promise.all(uploads);
         if (results[0].error) throw results[0].error;
         var data = {
@@ -2433,7 +2539,22 @@
 
   /* ---------------- init ---------------- */
   sb.auth.onAuthStateChange(function (_event, session) { refreshAuthFromSession(session); });
-  sb.auth.getSession().then(function (res) { refreshAuthFromSession(res.data.session); });
+  (async function () {
+    /* Arriving from the emailed link: swap the one-time token for a session. */
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var loginToken = params.get('login');
+      if (loginToken) {
+        params.delete('login');
+        var qs = params.toString();
+        window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+        var vr = await sb.auth.verifyLink(loginToken);
+        if (vr.error) toast(vr.error.message); else toast('Signed in.');
+      }
+    } catch (e) { /* ignore */ }
+    var sres = await sb.auth.getSession();
+    refreshAuthFromSession(sres.data.session);
+  })();
   loadTheme();
   loadAll();
 })();
