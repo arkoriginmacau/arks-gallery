@@ -761,7 +761,12 @@
   }
 
   /* Decodes a photo once and produces two uploads from it:
-       - thumb: a small JPEG for the grid/list view (unchanged behaviour).
+       - thumb: a JPEG for the grid/list view, capped at THUMB_MAX_DIM (see
+         below). Grid cards render well under that on screen, so the actual
+         CSS box is always a mild downscale from the stored file, however
+         high the viewer's screen density — a big enough safety margin that
+         the browser's own image scaling doesn't need any help to avoid
+         aliasing on fine, regular detail like a canvas' woven texture.
        - full: the "zoom" image shown in the lightbox, downscaled (see
          ZOOM_MAX_DIM below) and re-encoded through canvas as WebP
          (falling back to JPEG if the browser can't produce a WebP blob).
@@ -777,26 +782,25 @@
   /* Downscales a large source (an <img> or canvas) to an exact target size
      without the moiré/interference banding a single big-ratio drawImage()
      produces. A camera photo is routinely 3000-6000px on its long edge; a
-     480px thumbnail is a 6-12x reduction in one step. Canvas2D's bilinear
-     filter only samples a small neighbourhood around each output pixel, so
-     at that ratio it skips most of the source pixels instead of averaging
-     them — fine repeating detail (woven canvas texture, hair, fabric weave)
-     aliases into false, wavy stripes, exactly like a camera filming a TV
-     screen. Repeatedly halving (each step is a safe ~2x ratio) removes the
-     high-frequency detail gradually instead of skipping over it.
+     small thumbnail can be a 6-12x reduction in one step. Canvas2D's
+     bilinear filter only samples a small neighbourhood around each output
+     pixel, so at that ratio it skips most of the source pixels instead of
+     averaging them — fine repeating detail (woven canvas texture, hair,
+     fabric weave) aliases into false, wavy stripes, exactly like a camera
+     filming a TV screen. Repeatedly halving (each step is a safe ~2x ratio
+     the browser's high-quality smoothing *can* properly box-filter) removes
+     the high-frequency detail gradually instead of skipping over it, so the
+     final resize has nothing left to alias.
 
-     The final step (halving stops once another halving would undershoot the
-     target, so it lands anywhere up to ~2x the target size) still isn't
-     immune: a woven-canvas painting's weave is such a regular, high-contrast
-     pattern that even browsers' "high quality" smoothing at that last ratio
-     leaves visible aliasing — and a second, independent downscale (e.g. the
-     browser fitting the stored thumbnail into a smaller grid-card box via
-     CSS) can reveal it again even when the stored file looks clean on its
-     own. A slight gaussian blur on just the source of that final draw acts
-     as the anti-aliasing low-pass filter the smoothing alone doesn't provide
-     — small enough to be invisible on brushstroke detail, but enough to
-     remove the high-frequency energy that would otherwise alias into
-     stripes under any further resize. */
+     (An earlier version of this function also tried pre-blurring the final
+     step to guard against a *second*, independent downscale — the browser
+     fitting the stored thumbnail into a smaller grid-card box via CSS. That
+     made real-device rendering worse, not better: the softened result JPEG-
+     compresses into visible blocking that a high-DPI phone screen then
+     upscales into an even more visible grid pattern. The reliable fix is
+     the one below — generate the thumbnail large enough that this second
+     downscale is always a mild ratio the browser handles cleanly on its
+     own, rather than trying to out-guess it with a blur.) */
   function drawHQDownscale(source, srcW, srcH, destW, destH) {
     var curSource = source, curW = srcW, curH = srcH;
     while (curW * 0.5 > destW && curH * 0.5 > destH) {
@@ -815,11 +819,7 @@
     var fctx = finalCanvas.getContext('2d');
     fctx.imageSmoothingEnabled = true;
     fctx.imageSmoothingQuality = 'high';
-    var finalRatio = curW / destW;
-    var antiMoireBlurPx = Math.min(1.3, Math.max(0, (finalRatio - 1) * 1.5));
-    if (antiMoireBlurPx > 0.02) fctx.filter = 'blur(' + antiMoireBlurPx.toFixed(2) + 'px)';
     fctx.drawImage(curSource, 0, 0, curW, curH, 0, 0, destW, destH);
-    fctx.filter = 'none';
     return finalCanvas;
   }
 
@@ -1694,7 +1694,7 @@
         saveBtn.textContent = 'Uploading…'; saveBtn.disabled = true;
         try {
           var uid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
-          var processed = await processPhoto(pendingFile, 480, 0.72);
+          var processed = await processPhoto(pendingFile, 900, 0.78);
           var fullBase = (pendingFile.name || 'photo').replace(/\.[^.]+$/, '');
           var fullPath = 'full/' + uid + '-' + fullBase + extForType(processed.fullBlob.type, pendingFile.name);
           var thumbPath = 'thumb/' + uid + '.jpg';
@@ -1776,7 +1776,7 @@
       if (fillEl) fillEl.style.width = Math.round((i / total) * 100) + '%';
       try {
         var uid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
-        var processed = await processPhoto(f, 480, 0.72);
+        var processed = await processPhoto(f, 900, 0.78);
         var fullBase = (f.name || 'photo').replace(/\.[^.]+$/, '');
         var fullPath = 'full/' + uid + '-' + fullBase + extForType(processed.fullBlob.type, f.name);
         var thumbPath = 'thumb/' + uid + '.jpg';
