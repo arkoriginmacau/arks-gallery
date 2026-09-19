@@ -289,6 +289,29 @@
   }
   .censor-toggle-btn.active { color: var(--ochre); }
 
+  /* ---------- missing numbers finder ---------- */
+  .missing-input-row { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 4px; }
+  .missing-input-row .field { flex: 1; margin-bottom: 0; }
+  .missing-summary { font-size: 13px; color: var(--ink-soft); margin: 16px 0 10px; }
+  .missing-summary strong { color: var(--ink-2); }
+  .missing-list { max-height: 320px; overflow-y: auto; border: 1px solid var(--line); border-radius: 4px; }
+  .missing-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line-soft); }
+  .missing-row:last-child { border-bottom: none; }
+  .missing-row .missing-num { font-family: 'IBM Plex Mono', monospace; font-weight: 700; font-size: 13.5px; flex: 0 0 auto; min-width: 56px; }
+  .missing-status-btns { display: flex; gap: 6px; margin-left: auto; }
+  .missing-status-btn {
+    font-size: 11px; font-weight: 600; padding: 5px 9px; border-radius: 3px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--paper-2); color: var(--ink-soft);
+  }
+  .missing-status-btn:hover { border-color: var(--ochre); color: var(--ink-2); }
+  .missing-status-btn.status-sold:hover { border-color: var(--sold); color: var(--sold); }
+  .missing-status-btn.status-nfs:hover { border-color: var(--not-for-sale); color: var(--not-for-sale); }
+  .missing-status-btn:disabled { opacity: .5; cursor: default; }
+  .missing-row.is-logged .missing-num { color: var(--ink-faint); }
+  .missing-logged-tag { margin-left: auto; font-size: 11.5px; font-weight: 600; color: var(--ink-soft); display: flex; align-items: center; gap: 10px; }
+  .missing-undo-btn { font-size: 11px; color: var(--ink-faint); text-decoration: underline; background: none; border: none; cursor: pointer; padding: 0; }
+  .missing-undo-btn:hover { color: var(--ink-2); }
+
   /* ---------- painting sets ---------- */
   /* Badge on a card whose piece belongs to a set with 2+ tagged members —
      click opens the set overlay. Sits top-right, mirroring nfs-toggle's
@@ -973,6 +996,7 @@
       el.innerHTML = printBtn +
         '<button class="btn btn-ghost btn-sm" id="btnTheme" type="button" title="Change site colors">Theme</button>' +
         '<button class="btn btn-ghost btn-sm" id="btnSuffixes" type="button" title="Manage colored tags like &quot;Painting set&quot;">Suffixes</button>' +
+        '<button class="btn btn-ghost btn-sm" id="btnFindMissing" type="button" title="Find gaps in the current tab\'s catalogue numbering">Find missing #</button>' +
         '<button class="btn btn-ghost btn-sm" id="btnBulkUpload" type="button" title="Add several photos at once">Bulk upload</button>' +
         '<input type="file" id="bulkFileInput" accept="image/*" multiple style="display:none">' +
         '<button class="btn btn-ghost btn-sm" id="btnPdfSync" type="button" title="Fill in names and sizes from an inventory PDF">Update from PDF</button>' +
@@ -983,6 +1007,10 @@
         '<button class="btn btn-ghost btn-sm" id="btnSignOut" type="button">Sign out</button>';
       document.getElementById('btnTheme').addEventListener('click', openThemeModal);
       document.getElementById('btnSuffixes').addEventListener('click', openSuffixManagerModal);
+      document.getElementById('btnFindMissing').addEventListener('click', function () {
+        if (!state.activeTabId) { toast('Pick a tab first.'); return; }
+        openMissingNumbersModal();
+      });
       document.getElementById('btnAddPainting').addEventListener('click', function () {
         if (!state.activeTabId) { openTabModal(); return; }
         openPaintingModal();
@@ -2267,6 +2295,140 @@
       saveBtn.disabled = false; saveBtn.textContent = 'Save';
       if (ok) { toast('Suffixes saved.'); closeModal(); }
     });
+  }
+
+  /* ---------------- missing numbers finder ---------------- */
+  /* Catches up a catalogue that's fallen behind reality. Given a number
+     range for the current tab, lists which catalogue numbers in that
+     range have nothing entered at all — matched the same way the rest of
+     the app reads numbers (initialNumber's leading digit run), so a piece
+     that's part of a set (e.g. "59-1-1-3") still counts as covering 59.
+     A missing number can be logged right here — Sold, Not for sale, or
+     just Available — without a photo, so it stops showing up as a gap
+     next time; it becomes an ordinary (photo-less) entry in the grid that
+     can get its real photo and details later via the normal edit pencil. */
+  function openMissingNumbersModal() {
+    var tab = tabById(state.activeTabId);
+    if (!tab) return;
+    var root = document.getElementById('modalRoot');
+    var lastRange = null;
+
+    root.innerHTML = '<div class="modal-backdrop" id="missingBackdrop"><div class="modal modal-wide">' +
+      '<h2>Find missing numbers</h2>' +
+      '<p class="modal-sub">Checks ' + esc(tab.name) + (tab.prefix ? ' (' + esc(tab.prefix) + ')' : '') + ' for catalogue numbers with nothing entered yet.</p>' +
+      '<div class="missing-input-row">' +
+      '<div class="field"><label for="missingRange">Range</label>' +
+      '<input type="text" id="missingRange" class="mono" placeholder="e.g. 200-59" inputmode="numeric"></div>' +
+      '<button class="btn btn-primary" id="missingCheckBtn" type="button">Check</button>' +
+      '</div>' +
+      '<p class="field-hint">Either order works — highest and lowest, separated by a dash.</p>' +
+      '<div id="missingResultsWrap"></div>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" id="missingCloseBtn" type="button">Close</button></div>' +
+      '</div></div>';
+
+    document.getElementById('missingBackdrop').addEventListener('click', function (e) { if (e.target.id === 'missingBackdrop') closeModal(); });
+    document.getElementById('missingCloseBtn').addEventListener('click', closeModal);
+
+    var input = document.getElementById('missingRange');
+    input.addEventListener('keydown', function (e) { if (e.key === 'Enter') runCheck(); });
+    document.getElementById('missingCheckBtn').addEventListener('click', runCheck);
+    input.focus();
+
+    function runCheck() {
+      var raw = input.value.trim();
+      var m = raw.match(/^(\d+)\s*-\s*(\d+)$/);
+      if (!m) { toast('Enter a range like 200-59.'); return; }
+      var a = parseInt(m[1], 10), b = parseInt(m[2], 10);
+      var lo = Math.min(a, b), hi = Math.max(a, b);
+      if (hi - lo > 5000) { toast('That range is too wide — try something narrower.'); return; }
+      lastRange = { lo: lo, hi: hi };
+      renderResults();
+    }
+
+    function currentNumbers() {
+      var set = {};
+      state.paintings.forEach(function (p) {
+        if (p.tab_id !== tab.id) return;
+        var n = initialNumber(p.number);
+        if (n !== null) set[n] = true;
+      });
+      return set;
+    }
+
+    function renderResults() {
+      var wrap = document.getElementById('missingResultsWrap');
+      if (!wrap || !lastRange) return;
+      var existing = currentNumbers();
+      var missing = [];
+      for (var n = lastRange.lo; n <= lastRange.hi; n++) if (!existing[n]) missing.push(n);
+      var total = lastRange.hi - lastRange.lo + 1;
+
+      if (!missing.length) {
+        wrap.innerHTML = '<p class="missing-summary">No gaps — every number from <strong>' + lastRange.lo + '</strong> to <strong>' + lastRange.hi + '</strong> is accounted for.</p>';
+        return;
+      }
+
+      wrap.innerHTML = '<p class="missing-summary"><strong>' + missing.length + '</strong> of ' + total + ' numbers missing between <strong>' + lastRange.lo + '</strong> and <strong>' + lastRange.hi + '</strong>:</p>' +
+        '<div class="missing-list" id="missingList">' + missing.map(rowHTML).join('') + '</div>';
+      wireRows();
+    }
+
+    function rowHTML(n) {
+      return '<div class="missing-row" data-num="' + n + '">' +
+        '<span class="missing-num">' + esc((tab.prefix || '') + n) + '</span>' +
+        '<div class="missing-status-btns">' +
+        '<button class="missing-status-btn" data-log="available" type="button">Available</button>' +
+        '<button class="missing-status-btn status-sold" data-log="sold" type="button">Sold</button>' +
+        '<button class="missing-status-btn status-nfs" data-log="nfs" type="button">Not for sale</button>' +
+        '</div></div>';
+    }
+
+    function loggedRowHTML(n, status, paintingId) {
+      var label = status === 'sold' ? 'Logged — Sold' : (status === 'nfs' ? 'Logged — Not for sale' : 'Logged — Available');
+      return '<div class="missing-row is-logged" data-num="' + n + '">' +
+        '<span class="missing-num">' + esc((tab.prefix || '') + n) + '</span>' +
+        '<span class="missing-logged-tag">' + label + '<button class="missing-undo-btn" data-undo="' + esc(paintingId) + '" type="button">Undo</button></span>' +
+        '</div>';
+    }
+
+    function wireRows() {
+      var list = document.getElementById('missingList');
+      if (!list) return;
+      list.querySelectorAll('[data-log]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var rowEl = btn.closest('[data-num]');
+          logNumber(parseInt(rowEl.getAttribute('data-num'), 10), btn.getAttribute('data-log'), rowEl);
+        });
+      });
+      list.querySelectorAll('[data-undo]').forEach(function (btn) {
+        btn.addEventListener('click', function () { undoLog(btn.getAttribute('data-undo'), btn); });
+      });
+    }
+
+    async function logNumber(n, status, rowEl) {
+      var btns = rowEl.querySelectorAll('button');
+      btns.forEach(function (b) { b.disabled = true; });
+      var payload = {
+        tab_id: tab.id, name: '', number: String(n), date: null, extra_dates: [],
+        price: 0, size: '', description: '',
+        sold: status === 'sold', not_for_sale: status === 'nfs', censored: false,
+        hue: Math.floor(Math.random() * 360), suffix_id: null
+      };
+      var res = await sb.from('paintings').insert(payload).select().single();
+      if (res.error) { toast('Could not log #' + n + ' — try again.'); btns.forEach(function (b) { b.disabled = false; }); return; }
+      state.paintings.unshift(res.data);
+      renderAll();
+      rowEl.outerHTML = loggedRowHTML(n, status, res.data.id);
+      wireRows();
+    }
+
+    async function undoLog(paintingId, btn) {
+      btn.disabled = true;
+      var before = state.paintings.slice();
+      await deletePainting(paintingId);
+      if (state.paintings.length === before.length) { btn.disabled = false; return; } // delete failed, deletePainting already toasted
+      renderResults();
+    }
   }
 
   /* ---------------- init ---------------- */
