@@ -208,7 +208,18 @@
     border-bottom: 1px solid var(--line);
   }
   .card-image img, .card-image .swatch { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .card-image .swatch { display: flex; align-items: center; justify-content: center; }
+    .card-image.move-ready { cursor: grab; }
+  .card-image.moving { cursor: grabbing; touch-action: none; user-select: none; }
+  .card-image.moving img { -webkit-user-drag: none; }
+  .card-image.moving::before, .card-image.moving::after { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 6; animation: moveBlink .6s steps(1) infinite;
+    background:
+      linear-gradient(#e11,#e11) top left / 22px 4px no-repeat, linear-gradient(#e11,#e11) top left / 4px 22px no-repeat,
+      linear-gradient(#e11,#e11) top right / 22px 4px no-repeat, linear-gradient(#e11,#e11) top right / 4px 22px no-repeat,
+      linear-gradient(#e11,#e11) bottom left / 22px 4px no-repeat, linear-gradient(#e11,#e11) bottom left / 4px 22px no-repeat,
+      linear-gradient(#e11,#e11) bottom right / 22px 4px no-repeat, linear-gradient(#e11,#e11) bottom right / 4px 22px no-repeat; }
+  .card-image.moving::after { display: none; }
+  @keyframes moveBlink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+.card-image .swatch { display: flex; align-items: center; justify-content: center; }
   .card-image .swatch span {
     font-family: 'Fraunces', serif; font-size: 44px; color: rgba(255,255,255,.78);
     font-weight: 500;
@@ -750,7 +761,7 @@
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
 
-  var state = { tabs: [], paintings: [], suffixes: [], activeTabId: null, printMode: 'A4', printRows: 8, printScope: 'current', loaded: false };
+  var state = { thumbPos: {}, tabs: [], paintings: [], suffixes: [], activeTabId: null, printMode: 'A4', printRows: 8, printScope: 'current', loaded: false };
   var isAdmin = false;
   var currentUserEmail = null;
   /* When this page is loaded inside someone else's site (e.g. embedded on the
@@ -1063,8 +1074,14 @@
     if (!id) return null;
     return state.suffixes.find(function (s) { return s.id === id; }) || null;
   }
+  /* Per-painting thumbnail crop position {paintingId: [x%, y%]}, kept in site_theme row 2
+     (row 1 is the colour theme). Missing entry = centred. */
+  async function fetchThumbPos() {
+    var res = await sb.from('site_theme').select('colors').eq('id', 2).maybeSingle();
+    state.thumbPos = (res && res.data && res.data.colors && typeof res.data.colors === 'object') ? res.data.colors : {};
+  }
   async function loadAll() {
-    await Promise.all([fetchTabs(), fetchPaintings(), fetchSuffixes()]);
+    await Promise.all([fetchTabs(), fetchPaintings(), fetchSuffixes(), fetchThumbPos()]);
     state.loaded = true;
     renderAll();
   }
@@ -1207,7 +1224,7 @@
       var thumbSrc = publicImgUrl(p.thumb_path) || publicImgUrl(p.image_path);
       var fullSrc = publicImgUrl(p.image_path) || thumbSrc;
       var imageInner = thumbSrc
-        ? '<img src="' + esc(thumbSrc) + '" alt="' + esc(p.name) + '" loading="lazy" decoding="async">'
+        ? '<img src="' + esc(thumbSrc) + '" alt="' + esc(p.name) + '" loading="lazy" decoding="async" draggable="false"' + thumbPosStyle(p) + '>'
         : '<div class="swatch" style="background:' + swatchGradient(p.hue || 30) + '"><span>' + esc((p.name || '?').charAt(0).toUpperCase()) + '</span></div>';
       var setMates = setMembers(p);
       var suffix = suffixById(p.suffix_id);
@@ -1299,7 +1316,7 @@
         var p = entry.p;
         var thumbSrc = publicImgUrl(p.thumb_path) || publicImgUrl(p.image_path);
         var thumb = thumbSrc
-          ? '<img class="p-thumb" src="' + esc(thumbSrc) + '" alt="">'
+          ? '<img class="p-thumb" src="' + esc(thumbSrc) + '" alt=""' + thumbPosStyle(p) + '>'
           : '<div class="p-thumb swatch" style="background:' + swatchGradient(p.hue || 30) + '">' + esc((p.name || '?').charAt(0).toUpperCase()) + '</div>';
         return '<div class="print-row' + (p.sold ? ' sold' : '') + '">' + thumb +
           '<div class="p-num">' + esc(catalogNum(p)) + '</div>' +
@@ -1410,6 +1427,7 @@
     grid.querySelectorAll('[data-toggle-censor]').forEach(function (el) {
       el.addEventListener('click', function () { toggleCensored(el.getAttribute('data-toggle-censor')); });
     });
+    setupThumbMove(grid);
     grid.querySelectorAll('[data-view-set]').forEach(function (el) {
       el.addEventListener('click', function (e) {
         e.stopPropagation(); // sits inside the card-image lightbox trigger
@@ -1567,6 +1585,70 @@
      the lightbox opens the same full-size image (unblurred) as always, so
      this is purely a "don't show it at a glance" toggle, not real redaction
      of the underlying photo. */
+  function thumbPosStyle(p) {
+    var pos = state.thumbPos[p.id] || [50, 50], x = pos[0], y = pos[1];
+    return (x === 50 && y === 50) ? '' : ' style="object-position:' + x + '% ' + y + '%"';
+  }
+  /* Admin: hold ~1s on a thumbnail (red corners blink), then drag to reposition the crop. */
+  function setupThumbMove(grid) {
+    if (!isAdmin) return;
+    grid.querySelectorAll('.card-image').forEach(function (box) {
+      var img = box.querySelector('img'); if (!img) return;
+      var id = box.parentNode.getAttribute('data-card');
+      var timer = null, active = false, sx = 0, sy = 0, startX = 50, startY = 50, curX = 50, curY = 50, pid = null, downX = 0, downY = 0;
+      function cancelTimer() { if (timer) { clearTimeout(timer); timer = null; } }
+      box.addEventListener('contextmenu', function (e) { if (timer || active) e.preventDefault(); });
+      box.addEventListener('pointerdown', function (e) {
+        if (e.button && e.button !== 0) return;
+        if (e.target.closest('button')) return;
+        downX = sx = e.clientX; downY = sy = e.clientY; pid = e.pointerId;
+        var pos0 = state.thumbPos[id] || [50, 50];
+        startX = curX = pos0[0]; startY = curY = pos0[1];
+        cancelTimer();
+        timer = setTimeout(function () {
+          timer = null; active = true; box.classList.add('moving');
+          try { box.setPointerCapture(pid); } catch (err) {}
+          if (navigator.vibrate) { try { navigator.vibrate(30); } catch (err) {} }
+        }, 1000);
+      });
+      box.addEventListener('pointermove', function (e) {
+        if (!active) {
+          if (timer && Math.hypot(e.clientX - downX, e.clientY - downY) > 8) cancelTimer();
+          return;
+        }
+        e.preventDefault();
+        var bw = box.clientWidth, bh = box.clientHeight, nw = img.naturalWidth || bw, nh = img.naturalHeight || bh;
+        var scale = Math.max(bw / nw, bh / nh), ow = nw * scale - bw, oh = nh * scale - bh;
+        // image follows the cursor: dragging right/down reveals the left/top part
+        if (ow > 0.5) curX = Math.max(0, Math.min(100, startX - (e.clientX - sx) / ow * 100));
+        if (oh > 0.5) curY = Math.max(0, Math.min(100, startY - (e.clientY - sy) / oh * 100));
+        img.style.objectPosition = curX + '% ' + curY + '%';
+      });
+      function finish(e) {
+        cancelTimer();
+        if (!active) return;
+        active = false; box.classList.remove('moving');
+        try { box.releasePointerCapture(pid); } catch (err) {}
+        var swallow = function (ev) { ev.stopPropagation(); ev.preventDefault(); };
+        box.addEventListener('click', swallow, { capture: true, once: true });
+        setTimeout(function () { box.removeEventListener('click', swallow, true); }, 400);
+        curX = Math.round(curX * 10) / 10; curY = Math.round(curY * 10) / 10;
+        if (curX === startX && curY === startY) return;
+        var prev = state.thumbPos[id];
+        state.thumbPos[id] = [curX, curY];
+        sb.from('site_theme').upsert({ id: 2, colors: state.thumbPos, updated_at: new Date().toISOString() }).then(function (res) {
+          if (res.error) {
+            if (prev) state.thumbPos[id] = prev; else delete state.thumbPos[id];
+            renderAll(); toast('Could not save position — try again.');
+          } else toast('Thumbnail position saved.');
+        });
+      }
+      box.addEventListener('pointerup', finish);
+      box.addEventListener('pointercancel', finish);
+      box.addEventListener('touchmove', function (e) { if (active) e.preventDefault(); }, { passive: false });
+    });
+  }
+
   async function toggleCensored(id) {
     var p = state.paintings.find(function (x) { return x.id === id; });
     if (!p) return;
