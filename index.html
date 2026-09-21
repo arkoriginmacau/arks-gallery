@@ -1122,7 +1122,7 @@
         '<button class="btn btn-ghost btn-sm" id="btnFindMissing" type="button" title="Find gaps in the current tab\'s catalogue numbering">Find missing #</button>' +
         '<button class="btn btn-ghost btn-sm" id="btnBulkUpload" type="button" title="Add several photos at once">Bulk upload</button>' +
         '<input type="file" id="bulkFileInput" accept="image/*" multiple style="display:none">' +
-        '<button class="btn btn-ghost btn-sm" id="btnPdfSync" type="button" title="Fill in names and sizes from an inventory PDF">Update from PDF</button>' +
+        '<button class="btn btn-ghost btn-sm" id="btnPdfSync" type="button" title="Fill in names, sizes and dates from an inventory PDF">Update from PDF</button>' +
         '<input type="file" id="pdfFileInput" accept="application/pdf" style="display:none">' +
         '<button class="btn btn-primary" id="btnAddPainting" type="button">' +
         '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>Add painting</button>' +
@@ -2065,8 +2065,9 @@
   }
 
   /* ---------------- update from PDF ----------------
-     The inventory PDF lists rows like "O-06-1.1/4  Some Painting Name  60 x 80 cm",
-     one per line once the page text is reconstructed. Some rows have no usable
+     The inventory PDF lists rows like "2024-01-18  O-06-1.1/4  Some Painting Name  60 x 80 cm"
+     (date, number, name, size), one per line once the page text is reconstructed.
+     The leading date is optional — some rows have it blank. Some rows have no usable
      size ("Dont Exist", "not done", trailing placeholder dashes) — those are still
      parsed and kept (with size: null) rather than skipped, since they're still
      part of the list and may still carry a name correction. */
@@ -2088,7 +2089,7 @@
   }
 
   function parseInventoryLines(lines) {
-    var numberLineRe = /^([A-Za-z]+-[A-Za-z0-9.\-\/]*\d)\s+(.*)$/;
+    var numberLineRe = /^(?:(\d{4}-\d{2}-\d{2})\s+)?([A-Za-z]+-[A-Za-z0-9.\-\/]*\d)\s+(.*)$/;
     var sizeRe = /(\d+)\s*[x×]\s*(\d+)\s*cm(\s*\(thick\))?\s*$/i;
     var rows = [];
     lines.forEach(function (line) {
@@ -2096,8 +2097,9 @@
       if (!trimmed) return;
       var m = trimmed.match(numberLineRe);
       if (!m) return;
-      var number = m[1];
-      var rest = m[2].trim();
+      var date = m[1] || null;
+      var number = m[2];
+      var rest = m[3].trim();
       var sizeMatch = rest.match(sizeRe);
       var size = null, name = rest;
       if (sizeMatch) {
@@ -2106,7 +2108,7 @@
       }
       /* No size match: row is still kept in full, name is whatever text remains
          (e.g. "Dont Exist", "not done—") — never dropped. */
-      rows.push({ number: number, name: name, size: size });
+      rows.push({ number: number, name: name, size: size, date: date });
     });
     return rows;
   }
@@ -2143,14 +2145,17 @@
         if (!row) { unmatchedCount++; return; }
         var newName = row.name || '';
         var newSize = row.size; /* null = PDF has no usable size — never overwrite existing size with it */
+        var newDate = row.date; /* null = PDF row has no date — never overwrite existing date with it */
         var nameChanged = newName !== (p.name || '');
         var sizeChanged = newSize !== null && newSize !== (p.size || '');
-        if (nameChanged || sizeChanged) {
+        var dateChanged = newDate !== null && newDate !== (p.date ? String(p.date).slice(0, 10) : '');
+        if (nameChanged || sizeChanged || dateChanged) {
           changes.push({
             id: p.id, catalog: catalogNum(p),
             oldName: p.name || '', newName: newName,
             oldSize: p.size || '', newSize: sizeChanged ? newSize : (p.size || ''),
-            nameChanged: nameChanged, sizeChanged: sizeChanged
+            oldDate: p.date ? String(p.date).slice(0, 10) : '', newDate: dateChanged ? newDate : (p.date ? String(p.date).slice(0, 10) : ''),
+            nameChanged: nameChanged, sizeChanged: sizeChanged, dateChanged: dateChanged
           });
         }
       });
@@ -2172,6 +2177,9 @@
         '<td>' + (c.sizeChanged
           ? '<span class="pdf-diff-old">' + esc(c.oldSize || '—') + '</span><span class="pdf-diff-new">' + esc(c.newSize || '—') + '</span>'
           : esc(c.oldSize || '—')) + '</td>' +
+        '<td>' + (c.dateChanged
+          ? '<span class="pdf-diff-old">' + esc(c.oldDate || '—') + '</span><span class="pdf-diff-new">' + esc(c.newDate || '—') + '</span>'
+          : esc(c.oldDate || '—')) + '</td>' +
         '</tr>';
     }).join('');
 
@@ -2186,7 +2194,7 @@
         : '') +
       '</p>' +
       (changes.length
-        ? '<div class="pdf-diff-scroll"><table class="pdf-diff-table"><thead><tr><th>Number</th><th>Name</th><th>Size</th></tr></thead><tbody>' + rowsHtml + '</tbody></table></div>'
+        ? '<div class="pdf-diff-scroll"><table class="pdf-diff-table"><thead><tr><th>Number</th><th>Name</th><th>Size</th><th>Date</th></tr></thead><tbody>' + rowsHtml + '</tbody></table></div>'
         : '') +
       '<div class="modal-actions"><button class="btn btn-ghost" id="pdfPreviewCancel" type="button">Cancel</button>' +
       (changes.length ? '<button class="btn btn-primary" id="pdfPreviewApply" type="button">Apply ' + changes.length + ' update' + (changes.length === 1 ? '' : 's') + '</button>' : '') +
@@ -2209,6 +2217,7 @@
       var patch = {};
       if (c.nameChanged) patch.name = c.newName;
       if (c.sizeChanged) patch.size = c.newSize;
+      if (c.dateChanged) patch.date = c.newDate;
       try {
         var res = await sb.from('paintings').update(patch).eq('id', c.id).select().single();
         if (res.error) throw res.error;
