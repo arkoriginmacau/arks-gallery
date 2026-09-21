@@ -512,6 +512,11 @@
     position: sticky; top: 0; background: var(--paper); font-size: 11px;
     text-transform: uppercase; letter-spacing: .04em; color: var(--ink-soft);
   }
+  .test-red { color: #ff2a2a !important; font-weight: 700; }
+  .card.is-test-new { outline: 3px solid #ff2a2a; outline-offset: -3px; }
+  .test-new-tag { display: inline-block; background: #ff2a2a; color: #fff; font-size: 10px; font-weight: 700; letter-spacing: .08em; padding: 2px 6px; border-radius: 3px; margin-bottom: 6px; }
+  #testBanner { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 9999; background: #ff2a2a; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; box-shadow: 0 6px 24px rgba(0,0,0,.35); display: flex; gap: 14px; align-items: center; max-width: calc(100vw - 24px); }
+  #testBanner button { background: #fff; color: #c00; border: 0; border-radius: 5px; padding: 5px 12px; font-weight: 700; cursor: pointer; }
   .pdf-diff-old { display: block; color: var(--ink-soft); text-decoration: line-through; }
   .pdf-diff-new { display: block; color: var(--ink); font-weight: 600; }
   .bulk-progress-track {
@@ -1129,6 +1134,8 @@
         '<input type="file" id="bulkFileInput" accept="image/*" multiple style="display:none">' +
         '<button class="btn btn-ghost btn-sm" id="btnPdfSync" type="button" title="Fill in names, sizes and dates from an inventory PDF">Update from PDF</button>' +
         '<input type="file" id="pdfFileInput" accept="application/pdf" style="display:none">' +
+        '<button class="btn btn-ghost btn-sm" id="btnPdfTest" type="button" title="Preview what the PDF would change — shown in red, nothing is saved">Test from PDF</button>' +
+        '<input type="file" id="pdfTestInput" accept="application/pdf" style="display:none">' +
         '<button class="btn btn-primary" id="btnAddPainting" type="button">' +
         '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>Add painting</button>' +
         '<span class="admin-pill"><span class="dot"></span>' + esc(currentUserEmail) + '</span>' +
@@ -1161,6 +1168,15 @@
         e.target.value = '';
         if (!f) return;
         runPdfSync(f);
+      });
+      document.getElementById('btnPdfTest').addEventListener('click', function () {
+        document.getElementById('pdfTestInput').click();
+      });
+      document.getElementById('pdfTestInput').addEventListener('change', function (e) {
+        var f = e.target.files[0];
+        e.target.value = '';
+        if (!f) return;
+        runPdfSync(f, true);
       });
       document.getElementById('btnSignOut').addEventListener('click', signOut);
     } else if (isEmbedded) {
@@ -1196,11 +1212,57 @@
     bar.innerHTML = html;
   }
 
+  /* ---------------- PDF test preview (nothing is saved) ---------------- */
+  var testOverlay = null; /* { byId: {id: {name?,size?,date?}}, extras: [placeholder paintings] } */
+  function testView(p) {
+    if (!testOverlay) return p;
+    var o = testOverlay.byId[p.id];
+    if (!o) return p;
+    var v = Object.assign({}, p);
+    v.__red = {};
+    ['name', 'size', 'date'].forEach(function (k) {
+      if (Object.prototype.hasOwnProperty.call(o, k)) { v[k] = o[k]; v.__red[k] = true; }
+    });
+    return v;
+  }
+  function updateTestBanner() {
+    var el = document.getElementById('testBanner');
+    if (!testOverlay) { if (el) el.remove(); return; }
+    if (!el) { el = document.createElement('div'); el.id = 'testBanner'; document.body.appendChild(el); }
+    var changed = Object.keys(testOverlay.byId).length, added = testOverlay.extras.length;
+    el.innerHTML = '<span>TEST PREVIEW — nothing is saved. Red = would come from the PDF (' +
+      changed + ' painting' + (changed === 1 ? '' : 's') + ' changed, ' + added + ' added).</span>' +
+      '<button type="button" id="testClearBtn">Clear test</button>';
+    document.getElementById('testClearBtn').addEventListener('click', function () {
+      testOverlay = null; updateTestBanner(); renderAll();
+    });
+  }
+  function startPdfTest(changes, creates) {
+    testOverlay = { byId: {}, extras: [] };
+    changes.forEach(function (c) {
+      var o = {};
+      if (c.nameChanged) o.name = c.newName;
+      if (c.sizeChanged) o.size = c.newSize;
+      if (c.dateChanged) o.date = c.newDate;
+      testOverlay.byId[c.id] = o;
+    });
+    creates.forEach(function (c, i) {
+      testOverlay.extras.push({
+        id: 'test-' + i, tab_id: c.tab_id, number: c.number, name: c.name, date: c.date, extra_dates: [],
+        price: 0, size: '', description: '', sold: false, not_for_sale: false, censored: false, hue: 0,
+        __testNew: true, __red: { name: true, number: true, date: true, size: true }
+      });
+    });
+    updateTestBanner();
+    renderAll();
+    toast('Test preview: red = from the PDF. Nothing was saved.');
+  }
+
   /* ---------------- render: grid ---------------- */
   function renderGrid() {
     var tab = tabById(state.activeTabId);
     document.getElementById('tabTitle').textContent = tab ? tab.name : (state.loaded ? 'No tabs yet' : 'Loading…');
-    var items = sortByNumber(state.paintings.filter(function (p) { return p.tab_id === state.activeTabId; }));
+    var items = sortByNumber(state.paintings.concat(testOverlay ? testOverlay.extras : []).filter(function (p) { return p.tab_id === state.activeTabId; }));
     document.getElementById('tabSub').textContent = items.length + (items.length === 1 ? ' piece' : ' pieces');
 
     var grid = document.getElementById('grid');
@@ -1225,7 +1287,9 @@
       return;
     }
 
-    grid.innerHTML = items.map(function (p) {
+    grid.innerHTML = items.map(function (p0) {
+      var p = testView(p0);
+      var red = p.__red || {};
       var thumbSrc = publicImgUrl(p.thumb_path) || publicImgUrl(p.image_path);
       var fullSrc = publicImgUrl(p.image_path) || thumbSrc;
       var imageInner = thumbSrc
@@ -1235,7 +1299,7 @@
           : '<div class="swatch" style="background:' + swatchGradient(p.hue || 30) + '"><span>' + esc((p.name || '?').charAt(0).toUpperCase()) + '</span></div>');
       var setMates = setMembers(p);
       var suffix = suffixById(p.suffix_id);
-      return '<div class="card' + (p.sold ? ' is-sold' : '') + '" data-card="' + p.id + '">' +
+      return '<div class="card' + (p.sold ? ' is-sold' : '') + (p.__testNew ? ' is-test-new' : '') + '" data-card="' + p.id + '">' +
         '<div class="card-image' + (p.censored ? ' is-censored' : '') + '"' + (thumbSrc ? ' data-lightbox="' + esc(fullSrc) + '" title="' + (isEmbedded ? 'Click to view full size (opens in a new tab)' : 'Click to view full size') + '"' : '') + '>' + imageInner +
         (p.censored
           ? '<div class="censored-badge"><div class="censored-chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>Click to view</div></div>'
@@ -1244,7 +1308,7 @@
         (p.sold
           ? '<div class="sold-slash"></div><div class="sold-stamp">Sold</div>'
           : (p.not_for_sale ? '<div class="notforsale-slash"></div><div class="notforsale-stamp">Not for sale</div>' : '')) +
-        (isAdmin
+        ((isAdmin && !p.__testNew)
           ? '<button class="nfs-toggle' + (p.not_for_sale ? ' active' : '') + '" data-toggle-nfs="' + p.id + '" type="button" ' +
             'title="' + (p.not_for_sale ? 'Remove not-for-sale mark' : 'Mark as not for sale') + '">N/S</button>'
           : '') +
@@ -1256,15 +1320,16 @@
         (thumbSrc ? '<span class="expand-hint"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 3H5a2 2 0 0 0-2 2v3m0 8v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3m0-8V5a2 2 0 0 0-2-2h-3"/></svg></span>' : '') +
         '</div>' +
         '<div class="card-body">' +
-        '<div class="card-name"><span class="field-label">Name:</span> ' + esc(p.name || 'Untitled') + '</div>' +
-        '<div class="card-meta"><span class="field-label">Number:</span> <span class="mono">' + esc(catalogNum(p)) + '</span></div>' +
-        '<div class="card-meta"><span class="field-label">Date:</span> <span class="mono">' + esc(fmtPieceDate(p)) + '</span></div>' +
-        (p.size ? '<div class="card-meta"><span class="field-label">Size:</span> <span class="mono">' + esc(p.size) + '</span></div>' : '') +
+        (p.__testNew ? '<div class="test-new-tag">TEST — NEW</div>' : '') +
+        '<div class="card-name"><span class="field-label">Name:</span> ' + (red.name ? '<span class="test-red">' : '') + esc(p.name || 'Untitled') + (red.name ? '</span>' : '') + '</div>' +
+        '<div class="card-meta"><span class="field-label">Number:</span> <span class="mono' + (red.number ? ' test-red' : '') + '">' + esc(catalogNum(p)) + '</span></div>' +
+        '<div class="card-meta"><span class="field-label">Date:</span> <span class="mono' + (red.date ? ' test-red' : '') + '">' + esc(fmtPieceDate(p)) + '</span></div>' +
+        (p.size ? '<div class="card-meta"><span class="field-label">Size:</span> <span class="mono' + (red.size ? ' test-red' : '') + '">' + esc(p.size) + '</span></div>' : '') +
         (p.description ? '<div class="card-desc"><span class="field-label">Description:</span> ' + esc(p.description) + '</div>' : '') +
         '<div class="card-bottom">' +
         (suffix ? '<div class="suffix-tag" style="color:' + esc(suffix.color) + '">' + esc(suffix.label) + '</div>' : '') +
         '<div class="card-footer">' +
-        (isAdmin
+        ((isAdmin && !p.__testNew)
           ? '<button class="sold-toggle" data-toggle-sold="' + p.id + '"><span class="switch"></span>' + (p.sold ? 'Sold' : 'Mark sold') + '</button>' +
             '<div class="card-actions">' +
             '<button class="icon-btn set-assign-btn' + (p.set_id ? ' has-set' : '') + '" data-assign-set="' + p.id + '" aria-label="Add to set" title="' + (p.set_id ? 'In set bucket ' + esc(String(p.set_id)) + ' — click to change' : 'Add to a set') + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2 9 4.9-9 4.9-9-4.9L12 2Z"/><path d="m3 12 9 4.9 9-4.9M3 17l9 4.9 9-4.9"/></svg></button>' +
@@ -2131,7 +2196,7 @@
     return m ? m.join('-') : '';
   }
 
-  async function runPdfSync(file) {
+  async function runPdfSync(file, testMode) {
     if (!window.pdfjsLib) { toast('PDF reader failed to load — check your connection and try again.'); return; }
     toast('Reading PDF…');
     try {
@@ -2186,6 +2251,7 @@
                        catalog: (tab.prefix || '') + pm[2] });
       });
 
+      if (testMode) { startPdfTest(changes, creates); return; }
       openPdfPreviewModal(changes, unmatchedCount, rows.length, creates);
     } catch (e) {
       toast('Could not read that PDF — is it a valid inventory PDF?');
