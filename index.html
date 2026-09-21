@@ -514,8 +514,13 @@
   }
   .test-red { color: #ff2a2a !important; font-weight: 700; }
   .card.is-test-new { outline: 3px solid #ff2a2a; outline-offset: -3px; }
+  .test-edit { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; color: #ff2a2a; background: rgba(255,42,42,.10); border: 1px solid #ff2a2a; border-radius: 4px; padding: 3px 6px; margin: 2px 0; }
+  .test-edit:focus { outline: 2px solid #ff2a2a; background: rgba(255,42,42,.18); }
+  .test-discard { background: transparent; color: #ff2a2a; border: 1px solid #ff2a2a; border-radius: 4px; font-size: 11px; font-weight: 700; padding: 2px 8px; margin: 4px 0 6px; cursor: pointer; }
+  .test-discard:hover { background: #ff2a2a; color: #fff; }
+  #testBanner button.is-primary { background: #111; color: #fff; }
   .test-new-tag { display: inline-block; background: #ff2a2a; color: #fff; font-size: 10px; font-weight: 700; letter-spacing: .08em; padding: 2px 6px; border-radius: 3px; margin-bottom: 6px; }
-  #testBanner { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 9999; background: #ff2a2a; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; box-shadow: 0 6px 24px rgba(0,0,0,.35); display: flex; gap: 14px; align-items: center; max-width: calc(100vw - 24px); }
+  #testBanner { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 40; background: #ff2a2a; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; box-shadow: 0 6px 24px rgba(0,0,0,.35); display: flex; gap: 14px; align-items: center; max-width: calc(100vw - 24px); }
   #testBanner button { background: #fff; color: #c00; border: 0; border-radius: 5px; padding: 5px 12px; font-weight: 700; cursor: pointer; }
   .pdf-diff-old { display: block; color: var(--ink-soft); text-decoration: line-through; }
   .pdf-diff-new { display: block; color: var(--ink); font-weight: 600; }
@@ -1132,9 +1137,7 @@
         '<button class="btn btn-ghost btn-sm" id="btnFindMissing" type="button" title="Find gaps in the current tab\'s catalogue numbering">Find missing #</button>' +
         '<button class="btn btn-ghost btn-sm" id="btnBulkUpload" type="button" title="Add several photos at once">Bulk upload</button>' +
         '<input type="file" id="bulkFileInput" accept="image/*" multiple style="display:none">' +
-        '<button class="btn btn-ghost btn-sm" id="btnPdfSync" type="button" title="Fill in names, sizes and dates from an inventory PDF">Update from PDF</button>' +
-        '<input type="file" id="pdfFileInput" accept="application/pdf" style="display:none">' +
-        '<button class="btn btn-ghost btn-sm" id="btnPdfTest" type="button" title="Preview what the PDF would change — shown in red, nothing is saved">Test from PDF</button>' +
+        '<button class="btn btn-ghost btn-sm" id="btnPdfTest" type="button" title="Read an inventory PDF, preview the changes in red, fix anything wrong, then apply">Import from PDF</button>' +
         '<input type="file" id="pdfTestInput" accept="application/pdf" style="display:none">' +
         '<button class="btn btn-primary" id="btnAddPainting" type="button">' +
         '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>Add painting</button>' +
@@ -1160,15 +1163,6 @@
         if (!files.length) return;
         openBulkConfirmModal(files);
       });
-      document.getElementById('btnPdfSync').addEventListener('click', function () {
-        document.getElementById('pdfFileInput').click();
-      });
-      document.getElementById('pdfFileInput').addEventListener('change', function (e) {
-        var f = e.target.files[0];
-        e.target.value = '';
-        if (!f) return;
-        runPdfSync(f);
-      });
       document.getElementById('btnPdfTest').addEventListener('click', function () {
         document.getElementById('pdfTestInput').click();
       });
@@ -1176,7 +1170,7 @@
         var f = e.target.files[0];
         e.target.value = '';
         if (!f) return;
-        runPdfSync(f, true);
+        runPdfSync(f);
       });
       document.getElementById('btnSignOut').addEventListener('click', signOut);
     } else if (isEmbedded) {
@@ -1230,11 +1224,42 @@
     if (!testOverlay) { if (el) el.remove(); return; }
     if (!el) { el = document.createElement('div'); el.id = 'testBanner'; document.body.appendChild(el); }
     var changed = Object.keys(testOverlay.byId).length, added = testOverlay.extras.length;
-    el.innerHTML = '<span>TEST PREVIEW — nothing is saved. Red = would come from the PDF (' +
-      changed + ' painting' + (changed === 1 ? '' : 's') + ' changed, ' + added + ' added).</span>' +
-      '<button type="button" id="testClearBtn">Clear test</button>';
+    el.innerHTML = '<span>PREVIEW — nothing is saved yet. Red = from the PDF (' +
+      changed + ' changed, ' + added + ' new). Edit the red fields to fix anything, then Apply.</span>' +
+      '<button type="button" id="testApplyBtn" class="is-primary">Apply…</button>' +
+      '<button type="button" id="testClearBtn">Cancel</button>';
     document.getElementById('testClearBtn').addEventListener('click', function () {
       testOverlay = null; updateTestBanner(); renderAll();
+    });
+    document.getElementById('testApplyBtn').addEventListener('click', openPdfApplyConfirm);
+  }
+  var testGridWired = false;
+  function wireTestGrid() {
+    if (testGridWired) return;
+    var grid = document.getElementById('grid');
+    if (!grid) return;
+    testGridWired = true;
+    grid.addEventListener('change', function (e) {
+      var t = e.target;
+      if (!testOverlay || !t.classList || !t.classList.contains('test-edit')) return;
+      var id = t.getAttribute('data-tid'), f = t.getAttribute('data-f');
+      var tgt = String(id).indexOf('test-') === 0
+        ? testOverlay.extras.find(function (x) { return x.id === id; })
+        : testOverlay.byId[id];
+      if (!tgt) return;
+      if (f === 'date') tgt.date = t.value || null;
+      else tgt[f] = t.value.trim();
+    });
+    grid.addEventListener('click', function (e) {
+      var btn = e.target.closest ? e.target.closest('.test-discard') : null;
+      if (!btn || !testOverlay) return;
+      var id = btn.getAttribute('data-tid');
+      if (String(id).indexOf('test-') === 0) {
+        testOverlay.extras = testOverlay.extras.filter(function (x) { return x.id !== id; });
+      } else {
+        delete testOverlay.byId[id];
+      }
+      updateTestBanner(); renderAll();
     });
   }
   function startPdfTest(changes, creates) {
@@ -1253,9 +1278,42 @@
         __testNew: true, __red: { name: true, number: true, date: true, size: true }
       });
     });
+    wireTestGrid();
     updateTestBanner();
     renderAll();
-    toast('Test preview: red = from the PDF. Nothing was saved.');
+    toast('Preview loaded: red = from the PDF. Nothing is saved until you Apply.');
+  }
+  /* Confirmation popup, then save the (possibly hand-corrected) preview for real. */
+  function openPdfApplyConfirm() {
+    if (!testOverlay) return;
+    var changes = [], creates = [];
+    Object.keys(testOverlay.byId).forEach(function (id) {
+      var o = testOverlay.byId[id], p = state.paintings.find(function (x) { return String(x.id) === String(id); });
+      if (!p) return;
+      var c = { id: p.id, nameChanged: 'name' in o, sizeChanged: 'size' in o, dateChanged: 'date' in o,
+                newName: o.name, newSize: o.size, newDate: o.date };
+      if (c.nameChanged || c.sizeChanged || c.dateChanged) changes.push(c);
+    });
+    testOverlay.extras.forEach(function (x) {
+      creates.push({ tab_id: x.tab_id, number: x.number, name: x.name || 'Dont Exist', date: x.date || null });
+    });
+    if (!changes.length && !creates.length) { toast('Nothing to apply.'); return; }
+    var root = document.getElementById('modalRoot');
+    root.innerHTML = '<div class="modal-backdrop" id="pdfConfirmBackdrop"><div class="modal">' +
+      '<h2>Save these changes?</h2>' +
+      '<p class="field-hint">' + changes.length + ' painting' + (changes.length === 1 ? '' : 's') + ' will be updated' +
+      (creates.length ? ' and ' + creates.length + ' new placeholder' + (creates.length === 1 ? '' : 's') + ' added' : '') +
+      '. This writes to the live gallery and overwrites the existing name, size and date on those paintings.</p>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" id="pdfConfirmCancel" type="button">Go back</button>' +
+      '<button class="btn btn-primary" id="pdfConfirmGo" type="button">Yes, save</button></div>' +
+      '</div></div>';
+    document.getElementById('pdfConfirmBackdrop').addEventListener('click', function (e) { if (e.target.id === 'pdfConfirmBackdrop') closeModal(); });
+    document.getElementById('pdfConfirmCancel').addEventListener('click', closeModal);
+    var go = document.getElementById('pdfConfirmGo');
+    go.addEventListener('click', function () {
+      document.getElementById('pdfConfirmCancel').disabled = true;
+      applyPdfChanges(changes, go, creates);
+    });
   }
 
   /* ---------------- render: grid ---------------- */
@@ -1320,11 +1378,18 @@
         (thumbSrc ? '<span class="expand-hint"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 3H5a2 2 0 0 0-2 2v3m0 8v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3m0-8V5a2 2 0 0 0-2-2h-3"/></svg></span>' : '') +
         '</div>' +
         '<div class="card-body">' +
-        (p.__testNew ? '<div class="test-new-tag">TEST — NEW</div>' : '') +
-        '<div class="card-name"><span class="field-label">Name:</span> ' + (red.name ? '<span class="test-red">' : '') + esc(p.name || 'Untitled') + (red.name ? '</span>' : '') + '</div>' +
+        (p.__testNew ? '<div class="test-new-tag">NEW — from PDF</div> ' : '') +
+        ((p.__testNew || p.__red) ? '<button class="test-discard" type="button" data-tid="' + esc(String(p.id)) + '">' + (p.__testNew ? 'Skip this one' : 'Discard change') + '</button>' : '') +
+        '<div class="card-name"><span class="field-label">Name:</span> ' + (red.name
+          ? '<input class="test-edit" type="text" data-tid="' + esc(String(p.id)) + '" data-f="name" value="' + esc(p.name || '') + '">'
+          : esc(p.name || 'Untitled')) + '</div>' +
         '<div class="card-meta"><span class="field-label">Number:</span> <span class="mono' + (red.number ? ' test-red' : '') + '">' + esc(catalogNum(p)) + '</span></div>' +
-        '<div class="card-meta"><span class="field-label">Date:</span> <span class="mono' + (red.date ? ' test-red' : '') + '">' + esc(fmtPieceDate(p)) + '</span></div>' +
-        (p.size ? '<div class="card-meta"><span class="field-label">Size:</span> <span class="mono' + (red.size ? ' test-red' : '') + '">' + esc(p.size) + '</span></div>' : '') +
+        '<div class="card-meta"><span class="field-label">Date:</span> ' + (red.date
+          ? '<input class="test-edit" type="date" data-tid="' + esc(String(p.id)) + '" data-f="date" value="' + esc(p.date ? String(p.date).slice(0, 10) : '') + '">'
+          : '<span class="mono">' + esc(fmtPieceDate(p)) + '</span>') + '</div>' +
+        (p.size ? '<div class="card-meta"><span class="field-label">Size:</span> ' + (red.size
+          ? '<input class="test-edit" type="text" data-tid="' + esc(String(p.id)) + '" data-f="size" value="' + esc(p.size) + '">'
+          : '<span class="mono">' + esc(p.size) + '</span>') + '</div>' : '') +
         (p.description ? '<div class="card-desc"><span class="field-label">Description:</span> ' + esc(p.description) + '</div>' : '') +
         '<div class="card-bottom">' +
         (suffix ? '<div class="suffix-tag" style="color:' + esc(suffix.color) + '">' + esc(suffix.label) + '</div>' : '') +
@@ -2065,7 +2130,7 @@
     root.innerHTML = '<div class="modal-backdrop" id="bulkConfirmBackdrop"><div class="modal">' +
       '<h2>Bulk upload ' + files.length + ' photo' + (files.length === 1 ? '' : 's') + '?</h2>' +
       '<p class="field-hint">Each photo will be added as a new painting in "' + esc(tab ? tab.name : '') +
-      '", using its file name as the catalogue number. No name will be set — use "Update from PDF" ' +
+      '", using its file name as the catalogue number. No name will be set — use "Import from PDF" ' +
       'afterwards, or edit each piece by hand, to fill in the name and size.</p>' +
       '<div class="modal-actions"><button class="btn btn-ghost" id="bulkConfirmCancel" type="button">Cancel</button>' +
       '<button class="btn btn-primary" id="bulkConfirmGo" type="button">Upload</button></div>' +
@@ -2196,7 +2261,7 @@
     return m ? m.join('-') : '';
   }
 
-  async function runPdfSync(file, testMode) {
+  async function runPdfSync(file) {
     if (!window.pdfjsLib) { toast('PDF reader failed to load — check your connection and try again.'); return; }
     toast('Reading PDF…');
     try {
@@ -2251,60 +2316,10 @@
                        catalog: (tab.prefix || '') + pm[2] });
       });
 
-      if (testMode) { startPdfTest(changes, creates); return; }
-      openPdfPreviewModal(changes, unmatchedCount, rows.length, creates);
+      startPdfTest(changes, creates);
     } catch (e) {
       toast('Could not read that PDF — is it a valid inventory PDF?');
     }
-  }
-
-  function openPdfPreviewModal(changes, unmatchedCount, totalPdfRows, creates) {
-    creates = creates || [];
-    var root = document.getElementById('modalRoot');
-    var rowsHtml = changes.map(function (c) {
-      return '<tr>' +
-        '<td>' + esc(c.catalog) + '</td>' +
-        '<td>' + (c.nameChanged
-          ? '<span class="pdf-diff-old">' + esc(c.oldName || '—') + '</span><span class="pdf-diff-new">' + esc(c.newName || '—') + '</span>'
-          : esc(c.oldName || '—')) + '</td>' +
-        '<td>' + (c.sizeChanged
-          ? '<span class="pdf-diff-old">' + esc(c.oldSize || '—') + '</span><span class="pdf-diff-new">' + esc(c.newSize || '—') + '</span>'
-          : esc(c.oldSize || '—')) + '</td>' +
-        '<td>' + (c.dateChanged
-          ? '<span class="pdf-diff-old">' + esc(c.oldDate || '—') + '</span><span class="pdf-diff-new">' + esc(c.newDate || '—') + '</span>'
-          : esc(c.oldDate || '—')) + '</td>' +
-        '</tr>';
-    }).join('') + creates.map(function (c) {
-      return '<tr><td>' + esc(c.catalog) + '</td>' +
-        '<td><span class="pdf-diff-new">Dont Exist (new placeholder)</span></td>' +
-        '<td>—</td><td>' + esc(c.date || '—') + '</td></tr>';
-    }).join('');
-    var totalOps = changes.length + creates.length;
-
-    root.innerHTML = '<div class="modal-backdrop" id="pdfPreviewBackdrop"><div class="modal modal-wide">' +
-      '<h2>Update from PDF</h2>' +
-      '<p class="field-hint">' + totalPdfRows + ' row' + (totalPdfRows === 1 ? '' : 's') + ' read from the PDF. ' +
-      (changes.length
-        ? changes.length + ' painting' + (changes.length === 1 ? '' : 's') + ' will be updated.'
-        : (creates.length ? '' : 'No differences found — nothing to update.')) +
-      (creates.length
-        ? ' ' + creates.length + ' "Dont Exist" placeholder' + (creates.length === 1 ? '' : 's') + ' will be added (black tile, no zoom).'
-        : '') +
-      (unmatchedCount
-        ? ' ' + unmatchedCount + ' existing painting' + (unmatchedCount === 1 ? '' : 's') + ' had no matching number in the PDF and will be left as-is.'
-        : '') +
-      '</p>' +
-      (totalOps
-        ? '<div class="pdf-diff-scroll"><table class="pdf-diff-table"><thead><tr><th>Number</th><th>Name</th><th>Size</th><th>Date</th></tr></thead><tbody>' + rowsHtml + '</tbody></table></div>'
-        : '') +
-      '<div class="modal-actions"><button class="btn btn-ghost" id="pdfPreviewCancel" type="button">Cancel</button>' +
-      (totalOps ? '<button class="btn btn-primary" id="pdfPreviewApply" type="button">Apply ' + totalOps + ' change' + (totalOps === 1 ? '' : 's') + '</button>' : '') +
-      '</div></div></div>';
-
-    document.getElementById('pdfPreviewBackdrop').addEventListener('click', function (e) { if (e.target.id === 'pdfPreviewBackdrop') closeModal(); });
-    document.getElementById('pdfPreviewCancel').addEventListener('click', closeModal);
-    var applyBtn = document.getElementById('pdfPreviewApply');
-    if (applyBtn) applyBtn.addEventListener('click', function () { applyPdfChanges(changes, applyBtn, creates); });
   }
 
   async function applyPdfChanges(changes, btn, creates) {
@@ -2347,6 +2362,7 @@
         failed++;
       }
     }
+    testOverlay = null; updateTestBanner();
     closeModal();
     renderAll();
     toast(ok + ' painting' + (ok === 1 ? '' : 's') + ' updated from PDF' +
