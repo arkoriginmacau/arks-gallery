@@ -1139,6 +1139,7 @@
         '<input type="file" id="bulkFileInput" accept="image/*" multiple style="display:none">' +
         '<button class="btn btn-ghost btn-sm" id="btnPdfTest" type="button" title="Read an inventory PDF, preview the changes in red, fix anything wrong, then apply">Import from PDF</button>' +
         '<input type="file" id="pdfTestInput" accept="application/pdf" style="display:none">' +
+        '<button class="btn btn-ghost btn-sm" id="btnXlsxExport" type="button" title="Download the inventory (date, number, name, size) as an Excel file — edit it, print it to PDF, then re-import with Import from PDF">Export to Excel</button>' +
         '<button class="btn btn-primary" id="btnAddPainting" type="button">' +
         '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>Add painting</button>' +
         '<span class="admin-pill"><span class="dot"></span>' + esc(currentUserEmail) + '</span>' +
@@ -1163,6 +1164,7 @@
         if (!files.length) return;
         openBulkConfirmModal(files);
       });
+      document.getElementById('btnXlsxExport').addEventListener('click', exportInventoryXlsx);
       document.getElementById('btnPdfTest').addEventListener('click', function () {
         document.getElementById('pdfTestInput').click();
       });
@@ -1204,6 +1206,90 @@
     }).join('');
     if (isAdmin) html += '<button class="tab-add" id="btnAddTab" type="button">+ Tab</button>';
     bar.innerHTML = html;
+  }
+
+  /* ---------------- export to Excel ----------------
+     One sheet per tab with Date / Number / Name / Size, styled like the
+     hand-made inventory sheet. Print any sheet to PDF and bring it back with
+     "Import from PDF" — the columns are in the order that importer expects. */
+  function loadExcelJs() {
+    if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+    return new Promise(function (resolve, reject) {
+      var sc = document.createElement('script');
+      sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+      sc.onload = function () { window.ExcelJS ? resolve(window.ExcelJS) : reject(new Error('ExcelJS missing')); };
+      sc.onerror = function () { reject(new Error('ExcelJS failed to load')); };
+      document.head.appendChild(sc);
+    });
+  }
+  function inventoryRowsForTab(tab) {
+    var list = state.paintings.filter(function (p) { return p.tab_id === tab.id; });
+    list.sort(function (a, b) {
+      var na = initialNumber(a.number), nb = initialNumber(b.number);
+      if (na === null && nb === null) return String(a.number || '').localeCompare(String(b.number || ''), undefined, { numeric: true });
+      if (na === null) return 1;
+      if (nb === null) return -1;
+      if (na !== nb) return na - nb;
+      return String(a.number || '').localeCompare(String(b.number || ''), undefined, { numeric: true });
+    });
+    return list.map(function (p) {
+      var name = p.name || '';
+      var isNone = /^\s*don['\u2019]?t\s+exist\s*$/i.test(name);
+      var size = String(p.size || '').replace(/(\d)\s*[x\u00d7]\s*(\d)/i, '$1x$2');
+      return [p.date ? String(p.date).slice(0, 10) : '', catalogNum(p), name, size || (isNone ? '---' : '')];
+    });
+  }
+  function buildInventoryWorkbook(ExcelJS, sheets) {
+    var wb = new ExcelJS.Workbook();
+    var used = {};
+    sheets.forEach(function (sh) {
+      var nm = String(sh.name || 'Sheet').replace(/[\[\]:*?\/\\]/g, ' ').trim().slice(0, 31) || 'Sheet';
+      var base = nm, k = 2;
+      while (used[nm.toLowerCase()]) { nm = base.slice(0, 28) + ' ' + (k++); }
+      used[nm.toLowerCase()] = true;
+      var ws = wb.addWorksheet(nm, { views: [{ state: 'frozen', ySplit: 1 }] });
+      ws.columns = [{ width: 14 }, { width: 18 }, { width: 40 }, { width: 20 }];
+      var thin = { style: 'thin', color: { argb: 'FFBFBFBF' } };
+      var border = { top: thin, left: thin, bottom: thin, right: thin };
+      var head = ws.addRow(['Date', 'Number', 'Name', 'Size']);
+      head.eachCell(function (c) {
+        c.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2C3E50' } };
+        c.alignment = { vertical: 'middle' };
+        c.border = border;
+      });
+      sh.rows.forEach(function (r, i) {
+        var row = ws.addRow(r);
+        row.eachCell({ includeEmpty: true }, function (c) {
+          c.font = { name: 'Arial', size: 11 };
+          c.alignment = { vertical: 'middle' };
+          c.border = border;
+          c.numFmt = '@';
+          if (i % 2 === 0) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
+        });
+      });
+    });
+    return wb;
+  }
+  async function exportInventoryXlsx() {
+    if (!state.tabs.length) { toast('Nothing to export yet.'); return; }
+    toast('Building Excel file…');
+    try {
+      var ExcelJS = await loadExcelJs();
+      var wb = buildInventoryWorkbook(ExcelJS, state.tabs.map(function (t) {
+        return { name: t.name, rows: inventoryRowsForTab(t) };
+      }));
+      var buf = await wb.xlsx.writeBuffer();
+      var blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'painting_inventory.xlsx';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+      toast('Downloaded painting_inventory.xlsx (one sheet per tab).');
+    } catch (e) {
+      toast('Could not build the Excel file — check your connection and try again.');
+    }
   }
 
   /* ---------------- PDF test preview (nothing is saved) ---------------- */
