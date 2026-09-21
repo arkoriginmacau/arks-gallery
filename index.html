@@ -909,6 +909,11 @@
       return fetch(IMAGE_BASE + '/' + encodePath(p), { method: 'DELETE', headers: auth }).catch(function () {});
     }));
   }
+  /* A "Dont Exist" placeholder: a catalogue number that was never painted.
+     Shown as a plain black tile — no photo, so it can't be opened/zoomed. */
+  function isNoPiece(p) {
+    return !p.thumb_path && !p.image_path && /^\s*don['\u2019]?t\s+exist\s*$/i.test(p.name || '');
+  }
   function swatchGradient(hue) {
     return 'linear-gradient(135deg, hsl(' + hue + ' 46% 42%), hsl(' + ((hue + 40) % 360) + ' 40% 28%))';
   }
@@ -1225,7 +1230,9 @@
       var fullSrc = publicImgUrl(p.image_path) || thumbSrc;
       var imageInner = thumbSrc
         ? '<img src="' + esc(thumbSrc) + '" alt="' + esc(p.name) + '" loading="lazy" decoding="async" draggable="false"' + thumbPosStyle(p) + '>'
-        : '<div class="swatch" style="background:' + swatchGradient(p.hue || 30) + '"><span>' + esc((p.name || '?').charAt(0).toUpperCase()) + '</span></div>';
+        : (isNoPiece(p)
+          ? '<div class="swatch" style="background:#000"></div>'
+          : '<div class="swatch" style="background:' + swatchGradient(p.hue || 30) + '"><span>' + esc((p.name || '?').charAt(0).toUpperCase()) + '</span></div>');
       var setMates = setMembers(p);
       var suffix = suffixById(p.suffix_id);
       return '<div class="card' + (p.sold ? ' is-sold' : '') + '" data-card="' + p.id + '">' +
@@ -1317,7 +1324,9 @@
         var thumbSrc = publicImgUrl(p.thumb_path) || publicImgUrl(p.image_path);
         var thumb = thumbSrc
           ? '<img class="p-thumb" src="' + esc(thumbSrc) + '" alt=""' + thumbPosStyle(p) + '>'
-          : '<div class="p-thumb swatch" style="background:' + swatchGradient(p.hue || 30) + '">' + esc((p.name || '?').charAt(0).toUpperCase()) + '</div>';
+          : (isNoPiece(p)
+            ? '<div class="p-thumb swatch" style="background:#000"></div>'
+            : '<div class="p-thumb swatch" style="background:' + swatchGradient(p.hue || 30) + '">' + esc((p.name || '?').charAt(0).toUpperCase()) + '</div>');
         return '<div class="print-row' + (p.sold ? ' sold' : '') + '">' + thumb +
           '<div class="p-num">' + esc(catalogNum(p)) + '</div>' +
           '<div class="p-info"><div class="p-name"><span class="p-label">Name:</span> ' + esc(p.name || 'Untitled') + '</div>' +
@@ -2108,6 +2117,7 @@
       }
       /* No size match: row is still kept in full, name is whatever text remains
          (e.g. "Dont Exist", "not done—") — never dropped. */
+      name = name.replace(/[\s\-\u2013\u2014]+$/, ''); /* trailing "---" placeholder in the size column */
       rows.push({ number: number, name: name, size: size, date: date });
     });
     return rows;
@@ -2138,11 +2148,13 @@
 
       var changes = [];
       var unmatchedCount = 0;
+      var matchedKeys = {};
       state.paintings.forEach(function (p) {
         var tab = tabById(p.tab_id);
         var prefixLetter = (tab && tab.prefix ? tab.prefix : '').replace(/[^A-Za-z]/g, '');
         var row = byKey[prefixLetter + ':' + normalizeNumKey(p.number)];
         if (!row) { unmatchedCount++; return; }
+        matchedKeys[prefixLetter + ':' + normalizeNumKey(p.number)] = true;
         var newName = row.name || '';
         var newSize = row.size; /* null = PDF has no usable size — never overwrite existing size with it */
         var newDate = row.date; /* null = PDF row has no date — never overwrite existing date with it */
@@ -2160,13 +2172,28 @@
         }
       });
 
-      openPdfPreviewModal(changes, unmatchedCount, rows.length);
+      /* "Dont Exist" rows with no painting yet are added automatically as
+         placeholders (black tile, no photo, not zoomable). */
+      var creates = [];
+      Object.keys(byKey).forEach(function (key) {
+        var r = byKey[key];
+        if (matchedKeys[key] || !/^\s*don['\u2019]?t\s+exist\s*$/i.test(r.name || '')) return;
+        var pm = String(r.number).match(/^([A-Za-z]+)-(.+)$/);
+        if (!pm) return;
+        var tab = state.tabs.find(function (t) { return t.prefix && t.prefix.replace(/[^A-Za-z]/g, '') === pm[1]; });
+        if (!tab) return;
+        creates.push({ tab_id: tab.id, number: pm[2], name: 'Dont Exist', date: r.date || null,
+                       catalog: (tab.prefix || '') + pm[2] });
+      });
+
+      openPdfPreviewModal(changes, unmatchedCount, rows.length, creates);
     } catch (e) {
       toast('Could not read that PDF — is it a valid inventory PDF?');
     }
   }
 
-  function openPdfPreviewModal(changes, unmatchedCount, totalPdfRows) {
+  function openPdfPreviewModal(changes, unmatchedCount, totalPdfRows, creates) {
+    creates = creates || [];
     var root = document.getElementById('modalRoot');
     var rowsHtml = changes.map(function (c) {
       return '<tr>' +
@@ -2181,32 +2208,41 @@
           ? '<span class="pdf-diff-old">' + esc(c.oldDate || '—') + '</span><span class="pdf-diff-new">' + esc(c.newDate || '—') + '</span>'
           : esc(c.oldDate || '—')) + '</td>' +
         '</tr>';
+    }).join('') + creates.map(function (c) {
+      return '<tr><td>' + esc(c.catalog) + '</td>' +
+        '<td><span class="pdf-diff-new">Dont Exist (new placeholder)</span></td>' +
+        '<td>—</td><td>' + esc(c.date || '—') + '</td></tr>';
     }).join('');
+    var totalOps = changes.length + creates.length;
 
     root.innerHTML = '<div class="modal-backdrop" id="pdfPreviewBackdrop"><div class="modal modal-wide">' +
       '<h2>Update from PDF</h2>' +
       '<p class="field-hint">' + totalPdfRows + ' row' + (totalPdfRows === 1 ? '' : 's') + ' read from the PDF. ' +
       (changes.length
         ? changes.length + ' painting' + (changes.length === 1 ? '' : 's') + ' will be updated.'
-        : 'No differences found — nothing to update.') +
+        : (creates.length ? '' : 'No differences found — nothing to update.')) +
+      (creates.length
+        ? ' ' + creates.length + ' "Dont Exist" placeholder' + (creates.length === 1 ? '' : 's') + ' will be added (black tile, no zoom).'
+        : '') +
       (unmatchedCount
         ? ' ' + unmatchedCount + ' existing painting' + (unmatchedCount === 1 ? '' : 's') + ' had no matching number in the PDF and will be left as-is.'
         : '') +
       '</p>' +
-      (changes.length
+      (totalOps
         ? '<div class="pdf-diff-scroll"><table class="pdf-diff-table"><thead><tr><th>Number</th><th>Name</th><th>Size</th><th>Date</th></tr></thead><tbody>' + rowsHtml + '</tbody></table></div>'
         : '') +
       '<div class="modal-actions"><button class="btn btn-ghost" id="pdfPreviewCancel" type="button">Cancel</button>' +
-      (changes.length ? '<button class="btn btn-primary" id="pdfPreviewApply" type="button">Apply ' + changes.length + ' update' + (changes.length === 1 ? '' : 's') + '</button>' : '') +
+      (totalOps ? '<button class="btn btn-primary" id="pdfPreviewApply" type="button">Apply ' + totalOps + ' change' + (totalOps === 1 ? '' : 's') + '</button>' : '') +
       '</div></div></div>';
 
     document.getElementById('pdfPreviewBackdrop').addEventListener('click', function (e) { if (e.target.id === 'pdfPreviewBackdrop') closeModal(); });
     document.getElementById('pdfPreviewCancel').addEventListener('click', closeModal);
     var applyBtn = document.getElementById('pdfPreviewApply');
-    if (applyBtn) applyBtn.addEventListener('click', function () { applyPdfChanges(changes, applyBtn); });
+    if (applyBtn) applyBtn.addEventListener('click', function () { applyPdfChanges(changes, applyBtn, creates); });
   }
 
-  async function applyPdfChanges(changes, btn) {
+  async function applyPdfChanges(changes, btn, creates) {
+    creates = creates || [];
     btn.disabled = true;
     var cancelBtn = document.getElementById('pdfPreviewCancel');
     if (cancelBtn) cancelBtn.disabled = true;
@@ -2228,9 +2264,28 @@
         failed++;
       }
     }
+    var added = 0;
+    for (var j = 0; j < creates.length; j++) {
+      var cr = creates[j];
+      btn.textContent = 'Adding ' + (j + 1) + ' of ' + creates.length + '…';
+      try {
+        var ins = await sb.from('paintings').insert({
+          tab_id: cr.tab_id, name: cr.name, number: cr.number, date: cr.date, extra_dates: [],
+          price: 0, size: '', description: '', sold: false, not_for_sale: false, censored: false,
+          hue: 0, suffix_id: null
+        }).select().single();
+        if (ins.error) throw ins.error;
+        state.paintings.unshift(ins.data);
+        added++;
+      } catch (e) {
+        failed++;
+      }
+    }
     closeModal();
     renderAll();
-    toast(ok + ' painting' + (ok === 1 ? '' : 's') + ' updated from PDF' + (failed ? ', ' + failed + ' failed' : '') + '.');
+    toast(ok + ' painting' + (ok === 1 ? '' : 's') + ' updated from PDF' +
+      (added ? ', ' + added + ' placeholder' + (added === 1 ? '' : 's') + ' added' : '') +
+      (failed ? ', ' + failed + ' failed' : '') + '.');
   }
 
   /* ---------------- site theme ---------------- */
