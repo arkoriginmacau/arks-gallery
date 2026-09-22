@@ -1338,6 +1338,14 @@
     return tryNext();
   }
   function padTo(str, len) { str = String(str || ''); return str.length >= len ? str + '  ' : str + new Array(len - str.length + 2).join(' '); }
+  /* jsPDF's built-in helvetica/courier fonts only cover WinAnsi/Latin-1
+     glyphs. Passing a string with CJK (or other non-Latin) characters to
+     doc.text() doesn't just render those characters blank — it corrupts the
+     ENTIRE line's text encoding in the PDF, including the date/number/size
+     columns that Import from PDF depends on for matching. So every string
+     handed to doc.text() is sanitized down to printable ASCII first; a
+     shortened name is fine, a garbled catalogue number is not. */
+  function sanitizeForPdf(str) { return String(str || '').replace(/[^\x20-\x7E]/g, ''); }
   async function exportInventoryPdf() {
     if (!state.tabs.length) { toast('Nothing to export yet.'); return; }
     toast('Building PDF…');
@@ -1352,12 +1360,12 @@
         if (!first) doc.addPage(); first = false;
         var y = top;
         doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
-        doc.text(tab.name + (tab.prefix ? ' (' + tab.prefix + ')' : ''), marginX, y);
+        doc.text(sanitizeForPdf(tab.name + (tab.prefix ? ' (' + tab.prefix + ')' : '')), marginX, y);
         y += 20;
         doc.setFont('courier', 'normal'); doc.setFontSize(9);
         rows.forEach(function (r) {
           if (y > bottom) { doc.addPage(); y = top; }
-          var line = padTo(r[0], 12) + padTo(r[1], 13) + padTo(r[2], 32) + (r[3] || '');
+          var line = padTo(sanitizeForPdf(r[0]), 12) + padTo(sanitizeForPdf(r[1]), 13) + padTo(sanitizeForPdf(r[2]), 32) + sanitizeForPdf(r[3] || '');
           doc.text(line, marginX, y);
           y += lineH;
         });
