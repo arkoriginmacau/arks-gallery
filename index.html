@@ -1306,15 +1306,36 @@
      download — it'll come out blank on that line — though re-importing
      the same painting's *number* still works fine since matching never
      depends on the name. */
-  function loadJsPdf() {
-    if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve(window.jspdf.jsPDF);
+  function loadScriptOnce(src) {
     return new Promise(function (resolve, reject) {
       var sc = document.createElement('script');
-      sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js';
-      sc.onload = function () { (window.jspdf && window.jspdf.jsPDF) ? resolve(window.jspdf.jsPDF) : reject(new Error('jsPDF missing')); };
-      sc.onerror = function () { reject(new Error('jsPDF failed to load')); };
+      sc.src = src;
+      sc.onload = function () { resolve(); };
+      sc.onerror = function () { reject(new Error('script failed to load: ' + src)); };
       document.head.appendChild(sc);
     });
+  }
+  function loadJsPdf() {
+    if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve(window.jspdf.jsPDF);
+    // Two mirrors are tried in order: some CDNs occasionally prune an exact
+    // pinned version (this happened to the cdnjs copy of 2.5.2), so a single
+    // hardcoded URL is a single point of failure for this button.
+    var urls = [
+      'https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js'
+    ];
+    var i = 0;
+    function tryNext() {
+      if (i >= urls.length) return Promise.reject(new Error('jsPDF failed to load'));
+      var url = urls[i++];
+      return loadScriptOnce(url).then(function () {
+        if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
+        return tryNext();
+      }, function () {
+        return tryNext();
+      });
+    }
+    return tryNext();
   }
   function padTo(str, len) { str = String(str || ''); return str.length >= len ? str + '  ' : str + new Array(len - str.length + 2).join(' '); }
   async function exportInventoryPdf() {
