@@ -2717,6 +2717,43 @@
     });
   }
 
+  /* Opens a plain, ink-light checklist of missing numbers in a new tab and
+     triggers Print / Save as PDF there — meant to be walked around the
+     studio, ticking off boxes as each physical piece is found. Kept
+     separate from the site's own print CSS since it has nothing to do
+     with painting cards. */
+  function printMissingList(tab, range, missing) {
+    if (!missing || !missing.length) { toast('Nothing to print — check a range first.'); return; }
+    var w = window.open('', '_blank');
+    if (!w) { toast('Your browser blocked the print window — allow pop-ups for this site and try again.'); return; }
+    var rangeLabel = range ? (range.lo + '–' + range.hi) : '';
+    var rows = missing.map(function (n) {
+      return '<div class="row"><span class="box"></span><span class="num">' + esc((tab.prefix || '') + n) + '</span></div>';
+    }).join('');
+    var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Missing numbers — ' + esc(tab.name) + '</title>' +
+      '<style>' +
+      '@page { margin: 16mm 14mm; }' +
+      'body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; padding: 24px; }' +
+      'h1 { font-size: 18px; margin: 0 0 2px; }' +
+      '.sub { font-size: 12px; color: #555; margin: 0 0 18px; }' +
+      '.grid { column-count: 3; column-gap: 28px; }' +
+      '.row { display: flex; align-items: center; gap: 8px; break-inside: avoid; padding: 5px 0; border-bottom: 1px solid #ddd; }' +
+      '.box { width: 13px; height: 13px; border: 1.4px solid #333; border-radius: 2px; flex: 0 0 auto; }' +
+      '.num { font-family: "Courier New", monospace; font-size: 13px; font-weight: 700; }' +
+      '.count { font-size: 12px; color: #555; margin-top: 18px; }' +
+      '@media print { .noprint { display: none; } }' +
+      '</style></head><body>' +
+      '<h1>Missing numbers — ' + esc(tab.name) + '</h1>' +
+      '<p class="sub">Range ' + esc(rangeLabel) + ' · printed ' + esc(fmtDate(new Date().toISOString().slice(0, 10))) + '</p>' +
+      '<div class="grid">' + rows + '</div>' +
+      '<p class="count">' + missing.length + ' missing.</p>' +
+      '<p class="noprint" style="font-size:12px;color:#888;margin-top:20px;">This tab opened Print automatically — use it again anytime (Ctrl/Cmd+P).</p>' +
+      '</body></html>';
+    w.document.open(); w.document.write(html); w.document.close();
+    w.focus();
+    setTimeout(function () { try { w.print(); } catch (e) {} }, 300);
+  }
+
   /* ---------------- missing numbers finder ---------------- */
   /* Catches up a catalogue that's fallen behind reality. Given a number
      range for the current tab, lists which catalogue numbers in that
@@ -2743,11 +2780,13 @@
       '</div>' +
       '<p class="field-hint">Either order works — highest and lowest, separated by a dash.</p>' +
       '<div id="missingResultsWrap"></div>' +
-      '<div class="modal-actions"><button class="btn btn-ghost" id="missingCloseBtn" type="button">Close</button></div>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" id="missingPrintBtn" type="button" disabled title="Check a range first">Print list</button>' +
+      '<button class="btn btn-ghost" id="missingCloseBtn" type="button">Close</button></div>' +
       '</div></div>';
 
     document.getElementById('missingBackdrop').addEventListener('click', function (e) { if (e.target.id === 'missingBackdrop') closeModal(); });
     document.getElementById('missingCloseBtn').addEventListener('click', closeModal);
+    document.getElementById('missingPrintBtn').addEventListener('click', function () { printMissingList(tab, lastRange, currentMissingList()); });
 
     var input = document.getElementById('missingRange');
     input.addEventListener('keydown', function (e) { if (e.key === 'Enter') runCheck(); });
@@ -2764,6 +2803,9 @@
       lastRange = { lo: lo, hi: hi };
       renderResults();
     }
+
+    var lastMissing = [];
+    function currentMissingList() { return lastMissing; }
 
     function currentNumbers() {
       var set = {};
@@ -2782,6 +2824,9 @@
       var missing = [];
       for (var n = lastRange.lo; n <= lastRange.hi; n++) if (!existing[n]) missing.push(n);
       var total = lastRange.hi - lastRange.lo + 1;
+      lastMissing = missing;
+      var printBtn = document.getElementById('missingPrintBtn');
+      if (printBtn) { printBtn.disabled = !missing.length; printBtn.title = missing.length ? '' : 'Nothing missing to print'; }
 
       if (!missing.length) {
         wrap.innerHTML = '<p class="missing-summary">No gaps — every number from <strong>' + lastRange.lo + '</strong> to <strong>' + lastRange.hi + '</strong> is accounted for.</p>';
@@ -2840,6 +2885,9 @@
       renderAll();
       rowEl.outerHTML = loggedRowHTML(n, status, res.data.id);
       wireRows();
+      lastMissing = lastMissing.filter(function (x) { return x !== n; });
+      var printBtn2 = document.getElementById('missingPrintBtn');
+      if (printBtn2) printBtn2.disabled = !lastMissing.length;
     }
 
     async function undoLog(paintingId, btn) {
@@ -2848,6 +2896,11 @@
       await deletePainting(paintingId);
       if (state.paintings.length === before.length) { btn.disabled = false; return; } // delete failed, deletePainting already toasted
       renderResults();
+      if (lastRange) {
+        lastMissing = [];
+        var existingAfter = currentNumbers();
+        for (var nn = lastRange.lo; nn <= lastRange.hi; nn++) if (!existingAfter[nn]) lastMissing.push(nn);
+      }
     }
   }
 
