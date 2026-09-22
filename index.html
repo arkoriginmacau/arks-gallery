@@ -2339,12 +2339,18 @@
     return rows;
   }
 
-  /* Reconciles differing number formats (PDF: "O-06-1.1/4", app: "06-1-1-4")
-     by extracting just the digit runs and joining them, ignoring prefix
-     letters and punctuation differences. */
+  /* Matches by the LEADING catalogue number only ("13" out of "O-13-1.3/4"),
+     not the full compound number. The part after that first number is
+     always set/piece metadata, never part of the catalogue identity, and
+     its punctuation isn't consistent — dashes, dots, slashes, more
+     numbers, in any combination or order. Some pieces even have that
+     full descriptor saved as their number in the database (e.g.
+     "06-1-1-4"), others were only ever saved with the bare leading
+     number ("13") — either way, comparing just the first digit run
+     matches correctly and ignores everything after it. */
   function normalizeNumKey(raw) {
-    var m = String(raw === null || raw === undefined ? '' : raw).match(/\d+/g);
-    return m ? m.join('-') : '';
+    var m = String(raw === null || raw === undefined ? '' : raw).match(/\d+/);
+    return m ? m[0] : '';
   }
 
   async function runPdfSync(file) {
@@ -2398,7 +2404,8 @@
         if (!pm) return;
         var tab = state.tabs.find(function (t) { return t.prefix && t.prefix.replace(/[^A-Za-z]/g, '') === pm[1]; });
         if (!tab) return;
-        creates.push({ tab_id: tab.id, number: pm[2], name: 'Dont Exist', date: r.date || null,
+        var leadNum = normalizeNumKey(r.number) || pm[2];
+        creates.push({ tab_id: tab.id, number: leadNum, name: 'Dont Exist', date: r.date || null,
                        catalog: (tab.prefix || '') + pm[2] });
       });
 
