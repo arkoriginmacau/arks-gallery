@@ -280,12 +280,24 @@
   .nfs-toggle:hover { background: rgba(34,31,28,.8); }
   .nfs-toggle.active { background: var(--not-for-sale); border-color: var(--not-for-sale); }
 
-  /* Censored thumbnail: blurs only the <img> itself, so every badge layered
-     on top (price tag, sold/not-for-sale stamp, set badge) stays crisp, and
-     the lightbox — a separate <img> pointed at the same full-size photo,
-     never at this blurred one — always opens sharp. The blur is a grid-view
-     convenience only; nothing about the stored files changes. */
-  .card-image.is-censored img { filter: blur(32px); transform: scale(1.15); }
+  /* Censored thumbnail: pixel-mosaic only the <img> itself, so every badge
+     layered on top (price tag, sold/not-for-sale stamp, set badge) stays
+     crisp. For a plain manually-censored piece the lightbox still points at
+     the real full-size photo and opens sharp; for a "Hidden"-suffix piece
+     no lightbox link is added at all (see the grid render), so there is no
+     way to reach the original. Nothing about the stored files changes
+     either way — pixelateCensoredThumbs() (below, in JS) does the actual
+     mosaic work by drawing the real photo onto a small canvas and swapping
+     the <img> src for that tiny result; this image-rendering rule is just
+     what makes the browser upscale that tiny result in blocky squares
+     instead of smoothing it back out. (An earlier pure-CSS version of this
+     — a small layout box plus a scale() transform, no canvas — looked right
+     on some images and rendered fully sharp on others depending on how the
+     browser's compositor chose to resample the transform, which isn't
+     something to gamble a "hidden" image's privacy on.) */
+  .card-image.is-censored img {
+    image-rendering: pixelated; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges;
+  }
   .censored-badge {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     pointer-events: none;
@@ -1522,17 +1534,27 @@
       var red = p.__red || {};
       var thumbSrc = publicImgUrl(p.thumb_path) || publicImgUrl(p.image_path);
       var fullSrc = publicImgUrl(p.image_path) || thumbSrc;
+      var suffix = suffixById(p.suffix_id);
+      /* The "Hidden" suffix is a stronger form of censoring, driven purely
+         by which suffix is assigned (no separate DB flag): the real photo
+         still loads (so the pixelated preview has something to show), but
+         the lightbox link is left off entirely so there is no way to zoom
+         to the original, and the pixelated treatment applies regardless of
+         the piece's own `censored` field. */
+      var isHidden = !!(suffix && /^hidden$/i.test(suffix.label || ''));
+      var isCensoredView = p.censored || isHidden;
+      var canZoom = !!thumbSrc && !isHidden;
       var imageInner = thumbSrc
-        ? '<img src="' + esc(thumbSrc) + '" alt="' + esc(p.name) + '" loading="lazy" decoding="async" draggable="false"' + thumbPosStyle(p) + '>'
+        ? '<img src="' + esc(thumbSrc) + '" alt="' + esc(p.name) + '" loading="lazy" decoding="async" draggable="false"' +
+          (isCensoredView ? ' crossorigin="anonymous" data-pixelate="1"' : '') + thumbPosStyle(p) + '>'
         : (isNoPiece(p)
           ? '<div class="swatch" style="background:#000"></div>'
           : '<div class="swatch" style="background:' + swatchGradient(p.hue || 30) + '"><span>' + esc((p.name || '?').charAt(0).toUpperCase()) + '</span></div>');
       var setMates = setMembers(p);
-      var suffix = suffixById(p.suffix_id);
       return '<div class="card' + (p.sold ? ' is-sold' : '') + (p.__testNew ? ' is-test-new' : '') + '" data-card="' + p.id + '">' +
-        '<div class="card-image' + (p.censored ? ' is-censored' : '') + '"' + (thumbSrc ? ' data-lightbox="' + esc(fullSrc) + '" title="' + (isEmbedded ? 'Click to view full size (opens in a new tab)' : 'Click to view full size') + '"' : '') + '>' + imageInner +
-        (p.censored
-          ? '<div class="censored-badge"><div class="censored-chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>Click to view</div></div>'
+        '<div class="card-image' + (isCensoredView ? ' is-censored' : '') + '"' + (canZoom ? ' data-lightbox="' + esc(fullSrc) + '" title="' + (isEmbedded ? 'Click to view full size (opens in a new tab)' : 'Click to view full size') + '"' : '') + '>' + imageInner +
+        (isCensoredView
+          ? '<div class="censored-badge"><div class="censored-chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>' + (isHidden ? 'Hidden' : 'Click to view') + '</div></div>'
           : '') +
         (p.price ? '<span class="price-tag">' + fmtPrice(p.price) + '</span>' : '') +
         (p.sold
@@ -1547,7 +1569,7 @@
             '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2 9 4.9-9 4.9-9-4.9L12 2Z"/><path d="m3 12 9 4.9 9-4.9M3 17l9 4.9 9-4.9"/></svg>' +
             'Set ×' + setMates.length + '</button>'
           : '') +
-        (thumbSrc ? '<span class="expand-hint"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 3H5a2 2 0 0 0-2 2v3m0 8v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3m0-8V5a2 2 0 0 0-2-2h-3"/></svg></span>' : '') +
+        (canZoom ? '<span class="expand-hint"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 3H5a2 2 0 0 0-2 2v3m0 8v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3m0-8V5a2 2 0 0 0-2-2h-3"/></svg></span>' : '') +
         '</div>' +
         '<div class="card-body">' +
         (p.__testNew ? '<div class="test-new-tag">NEW — from PDF</div> ' : '') +
@@ -1714,9 +1736,53 @@
     if (addBtn) addBtn.addEventListener('click', function () { openTabModal(); });
   }
 
+  /* Turns every censored/"Hidden" thumbnail into a genuine low-res mosaic:
+     draws the real photo onto a small canvas (cropped the same way
+     object-fit:cover would crop it, so the mosaic lines up with the normal
+     thumbnail framing), then swaps the <img> src for that tiny result. From
+     that point on there is no higher-resolution copy left in the DOM for
+     the browser to reveal — image-rendering:pixelated (in CSS) just keeps
+     the upscale of that genuinely-tiny image blocky instead of smoothing it
+     into a blur. BLOCKS picks how many mosaic cells span the image's longer
+     side; higher = more recognizable, lower = more abstract. */
+  var CENSOR_BLOCKS = 12;
+  function pixelateCensoredThumbs(grid) {
+    grid.querySelectorAll('img[data-pixelate="1"]').forEach(function (img) {
+      if (img.__pixelateDone) return;
+      function run() {
+        if (img.__pixelateDone) return;
+        img.__pixelateDone = true;
+        try {
+          var box = img.closest('.card-image');
+          var boxRatio = (box && box.clientWidth && box.clientHeight) ? (box.clientWidth / box.clientHeight) : (4 / 3);
+          var bW = boxRatio >= 1 ? CENSOR_BLOCKS : Math.max(1, Math.round(CENSOR_BLOCKS * boxRatio));
+          var bH = boxRatio >= 1 ? Math.max(1, Math.round(CENSOR_BLOCKS / boxRatio)) : CENSOR_BLOCKS;
+          var sw = img.naturalWidth, sh = img.naturalHeight;
+          if (!sw || !sh) return; // broken image — leave as-is rather than throw
+          var srcRatio = sw / sh, cropW = sw, cropH = sh, sx = 0, sy = 0;
+          if (srcRatio > boxRatio) { cropW = sh * boxRatio; sx = (sw - cropW) / 2; }
+          else { cropH = sw / boxRatio; sy = (sh - cropH) / 2; }
+          var c = document.createElement('canvas');
+          c.width = bW; c.height = bH;
+          var ctx = c.getContext('2d');
+          ctx.drawImage(img, sx, sy, cropW, cropH, 0, 0, bW, bH);
+          img.src = c.toDataURL('image/png');
+          img.removeAttribute('crossorigin');
+        } catch (e) {
+          // Most likely a CORS-tainted canvas on some future image host.
+          // Leave the plain (unpixelated) <img> up rather than crash the
+          // grid — not ideal, but the no-zoom guard for "Hidden" pieces and
+          // the fact this is a grid-view convenience, not a security
+          // boundary, mean failing open here is the lesser problem.
+        }
+      }
+      if (img.complete && img.naturalWidth) run(); else img.addEventListener('load', run, { once: true });
+    });
+  }
   function bindGridEvents() {
     var grid = document.getElementById('grid');
     if (!grid) return;
+    pixelateCensoredThumbs(grid);
     grid.querySelectorAll('[data-toggle-sold]').forEach(function (el) {
       el.addEventListener('click', function () { toggleSold(el.getAttribute('data-toggle-sold')); });
     });
