@@ -1140,6 +1140,7 @@
         '<button class="btn btn-ghost btn-sm" id="btnPdfTest" type="button" title="Read an inventory PDF, preview the changes in red, fix anything wrong, then apply">Import from PDF</button>' +
         '<input type="file" id="pdfTestInput" accept="application/pdf" style="display:none">' +
         '<button class="btn btn-ghost btn-sm" id="btnXlsxExport" type="button" title="Download the inventory (date, number, name, size) as an Excel file — edit it, print it to PDF, then re-import with Import from PDF">Export to Excel</button>' +
+        '<button class="btn btn-ghost btn-sm" id="btnPdfExport" type="button" title="Download the current inventory as a PDF, in the exact layout Import from PDF reads — a ready-made master copy to correct offline and bring back in">Download PDF</button>' +
         '<button class="btn btn-primary" id="btnAddPainting" type="button">' +
         '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>Add painting</button>' +
         '<span class="admin-pill"><span class="dot"></span>' + esc(currentUserEmail) + '</span>' +
@@ -1165,6 +1166,7 @@
         openBulkConfirmModal(files);
       });
       document.getElementById('btnXlsxExport').addEventListener('click', exportInventoryXlsx);
+      document.getElementById('btnPdfExport').addEventListener('click', exportInventoryPdf);
       document.getElementById('btnPdfTest').addEventListener('click', function () {
         document.getElementById('pdfTestInput').click();
       });
@@ -1292,6 +1294,61 @@
     }
   }
 
+  /* ---------------- export as a re-importable PDF ----------------
+     A plain, monospaced listing of the CURRENT gallery — one line per
+     painting, in exactly the shape "Import from PDF" reads back
+     (optional date, catalogue number, name, size) — so this file can
+     become the running master copy: download it, note additions or
+     removals, hand-correct anything, then bring it straight back in
+     with Import from PDF next time the count has moved.
+     Note: the built-in PDF font here only covers Latin text. A name
+     written in Japanese, Chinese or similar won't render in this
+     download — it'll come out blank on that line — though re-importing
+     the same painting's *number* still works fine since matching never
+     depends on the name. */
+  function loadJsPdf() {
+    if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve(window.jspdf.jsPDF);
+    return new Promise(function (resolve, reject) {
+      var sc = document.createElement('script');
+      sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js';
+      sc.onload = function () { (window.jspdf && window.jspdf.jsPDF) ? resolve(window.jspdf.jsPDF) : reject(new Error('jsPDF missing')); };
+      sc.onerror = function () { reject(new Error('jsPDF failed to load')); };
+      document.head.appendChild(sc);
+    });
+  }
+  function padTo(str, len) { str = String(str || ''); return str.length >= len ? str + '  ' : str + new Array(len - str.length + 2).join(' '); }
+  async function exportInventoryPdf() {
+    if (!state.tabs.length) { toast('Nothing to export yet.'); return; }
+    toast('Building PDF…');
+    try {
+      var jsPDF = await loadJsPdf();
+      var doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      var marginX = 36, top = 44, bottom = 800, lineH = 13;
+      var first = true;
+      state.tabs.forEach(function (tab) {
+        var rows = inventoryRowsForTab(tab);
+        if (!rows.length) return;
+        if (!first) doc.addPage(); first = false;
+        var y = top;
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
+        doc.text(tab.name + (tab.prefix ? ' (' + tab.prefix + ')' : ''), marginX, y);
+        y += 20;
+        doc.setFont('courier', 'normal'); doc.setFontSize(9);
+        rows.forEach(function (r) {
+          if (y > bottom) { doc.addPage(); y = top; }
+          var line = padTo(r[0], 12) + padTo(r[1], 13) + padTo(r[2], 32) + (r[3] || '');
+          doc.text(line, marginX, y);
+          y += lineH;
+        });
+      });
+      if (first) { toast('Nothing to export yet.'); return; }
+      doc.save('painting_inventory.pdf');
+      toast('Downloaded painting_inventory.pdf — bring it back in anytime with Import from PDF.');
+    } catch (e) {
+      toast('Could not build the PDF — check your connection and try again.');
+    }
+  }
+
   /* ---------------- PDF test preview (nothing is saved) ---------------- */
   var testOverlay = null; /* { byId: {id: {name?,size?,date?}}, extras: [placeholder paintings] } */
   function testView(p) {
@@ -1359,8 +1416,8 @@
     });
     creates.forEach(function (c, i) {
       testOverlay.extras.push({
-        id: 'test-' + i, tab_id: c.tab_id, number: c.number, name: c.name, date: c.date, extra_dates: [],
-        price: 0, size: '', description: '', sold: false, not_for_sale: false, censored: false, hue: 0,
+        id: 'test-' + i, tab_id: c.tab_id, number: c.number, name: c.name || '', date: c.date, extra_dates: [],
+        price: 0, size: c.size || '', description: '', sold: false, not_for_sale: false, censored: false, hue: 0,
         __testNew: true, __red: { name: true, number: true, date: true, size: true }
       });
     });
@@ -1381,14 +1438,14 @@
       if (c.nameChanged || c.sizeChanged || c.dateChanged) changes.push(c);
     });
     testOverlay.extras.forEach(function (x) {
-      creates.push({ tab_id: x.tab_id, number: x.number, name: x.name || 'Dont Exist', date: x.date || null });
+      creates.push({ tab_id: x.tab_id, number: x.number, name: x.name || '', size: x.size || '', date: x.date || null });
     });
     if (!changes.length && !creates.length) { toast('Nothing to apply.'); return; }
     var root = document.getElementById('modalRoot');
     root.innerHTML = '<div class="modal-backdrop" id="pdfConfirmBackdrop"><div class="modal">' +
       '<h2>Save these changes?</h2>' +
       '<p class="field-hint">' + changes.length + ' painting' + (changes.length === 1 ? '' : 's') + ' will be updated' +
-      (creates.length ? ' and ' + creates.length + ' new placeholder' + (creates.length === 1 ? '' : 's') + ' added' : '') +
+      (creates.length ? ' and ' + creates.length + ' new painting' + (creates.length === 1 ? '' : 's') + ' added' : '') +
       '. This writes to the live gallery and overwrites the existing name, size and date on those paintings.</p>' +
       '<div class="modal-actions"><button class="btn btn-ghost" id="pdfConfirmCancel" type="button">Go back</button>' +
       '<button class="btn btn-primary" id="pdfConfirmGo" type="button">Yes, save</button></div>' +
@@ -2394,18 +2451,24 @@
         }
       });
 
-      /* "Dont Exist" rows with no painting yet are added automatically as
-         placeholders (black tile, no photo, not zoomable). */
+      /* Any PDF row that matches no existing painting is proposed as a new
+         one — not just rows literally named "Dont Exist". A PDF that's
+         grown past the gallery (more catalogue numbers on the physical
+         list than have been entered here yet) is exactly this case, and
+         it used to be silently dropped instead of offered for creation.
+         Still shown and saved as a photo-less black tile either way —
+         a real "Dont Exist" or a real new painting both need a photo
+         added later via the ordinary edit pencil. */
       var creates = [];
       Object.keys(byKey).forEach(function (key) {
         var r = byKey[key];
-        if (matchedKeys[key] || !/^\s*don['\u2019]?t\s+exist\s*$/i.test(r.name || '')) return;
+        if (matchedKeys[key]) return;
         var pm = String(r.number).match(/^([A-Za-z]+)-(.+)$/);
         if (!pm) return;
         var tab = state.tabs.find(function (t) { return t.prefix && t.prefix.replace(/[^A-Za-z]/g, '') === pm[1]; });
         if (!tab) return;
         var leadNum = normalizeNumKey(r.number) || pm[2];
-        creates.push({ tab_id: tab.id, number: leadNum, name: 'Dont Exist', date: r.date || null,
+        creates.push({ tab_id: tab.id, number: leadNum, name: r.name || '', size: r.size || '', date: r.date || null,
                        catalog: (tab.prefix || '') + pm[2] });
       });
 
@@ -2445,7 +2508,7 @@
       try {
         var ins = await sb.from('paintings').insert({
           tab_id: cr.tab_id, name: cr.name, number: cr.number, date: cr.date, extra_dates: [],
-          price: 0, size: '', description: '', sold: false, not_for_sale: false, censored: false,
+          price: 0, size: cr.size || '', description: '', sold: false, not_for_sale: false, censored: false,
           hue: 0, suffix_id: null
         }).select().single();
         if (ins.error) throw ins.error;
