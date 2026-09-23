@@ -461,6 +461,21 @@
   @keyframes suffixRainbow { 0% { background-position: 0% 50%; } 100% { background-position: 300% 50%; } }
   @media (prefers-reduced-motion: reduce) { .suffix-tag.rainbow { animation: none; background-position: 0% 50%; } }
   @media print { .suffix-tag.rainbow { background: none; -webkit-text-fill-color: currentColor; color: #b0479a; } }
+
+  /* "Pending for remake" gets the same treatment as "In Progress" above,
+     just a red pulse instead of a full rainbow — same mechanism, same
+     reduced-motion and print fallbacks, different gradient/keyframe name so
+     the two don't collide if a piece could ever carry both animated
+     styles' CSS at once. */
+  .suffix-tag.redshift {
+    background: linear-gradient(90deg, #3a0000, #7a0000, #b30000, #ff1a1a, #ff6666, #ff1a1a, #b30000, #7a0000, #3a0000);
+    background-size: 300% auto;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: suffixRedshift 4s linear infinite;
+  }
+  @keyframes suffixRedshift { 0% { background-position: 0% 50%; } 100% { background-position: 300% 50%; } }
+  @media (prefers-reduced-motion: reduce) { .suffix-tag.redshift { animation: none; background-position: 0% 50%; } }
+  @media print { .suffix-tag.redshift { background: none; -webkit-text-fill-color: currentColor; color: #b30000; } }
   /* Wraps the optional suffix tag + the footer as one unit and pins the
      whole unit to the bottom of the card body (instead of putting
      margin-top: auto on the tag itself, which would split the leftover
@@ -1562,6 +1577,8 @@
          the piece's own `censored` field. */
       var isHidden = !!(suffix && /^hidden$/i.test(suffix.label || ''));
       var isInProgress = !!(suffix && /^in progress$/i.test(suffix.label || ''));
+      var isPendingRemake = !!(suffix && /^pending( for)? remake$/i.test(suffix.label || ''));
+      var animatedSuffixClass = isInProgress ? ' rainbow' : (isPendingRemake ? ' redshift' : '');
       var isCensoredView = p.censored || isHidden;
       var canZoom = !!thumbSrc && !isHidden;
       var imageInner = thumbSrc
@@ -1607,7 +1624,7 @@
         (p.description ? '<div class="card-desc"><span class="field-label">Description:</span> ' + esc(p.description) + '</div>' : '') +
         '<div class="card-bottom">' +
         (suffix
-          ? '<div class="suffix-tag' + (isInProgress ? ' rainbow' : '') + '"' + (isInProgress ? '' : ' style="color:' + esc(suffix.color) + '"') + '>' + esc(suffix.label) + '</div>'
+          ? '<div class="suffix-tag' + animatedSuffixClass + '"' + (animatedSuffixClass ? '' : ' style="color:' + esc(suffix.color) + '"') + '>' + esc(suffix.label) + '</div>'
           : '') +
         '<div class="card-footer">' +
         ((isAdmin && !p.__testNew)
