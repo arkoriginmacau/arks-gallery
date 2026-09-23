@@ -1494,11 +1494,7 @@
   function startPdfTest(changes, creates, kind) {
     testOverlay = { kind: kind || 'pdf', byId: {}, extras: [] };
     changes.forEach(function (c) {
-      var o = {};
-      if (c.nameChanged) o.name = c.newName;
-      if (c.sizeChanged) o.size = c.newSize;
-      if (c.dateChanged) o.date = c.newDate;
-      testOverlay.byId[c.id] = o;
+      testOverlay.byId[c.id] = Object.assign({}, c.fields);
     });
     creates.forEach(function (c, i) {
       testOverlay.extras.push({
@@ -2764,13 +2760,11 @@
         var sizeChanged = newSize !== null && newSize !== (p.size || '');
         var dateChanged = newDate !== null && newDate !== (p.date ? String(p.date).slice(0, 10) : '');
         if (nameChanged || sizeChanged || dateChanged) {
-          changes.push({
-            id: p.id, catalog: catalogNum(p),
-            oldName: p.name || '', newName: newName,
-            oldSize: p.size || '', newSize: sizeChanged ? newSize : (p.size || ''),
-            oldDate: p.date ? String(p.date).slice(0, 10) : '', newDate: dateChanged ? newDate : (p.date ? String(p.date).slice(0, 10) : ''),
-            nameChanged: nameChanged, sizeChanged: sizeChanged, dateChanged: dateChanged
-          });
+          var fields = {};
+          if (nameChanged) fields.name = newName;
+          if (sizeChanged) fields.size = newSize;
+          if (dateChanged) fields.date = newDate;
+          changes.push({ id: p.id, fields: fields });
         }
       });
 
