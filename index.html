@@ -546,6 +546,23 @@
     width: 100%; max-width: 440px; padding: 26px; margin-bottom: 40px;
   }
   .modal.modal-wide { max-width: 720px; }
+  .modal.modal-xwide { max-width: 980px; }
+  .review-list { max-height: 68vh; overflow-y: auto; padding-right: 4px; }
+  .review-page { border: 1px solid var(--line); border-radius: 6px; padding: 14px; margin-bottom: 14px; }
+  .review-page h3 { margin: 0 0 8px; font-size: 14px; }
+  .review-page-reasons { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .review-reason-chip { background: rgba(255,42,42,.12); color: #ff2a2a; border: 1px solid rgba(255,42,42,.4); border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 600; }
+  .review-page-body { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+  .review-page-img { flex: 0 0 auto; width: 280px; min-height: 60px; }
+  .review-page-img img { width: 100%; border: 1px solid var(--line); border-radius: 4px; display: block; }
+  .review-blocks { flex: 1 1 320px; min-width: 280px; }
+  .review-block-row { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; line-height: 1.4; cursor: pointer; }
+  .review-block-row input[type="checkbox"] { margin-top: 3px; flex: 0 0 auto; }
+  .review-assign-rows { margin-top: 10px; }
+  .review-assign-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .review-assign-row input[type="text"] { width: 120px; border: 1px solid var(--line); background: var(--paper-2); color: var(--ink-2); border-radius: 3px; padding: 6px 8px; font-size: 13px; font-family: inherit; }
+  .review-resolved-tag { color: #2a7d2a; font-weight: 700; font-size: 11.5px; }
+  .review-add-num { margin-top: 10px; }
   .pdf-diff-scroll {
     max-height: 320px; overflow-y: auto; border: 1px solid var(--line);
     border-radius: 4px; margin-bottom: 4px;
@@ -1438,6 +1455,7 @@
 
   /* ---------------- PDF test preview (nothing is saved) ---------------- */
   var testOverlay = null; /* { kind: 'pdf'|'desc', byId: {id: {field: value}}, extras: [placeholder paintings] } */
+  var descReviewState = null; /* { pdf, pages, flagged: {pageNum: [reasons]}, order: [pageNum,...] } — pages needing a manual look after "Import descriptions from PDF" */
   function testView(p) {
     if (!testOverlay) return p;
     var o = testOverlay.byId[p.id];
@@ -1453,13 +1471,16 @@
     if (!el) { el = document.createElement('div'); el.id = 'testBanner'; document.body.appendChild(el); }
     var changed = Object.keys(testOverlay.byId).length, added = testOverlay.extras.length;
     var srcLabel = testOverlay.kind === 'desc' ? 'the description PDF' : 'the PDF';
+    var reviewCount = descReviewState ? descReviewState.order.length : 0;
     el.innerHTML = '<span>PREVIEW — nothing is saved yet. Red = from ' + srcLabel + ' (' +
       changed + ' changed, ' + added + ' new). Edit the red fields to fix anything, then Apply.</span>' +
+      (reviewCount ? '<button type="button" id="testReviewBtn">Review ' + reviewCount + ' page' + (reviewCount === 1 ? '' : 's') + '…</button>' : '') +
       '<button type="button" id="testApplyBtn" class="is-primary">Apply…</button>' +
       '<button type="button" id="testClearBtn">Cancel</button>';
     document.getElementById('testClearBtn').addEventListener('click', function () {
-      testOverlay = null; updateTestBanner(); renderAll();
+      testOverlay = null; descReviewState = null; updateTestBanner(); renderAll();
     });
+    if (reviewCount) document.getElementById('testReviewBtn').addEventListener('click', openDescReviewModal);
     document.getElementById('testApplyBtn').addEventListener('click', openPdfApplyConfirm);
   }
   var testGridWired = false;
@@ -2600,7 +2621,57 @@
       });
       pages.push(Object.keys(byPos).map(function (k) { return byPos[k]; }));
     }
-    return pages;
+    return { pdf: pdf, pages: pages };
+  }
+
+  /* A page's tag numbers can come as one combined line ("O-11-2.1/2
+     O-12-2.2/2") or, just as often, as two separate standalone lines (two
+     yellow boxes that don't happen to land on the same text-row) — both
+     count, so every anchor-shaped line on the page is collected. */
+  function getPageAnchorNums(lines) {
+    var nums = [];
+    lines.forEach(function (ln) {
+      if (!DESC_ANCHOR_RE.test(ln.text.trim())) return;
+      var m = ln.text.trim().match(DESC_NUM_RE);
+      if (m) nums = nums.concat(m);
+    });
+    return nums;
+  }
+
+  /* Every independently-selectable chunk of text on a page (every column,
+     every gap-separated block within a column — titles/captions included),
+     used by the manual review modal so the person can tick whichever
+     chunk(s) actually belong to a given catalogue number. Left-to-right,
+     top-to-bottom order. */
+  function getPageCandidateBlocks(lines) {
+    var anchorLines = lines.filter(function (ln) { return DESC_ANCHOR_RE.test(ln.text.trim()); });
+    var body = lines.filter(function (ln) { return anchorLines.indexOf(ln) === -1; });
+    var cols = clusterLinesByColumn(body);
+    var blocks = [];
+    cols.forEach(function (col) {
+      var sorted = col.lines.slice().sort(function (a, b) { return b.y - a.y; });
+      var subBlocks = [];
+      sorted.forEach(function (ln, i) {
+        var prev = sorted[i - 1];
+        if (!prev || (prev.y - ln.y) > DESC_BLOCK_GAP) subBlocks.push([]);
+        subBlocks[subBlocks.length - 1].push(ln);
+      });
+      subBlocks.forEach(function (b) {
+        var out = '', prevY = null;
+        b.forEach(function (ln) {
+          var t = ln.text.trim();
+          if (!t) return;
+          if (prevY === null) out = t;
+          else if ((prevY - ln.y) > DESC_PARA_GAP) out += '\n\n' + t;
+          else out += ' ' + t;
+          prevY = ln.y;
+        });
+        out = fixDescChars(out).replace(/[ \t]+/g, ' ').trim();
+        if (out) blocks.push({ text: out, avgX: b.reduce(function (s, l) { return s + l.x; }, 0) / b.length, topY: b[0].y });
+      });
+    });
+    blocks.sort(function (a, b) { return a.avgX - b.avgX || b.topY - a.topY; });
+    return blocks;
   }
 
   var DESC_ANCHOR_RE = /^([A-Za-z]{1,4}-\d[\w.\-\/]*(?:\s+[A-Za-z]{1,4}-\d[\w.\-\/]*)*)$/;
@@ -2652,12 +2723,20 @@
     return fixDescChars(out).replace(/[ \t]+/g, ' ').trim();
   }
 
-  /* One page can hold one piece (most pages) or two side by side (a
-     shared tag line like "O-11-2.1/2 O-12-2.2/2"); the tag lists the
-     numbers in the same left-to-right order as their columns below. */
+  /* One page can hold one piece (most pages) or two side by side sharing
+     ONE tag line like "O-11-2.1/2 O-12-2.2/2" — there the tag lists the
+     numbers in the same left-to-right order as their columns below, and
+     auto-assigning is reliable enough to propose straight into the red
+     preview. A page with two SEPARATE tag lines (two yellow boxes that
+     just don't land on the same text-row) is a shakier bet — layouts seen
+     in this book range from simple side-by-side to a crossed diagonal
+     (piece A's text sits where piece B's image is, and vice versa), so
+     rather than guess, this returns nothing for that page and leaves it
+     entirely to the manual review modal, which the caller flags it for. */
   function extractDescEntriesFromPage(lines, pageNum) {
-    var anchorLine = lines.find(function (ln) { return DESC_ANCHOR_RE.test(ln.text.trim()); });
-    if (!anchorLine) return [];
+    var anchorLines = lines.filter(function (ln) { return DESC_ANCHOR_RE.test(ln.text.trim()); });
+    if (anchorLines.length !== 1) return [];
+    var anchorLine = anchorLines[0];
     var nums = anchorLine.text.trim().match(DESC_NUM_RE) || [];
     if (!nums.length) return [];
     var body = lines.filter(function (ln) { return ln !== anchorLine; });
@@ -2683,10 +2762,16 @@
     if (!window.pdfjsLib) { toast('PDF reader failed to load — check your connection and try again.'); return; }
     toast('Reading PDF…');
     try {
-      var pages = await extractDescPdfPages(file);
+      var loaded = await extractDescPdfPages(file);
+      var pdf = loaded.pdf, pages = loaded.pages;
       var entries = [];
+      var pageAnchorNums = {}; /* pageNum -> [numbers on that page's tag line] */
       pages.forEach(function (lines, idx) {
-        entries = entries.concat(extractDescEntriesFromPage(lines, idx + 1));
+        var pageNum = idx + 1;
+        var nums = getPageAnchorNums(lines);
+        if (!nums.length) return;
+        pageAnchorNums[pageNum] = nums;
+        entries = entries.concat(extractDescEntriesFromPage(lines, pageNum));
       });
       if (!entries.length) { toast('Could not find any numbered entries in that PDF.'); return; }
 
@@ -2714,19 +2799,163 @@
       });
       var noMatchCount = Object.keys(byKey).length - Object.keys(matchedKeys).length;
 
+      /* Pages worth a manual look: a number the PDF has but no painting
+         matches, a page shared by two pieces (worth double-checking the
+         split either way), or a tag with no description text found near it. */
+      var flagged = {};
+      function flag(pageNum, reason) {
+        if (!flagged[pageNum]) flagged[pageNum] = [];
+        if (flagged[pageNum].indexOf(reason) === -1) flagged[pageNum].push(reason);
+      }
+      Object.keys(byKey).forEach(function (key) {
+        if (!matchedKeys[key]) flag(byKey[key].pageNum, 'No painting numbered ' + byKey[key].number + ' found');
+      });
+      Object.keys(pageAnchorNums).forEach(function (pnStr) {
+        var pn = Number(pnStr), nums = pageAnchorNums[pnStr];
+        if (nums.length > 1) flag(pn, 'Two pieces share this page — double-check the split');
+        var foundNums = entries.filter(function (e) { return e.pageNum === pn; }).map(function (e) { return e.number; });
+        nums.forEach(function (n) { if (foundNums.indexOf(n) === -1) flag(pn, 'No description text found near ' + n); });
+      });
+      var flaggedPageNums = Object.keys(flagged).map(Number).sort(function (a, b) { return a - b; });
+      descReviewState = flaggedPageNums.length ? { pdf: pdf, pages: pages, flagged: flagged, order: flaggedPageNums } : null;
+
       if (!changes.length) {
         toast(noMatchCount
           ? 'Found ' + entries.length + ' entries in the PDF, but none needed changes (' + noMatchCount + ' didn\'t match an existing painting).'
           : 'Found ' + entries.length + ' entries in the PDF — descriptions already match, nothing to change.');
+        if (descReviewState) { testOverlay = { kind: 'desc', byId: {}, extras: [] }; wireTestGrid(); updateTestBanner(); openDescReviewModal(); }
         return;
       }
       startPdfTest(changes, [], 'desc');
-      if (noMatchCount) toast(changes.length + ' description' + (changes.length === 1 ? '' : 's') + ' ready to preview — red = from the PDF. ' +
-        noMatchCount + ' entr' + (noMatchCount === 1 ? 'y' : 'ies') + ' in the PDF didn\'t match any existing painting and ' +
-        (noMatchCount === 1 ? 'was' : 'were') + ' skipped.');
+      var msg = changes.length + ' description' + (changes.length === 1 ? '' : 's') + ' ready to preview — red = from the PDF.';
+      if (flaggedPageNums.length) msg += ' ' + flaggedPageNums.length + ' page' + (flaggedPageNums.length === 1 ? '' : 's') +
+        ' need a manual check (unmatched numbers, shared pages, or no text found) — click "Review pages" in the preview bar.';
+      toast(msg);
     } catch (e) {
       toast('Could not read that PDF — is it a valid catalogue PDF?');
     }
+  }
+
+  /* Renders one PDF page to an <img> inside the review modal, on demand —
+     only the flagged pages ever get rendered, not all 199. */
+  async function renderReviewPageImage(pageNum) {
+    var container = document.getElementById('reviewImg-' + pageNum);
+    if (!container || !descReviewState) return;
+    try {
+      var page = await descReviewState.pdf.getPage(pageNum);
+      var viewport = page.getViewport({ scale: 1.3 });
+      var canvas = document.createElement('canvas');
+      canvas.width = viewport.width; canvas.height = viewport.height;
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
+      if (!document.getElementById('reviewImg-' + pageNum)) return; /* modal closed mid-render */
+      var img = document.createElement('img');
+      img.src = canvas.toDataURL('image/jpeg', 0.85);
+      img.alt = 'PDF page ' + pageNum;
+      container.innerHTML = '';
+      container.appendChild(img);
+    } catch (e) {
+      if (container) container.innerHTML = '<span class="field-hint">Could not render this page.</span>';
+    }
+  }
+
+  /* The manual-fix companion to "Import descriptions from PDF": for every
+     flagged page, shows the page image plus every independently-selectable
+     chunk of text found on it (see getPageCandidateBlocks) as a checklist —
+     the person ticks which chunk(s) belong to which catalogue number and
+     the result joins the very same red preview / Apply flow. */
+  function openDescReviewModal() {
+    if (!descReviewState) return;
+    var root = document.getElementById('modalRoot');
+    var pageNums = descReviewState.order;
+    root.innerHTML = '<div class="modal-backdrop" id="descReviewBackdrop"><div class="modal modal-xwide">' +
+      '<h2>Review flagged pages</h2>' +
+      '<p class="modal-sub">' + pageNums.length + ' page' + (pageNums.length === 1 ? '' : 's') + ' from the description PDF need a manual look — ' +
+      'a number that didn\'t match a painting, two pieces sharing a page, or no description text found nearby. ' +
+      'Tick the block(s) of text that belong to a number, fix the number if needed, then "Use checked blocks". ' +
+      'Nothing is saved here either — it joins the same red preview, ready for Apply.</p>' +
+      '<div id="descReviewList" class="review-list"></div>' +
+      '<div class="modal-actions"><button class="btn btn-primary" id="descReviewDone" type="button">Done</button></div>' +
+      '</div></div>';
+    document.getElementById('descReviewBackdrop').addEventListener('click', function (e) { if (e.target.id === 'descReviewBackdrop') closeModal(); });
+    document.getElementById('descReviewDone').addEventListener('click', closeModal);
+
+    var list = document.getElementById('descReviewList');
+    var html = '';
+    pageNums.forEach(function (pageNum) {
+      var lines = descReviewState.pages[pageNum - 1];
+      var reasons = descReviewState.flagged[pageNum] || [];
+      var nums = getPageAnchorNums(lines);
+      var blocks = getPageCandidateBlocks(lines);
+      html += '<div class="review-page" id="reviewPage-' + pageNum + '" data-next-idx="' + nums.length + '">' +
+        '<h3>Page ' + pageNum + '</h3>' +
+        '<div class="review-page-reasons">' + reasons.map(function (r) { return '<span class="review-reason-chip">' + esc(r) + '</span>'; }).join('') + '</div>' +
+        '<div class="review-page-body">' +
+        '<div class="review-page-img" id="reviewImg-' + pageNum + '"><span class="field-hint">Rendering page…</span></div>' +
+        '<div class="review-blocks">' +
+        blocks.map(function (b, i) {
+          return '<label class="review-block-row"><input type="checkbox" data-block="' + i + '"><span>' + esc(b.text.slice(0, 220)) + (b.text.length > 220 ? '…' : '') + '</span></label>';
+        }).join('') +
+        '<div class="review-assign-rows">' +
+        nums.map(function (num, idx) { return reviewAssignRowHtml(pageNum, idx, num); }).join('') +
+        '</div>' +
+        '<button type="button" class="btn btn-ghost btn-sm review-add-num" data-page="' + pageNum + '">+ Add another number</button>' +
+        '</div></div></div>';
+    });
+    list.innerHTML = html;
+
+    list.addEventListener('click', function (e) {
+      var addBtn = e.target.closest('.review-add-num');
+      if (addBtn) {
+        var pageNum = Number(addBtn.getAttribute('data-page'));
+        var section = document.getElementById('reviewPage-' + pageNum);
+        var idx = Number(section.getAttribute('data-next-idx'));
+        section.setAttribute('data-next-idx', String(idx + 1));
+        var row = document.createElement('div');
+        row.innerHTML = reviewAssignRowHtml(pageNum, idx, '');
+        section.querySelector('.review-assign-rows').appendChild(row.firstChild);
+        return;
+      }
+      var btn = e.target.closest('[data-num-idx]');
+      if (!btn || btn.tagName !== 'BUTTON') return;
+      var pageNum = Number(btn.getAttribute('data-page'));
+      var numIdx = btn.getAttribute('data-num-idx');
+      var section = document.getElementById('reviewPage-' + pageNum);
+      var checked = Array.prototype.slice.call(section.querySelectorAll('.review-blocks input[type="checkbox"]:checked'));
+      if (!checked.length) { toast('Tick at least one block of text first.'); return; }
+      var numField = section.querySelector('input[data-role="numfield"][data-num-idx="' + numIdx + '"]');
+      var number = numField ? numField.value.trim() : '';
+      if (!number) { toast('Enter a catalogue number first.'); return; }
+      var pageBlocks = getPageCandidateBlocks(descReviewState.pages[pageNum - 1]);
+      var chosen = checked.map(function (cb) { return pageBlocks[Number(cb.getAttribute('data-block'))]; }).filter(Boolean);
+      var text = fixDescChars(chosen.map(function (b) { return b.text; }).join('\n\n')).trim();
+      var pm = number.match(/^([A-Za-z]*)-?\s*(.+)$/);
+      var prefixLetter = (pm ? pm[1] : '').replace(/[^A-Za-z]/g, '').toUpperCase();
+      var normNum = normalizeNumKey(number);
+      var painting = state.paintings.find(function (p) {
+        var tab = tabById(p.tab_id);
+        var tp = (tab && tab.prefix ? tab.prefix : '').replace(/[^A-Za-z]/g, '').toUpperCase();
+        return tp === prefixLetter && normNum && normalizeNumKey(p.number) === normNum;
+      });
+      if (!painting) { toast('No painting numbered ' + number + ' found in any tab.'); return; }
+      if (!testOverlay) { testOverlay = { kind: 'desc', byId: {}, extras: [] }; wireTestGrid(); }
+      testOverlay.byId[painting.id] = { description: text };
+      var tag = document.getElementById('reviewResolved-' + pageNum + '-' + numIdx);
+      if (tag) { tag.hidden = false; tag.textContent = '✓ applied to "' + esc(painting.name || 'Untitled') + '"'; }
+      updateTestBanner();
+      renderAll();
+      toast('Description for ' + number + ' added to the preview.');
+    });
+
+    (async function () {
+      for (var i = 0; i < pageNums.length; i++) await renderReviewPageImage(pageNums[i]);
+    })();
+  }
+  function reviewAssignRowHtml(pageNum, idx, num) {
+    return '<div class="review-assign-row">' +
+      '<input type="text" class="mono" value="' + esc(num) + '" placeholder="e.g. O-57" data-role="numfield" data-num-idx="' + idx + '">' +
+      '<button type="button" class="btn btn-ghost btn-sm" data-page="' + pageNum + '" data-num-idx="' + idx + '">Use checked blocks →</button>' +
+      '<span class="review-resolved-tag" id="reviewResolved-' + pageNum + '-' + idx + '" hidden></span>' +
+      '</div>';
   }
 
   async function runPdfSync(file) {
@@ -2832,7 +3061,7 @@
         failed++;
       }
     }
-    testOverlay = null; updateTestBanner();
+    testOverlay = null; descReviewState = null; updateTestBanner();
     closeModal();
     renderAll();
     toast(ok + ' painting' + (ok === 1 ? '' : 's') + ' updated from PDF' +
