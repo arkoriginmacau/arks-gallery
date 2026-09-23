@@ -562,6 +562,7 @@
   .card.is-test-new { outline: 3px solid #ff2a2a; outline-offset: -3px; }
   .test-edit { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; color: #ff2a2a; background: rgba(255,42,42,.10); border: 1px solid #ff2a2a; border-radius: 4px; padding: 3px 6px; margin: 2px 0; }
   .test-edit:focus { outline: 2px solid #ff2a2a; background: rgba(255,42,42,.18); }
+  textarea.test-edit { resize: vertical; line-height: 1.4; }
   .test-discard { background: transparent; color: #ff2a2a; border: 1px solid #ff2a2a; border-radius: 4px; font-size: 11px; font-weight: 700; padding: 2px 8px; margin: 4px 0 6px; cursor: pointer; }
   .test-discard:hover { background: #ff2a2a; color: #fff; }
   #testBanner button.is-primary { background: #111; color: #fff; }
@@ -1185,6 +1186,8 @@
         '<input type="file" id="bulkFileInput" accept="image/*" multiple style="display:none">' +
         '<button class="btn btn-ghost btn-sm" id="btnPdfTest" type="button" title="Read an inventory PDF, preview the changes in red, fix anything wrong, then apply">Import from PDF</button>' +
         '<input type="file" id="pdfTestInput" accept="application/pdf" style="display:none">' +
+        '<button class="btn btn-ghost btn-sm" id="btnDescPdfTest" type="button" title="Read a catalogue PDF (one numbered piece per page) and pull its description text in, preview in red, fix anything wrong, then apply">Import descriptions from PDF</button>' +
+        '<input type="file" id="descPdfTestInput" accept="application/pdf" style="display:none">' +
         '<button class="btn btn-ghost btn-sm" id="btnXlsxExport" type="button" title="Download the inventory (date, number, name, size) as an Excel file — edit it, print it to PDF, then re-import with Import from PDF">Export to Excel</button>' +
         '<button class="btn btn-ghost btn-sm" id="btnPdfExport" type="button" title="Download the current inventory as a PDF, in the exact layout Import from PDF reads — a ready-made master copy to correct offline and bring back in">Download PDF</button>' +
         '<button class="btn btn-primary" id="btnAddPainting" type="button">' +
@@ -1221,6 +1224,15 @@
         e.target.value = '';
         if (!f) return;
         runPdfSync(f);
+      });
+      document.getElementById('btnDescPdfTest').addEventListener('click', function () {
+        document.getElementById('descPdfTestInput').click();
+      });
+      document.getElementById('descPdfTestInput').addEventListener('change', function (e) {
+        var f = e.target.files[0];
+        e.target.value = '';
+        if (!f) return;
+        runDescPdfSync(f);
       });
       document.getElementById('btnSignOut').addEventListener('click', signOut);
     } else if (isEmbedded) {
@@ -1425,16 +1437,14 @@
   }
 
   /* ---------------- PDF test preview (nothing is saved) ---------------- */
-  var testOverlay = null; /* { byId: {id: {name?,size?,date?}}, extras: [placeholder paintings] } */
+  var testOverlay = null; /* { kind: 'pdf'|'desc', byId: {id: {field: value}}, extras: [placeholder paintings] } */
   function testView(p) {
     if (!testOverlay) return p;
     var o = testOverlay.byId[p.id];
     if (!o) return p;
     var v = Object.assign({}, p);
     v.__red = {};
-    ['name', 'size', 'date'].forEach(function (k) {
-      if (Object.prototype.hasOwnProperty.call(o, k)) { v[k] = o[k]; v.__red[k] = true; }
-    });
+    Object.keys(o).forEach(function (k) { v[k] = o[k]; v.__red[k] = true; });
     return v;
   }
   function updateTestBanner() {
@@ -1442,7 +1452,8 @@
     if (!testOverlay) { if (el) el.remove(); return; }
     if (!el) { el = document.createElement('div'); el.id = 'testBanner'; document.body.appendChild(el); }
     var changed = Object.keys(testOverlay.byId).length, added = testOverlay.extras.length;
-    el.innerHTML = '<span>PREVIEW — nothing is saved yet. Red = from the PDF (' +
+    var srcLabel = testOverlay.kind === 'desc' ? 'the description PDF' : 'the PDF';
+    el.innerHTML = '<span>PREVIEW — nothing is saved yet. Red = from ' + srcLabel + ' (' +
       changed + ' changed, ' + added + ' new). Edit the red fields to fix anything, then Apply.</span>' +
       '<button type="button" id="testApplyBtn" class="is-primary">Apply…</button>' +
       '<button type="button" id="testClearBtn">Cancel</button>';
@@ -1480,8 +1491,8 @@
       updateTestBanner(); renderAll();
     });
   }
-  function startPdfTest(changes, creates) {
-    testOverlay = { byId: {}, extras: [] };
+  function startPdfTest(changes, creates, kind) {
+    testOverlay = { kind: kind || 'pdf', byId: {}, extras: [] };
     changes.forEach(function (c) {
       var o = {};
       if (c.nameChanged) o.name = c.newName;
@@ -1507,21 +1518,20 @@
     var changes = [], creates = [];
     Object.keys(testOverlay.byId).forEach(function (id) {
       var o = testOverlay.byId[id], p = state.paintings.find(function (x) { return String(x.id) === String(id); });
-      if (!p) return;
-      var c = { id: p.id, nameChanged: 'name' in o, sizeChanged: 'size' in o, dateChanged: 'date' in o,
-                newName: o.name, newSize: o.size, newDate: o.date };
-      if (c.nameChanged || c.sizeChanged || c.dateChanged) changes.push(c);
+      if (!p || !Object.keys(o).length) return;
+      changes.push({ id: p.id, fields: Object.assign({}, o) });
     });
     testOverlay.extras.forEach(function (x) {
       creates.push({ tab_id: x.tab_id, number: x.number, name: x.name || '', size: x.size || '', date: x.date || null });
     });
     if (!changes.length && !creates.length) { toast('Nothing to apply.'); return; }
     var root = document.getElementById('modalRoot');
+    var fieldsDesc = testOverlay.kind === 'desc' ? 'the description' : 'the existing name, size and date';
     root.innerHTML = '<div class="modal-backdrop" id="pdfConfirmBackdrop"><div class="modal">' +
       '<h2>Save these changes?</h2>' +
       '<p class="field-hint">' + changes.length + ' painting' + (changes.length === 1 ? '' : 's') + ' will be updated' +
       (creates.length ? ' and ' + creates.length + ' new painting' + (creates.length === 1 ? '' : 's') + ' added' : '') +
-      '. This writes to the live gallery and overwrites the existing name, size and date on those paintings.</p>' +
+      '. This writes to the live gallery and overwrites ' + fieldsDesc + ' on those paintings.</p>' +
       '<div class="modal-actions"><button class="btn btn-ghost" id="pdfConfirmCancel" type="button">Go back</button>' +
       '<button class="btn btn-primary" id="pdfConfirmGo" type="button">Yes, save</button></div>' +
       '</div></div>';
@@ -1621,7 +1631,9 @@
         (p.size ? '<div class="card-meta"><span class="field-label">Size:</span> ' + (red.size
           ? '<input class="test-edit" type="text" data-tid="' + esc(String(p.id)) + '" data-f="size" value="' + esc(p.size) + '">'
           : '<span class="mono">' + esc(p.size) + '</span>') + '</div>' : '') +
-        (p.description ? '<div class="card-desc"><span class="field-label">Description:</span> ' + esc(p.description) + '</div>' : '') +
+        ((p.description || red.description) ? '<div class="card-desc"><span class="field-label">Description:</span> ' + (red.description
+          ? '<textarea class="test-edit" data-tid="' + esc(String(p.id)) + '" data-f="description" rows="3">' + esc(p.description || '') + '</textarea>'
+          : esc(p.description)) + '</div>' : '') +
         '<div class="card-bottom">' +
         (suffix
           ? '<div class="suffix-tag' + animatedSuffixClass + '"' + (animatedSuffixClass ? '' : ' style="color:' + esc(suffix.color) + '"') + '>' + esc(suffix.label) + '</div>'
@@ -2544,6 +2556,183 @@
     return m ? m[0] : '';
   }
 
+  /* ---------------- import descriptions from PDF ----------------
+     A different kind of PDF than the inventory one above: a page-per-piece
+     book/catalogue where each piece has a small yellow "O-12" style number
+     tag and a paragraph of description text near it (sometimes two pieces
+     side by side on one page, sharing one tag line like "O-11 O-12"). This
+     reads the description text near each tag and proposes it as a change
+     to that piece's Description field, through the exact same red-preview
+     / edit / discard / Apply flow as "Import from PDF" above.
+
+     Some source PDFs (this book included) have a broken font somewhere
+     that maps a handful of punctuation glyphs to the wrong codepoints —
+     curly quotes and dashes come out as "í"/"ó"/"ì"/"î"/"Ö". FIX_CHARS
+     repairs exactly those; anything else non-ASCII is left alone since
+     it might be genuine (accented names, etc). Stray control characters
+     (a different, page-local font bug on a few pages) are stripped. */
+  var DESC_FIX_CHARS = { 'í': '’', 'ó': '—', 'ì': '“', 'î': '”', 'Ö': '…', 'ë': '’' };
+  function fixDescChars(s) {
+    return String(s || '')
+      .replace(/[íóìîÖë]/g, function (c) { return DESC_FIX_CHARS[c] || c; })
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '');
+  }
+
+  /* Same per-line grouping as extractPdfLines(), but keeping each line's
+     position so pieces that share a page can be told apart by column. */
+  async function extractDescPdfPages(file) {
+    var buf = await file.arrayBuffer();
+    var pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    var pages = [];
+    for (var pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      var page = await pdf.getPage(pageNum);
+      var content = await page.getTextContent();
+      var lines = [], current = '', curX = null, curY = null;
+      content.items.forEach(function (item) {
+        if (curX === null) { curX = item.transform[4]; curY = item.transform[5]; }
+        current += item.str;
+        if (item.hasEOL) { lines.push({ text: current, x: curX, y: curY }); current = ''; curX = null; curY = null; }
+      });
+      if (current) lines.push({ text: current, x: curX, y: curY });
+      /* a handful of pages carry a duplicate, truncated copy of a few lines
+         at the exact same position (a rendering artifact) — keep only the
+         longer line at each position */
+      var byPos = {};
+      lines.forEach(function (ln) {
+        var key = Math.round(ln.x) + ',' + Math.round(ln.y);
+        if (!byPos[key] || ln.text.length > byPos[key].text.length) byPos[key] = ln;
+      });
+      pages.push(Object.keys(byPos).map(function (k) { return byPos[k]; }));
+    }
+    return pages;
+  }
+
+  var DESC_ANCHOR_RE = /^([A-Za-z]{1,4}-\d[\w.\-\/]*(?:\s+[A-Za-z]{1,4}-\d[\w.\-\/]*)*)$/;
+  var DESC_NUM_RE = /[A-Za-z]{1,4}-\d[\w.\-\/]*/g;
+  var DESC_COLUMN_GAP = 50, DESC_BLOCK_GAP = 48, DESC_PARA_GAP = 28;
+
+  /* Groups a page's body lines (the tag line already excluded) into
+     left-to-right columns — two pieces sharing a page sit in separate
+     columns, each with its own description text and (often) its own
+     leaked title caption above/below it. */
+  function clusterLinesByColumn(lines) {
+    var sorted = lines.slice().sort(function (a, b) { return a.x - b.x; });
+    var cols = [];
+    sorted.forEach(function (ln) {
+      var last = cols[cols.length - 1];
+      if (last && ln.x - last.lines[last.lines.length - 1].x <= DESC_COLUMN_GAP) last.lines.push(ln);
+      else cols.push({ lines: [ln] });
+    });
+    cols.forEach(function (c) { c.chars = c.lines.reduce(function (s, l) { return s + l.text.length; }, 0); });
+    return cols;
+  }
+
+  /* Within one piece's column, the real description is the tallest block
+     of lines with normal line-to-line spacing; a caption/title sitting in
+     the same column is set off by a much bigger vertical gap and — being
+     short — loses out to the real paragraph(s) by character count. Within
+     the winning block, a blank-line-sized gap becomes a paragraph break. */
+  function buildDescFromColumn(col) {
+    var sorted = col.lines.slice().sort(function (a, b) { return b.y - a.y; });
+    var blocks = [];
+    sorted.forEach(function (ln, i) {
+      var prev = sorted[i - 1];
+      if (!prev || (prev.y - ln.y) > DESC_BLOCK_GAP) blocks.push([]);
+      blocks[blocks.length - 1].push(ln);
+    });
+    var winner = blocks.reduce(function (best, b) {
+      var chars = b.reduce(function (s, l) { return s + l.text.length; }, 0);
+      return chars > best.chars ? { lines: b, chars: chars } : best;
+    }, { lines: [], chars: -1 }).lines;
+    var out = '', prevY = null;
+    winner.forEach(function (ln) {
+      var t = ln.text.trim();
+      if (!t) return;
+      if (prevY === null) out = t;
+      else if ((prevY - ln.y) > DESC_PARA_GAP) out += '\n\n' + t;
+      else out += ' ' + t;
+      prevY = ln.y;
+    });
+    return fixDescChars(out).replace(/[ \t]+/g, ' ').trim();
+  }
+
+  /* One page can hold one piece (most pages) or two side by side (a
+     shared tag line like "O-11-2.1/2 O-12-2.2/2"); the tag lists the
+     numbers in the same left-to-right order as their columns below. */
+  function extractDescEntriesFromPage(lines, pageNum) {
+    var anchorLine = lines.find(function (ln) { return DESC_ANCHOR_RE.test(ln.text.trim()); });
+    if (!anchorLine) return [];
+    var nums = anchorLine.text.trim().match(DESC_NUM_RE) || [];
+    if (!nums.length) return [];
+    var body = lines.filter(function (ln) { return ln !== anchorLine; });
+    var cols = clusterLinesByColumn(body);
+    cols.sort(function (a, b) { return b.chars - a.chars; });
+    var top = cols.slice(0, nums.length);
+    top.sort(function (a, b) {
+      var ax = a.lines.reduce(function (s, l) { return s + l.x; }, 0) / a.lines.length;
+      var bx = b.lines.reduce(function (s, l) { return s + l.x; }, 0) / b.lines.length;
+      return ax - bx;
+    });
+    var out = [];
+    nums.forEach(function (num, i) {
+      var col = top[i];
+      if (!col) return;
+      var desc = buildDescFromColumn(col);
+      if (desc) out.push({ number: num, description: desc, pageNum: pageNum });
+    });
+    return out;
+  }
+
+  async function runDescPdfSync(file) {
+    if (!window.pdfjsLib) { toast('PDF reader failed to load — check your connection and try again.'); return; }
+    toast('Reading PDF…');
+    try {
+      var pages = await extractDescPdfPages(file);
+      var entries = [];
+      pages.forEach(function (lines, idx) {
+        entries = entries.concat(extractDescEntriesFromPage(lines, idx + 1));
+      });
+      if (!entries.length) { toast('Could not find any numbered entries in that PDF.'); return; }
+
+      var byKey = {};
+      entries.forEach(function (e) {
+        var pm = e.number.match(/^([A-Za-z]+)-/);
+        byKey[(pm ? pm[1] : '') + ':' + normalizeNumKey(e.number)] = e;
+      });
+
+      var changes = [];
+      state.paintings.forEach(function (p) {
+        var tab = tabById(p.tab_id);
+        var prefixLetter = (tab && tab.prefix ? tab.prefix : '').replace(/[^A-Za-z]/g, '');
+        var entry = byKey[prefixLetter + ':' + normalizeNumKey(p.number)];
+        if (!entry) return;
+        var newDesc = entry.description;
+        if (newDesc !== (p.description || '')) changes.push({ id: p.id, fields: { description: newDesc } });
+      });
+      var matchedKeys = {};
+      state.paintings.forEach(function (p) {
+        var tab = tabById(p.tab_id);
+        var prefixLetter = (tab && tab.prefix ? tab.prefix : '').replace(/[^A-Za-z]/g, '');
+        var key = prefixLetter + ':' + normalizeNumKey(p.number);
+        if (byKey[key]) matchedKeys[key] = true;
+      });
+      var noMatchCount = Object.keys(byKey).length - Object.keys(matchedKeys).length;
+
+      if (!changes.length) {
+        toast(noMatchCount
+          ? 'Found ' + entries.length + ' entries in the PDF, but none needed changes (' + noMatchCount + ' didn\'t match an existing painting).'
+          : 'Found ' + entries.length + ' entries in the PDF — descriptions already match, nothing to change.');
+        return;
+      }
+      startPdfTest(changes, [], 'desc');
+      if (noMatchCount) toast(changes.length + ' description' + (changes.length === 1 ? '' : 's') + ' ready to preview — red = from the PDF. ' +
+        noMatchCount + ' entr' + (noMatchCount === 1 ? 'y' : 'ies') + ' in the PDF didn\'t match any existing painting and ' +
+        (noMatchCount === 1 ? 'was' : 'were') + ' skipped.');
+    } catch (e) {
+      toast('Could not read that PDF — is it a valid catalogue PDF?');
+    }
+  }
+
   async function runPdfSync(file) {
     if (!window.pdfjsLib) { toast('PDF reader failed to load — check your connection and try again.'); return; }
     toast('Reading PDF…');
@@ -2621,10 +2810,7 @@
     for (var i = 0; i < changes.length; i++) {
       var c = changes[i];
       btn.textContent = 'Updating ' + (i + 1) + ' of ' + changes.length + '…';
-      var patch = {};
-      if (c.nameChanged) patch.name = c.newName;
-      if (c.sizeChanged) patch.size = c.newSize;
-      if (c.dateChanged) patch.date = c.newDate;
+      var patch = Object.assign({}, c.fields);
       try {
         var res = await sb.from('paintings').update(patch).eq('id', c.id).select().single();
         if (res.error) throw res.error;
