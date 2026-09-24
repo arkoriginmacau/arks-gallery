@@ -406,9 +406,22 @@
   .set-piece-cap { margin-top: 6px; font-size: 11px; text-align: center; color: var(--ink-soft-2); line-height: 1.3; }
   .set-piece-cap .mono { display: block; font-size: 10px; color: var(--ink-faint); margin-top: 1px; }
   @media (max-width: 620px) {
-    /* Percentage-of-row width (not vw) so two pieces reliably fit side by
-       side regardless of the modal's actual rendered width. */
-    .set-piece { width: calc(50% - 2px); margin-right: 0 !important; }
+    /* Narrow screens don't wrap into a cramped 2-up grid anymore -- the
+       row becomes a horizontally swipeable strip instead, so each piece
+       stays big enough to actually see. Desktop (above 620px) never
+       enters this block, so the PC layout is untouched. */
+    .set-row {
+      flex-wrap: nowrap; justify-content: flex-start;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+      scroll-snap-type: x mandatory; scrollbar-width: none;
+      gap: 10px;
+    }
+    .set-row::-webkit-scrollbar { display: none; }
+    .set-piece {
+      width: 62%; flex: 0 0 auto; margin-right: 0 !important;
+      scroll-snap-align: start;
+    }
+    .set-piece:hover { transform: none; } /* avoid a stuck hover-lift after a tap */
   }
 
   .lightbox-backdrop {
