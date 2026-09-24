@@ -361,6 +361,24 @@
   .set-badge:hover { background: rgba(34,31,28,.8); }
   .set-assign-btn.has-set { color: var(--ochre); }
 
+  /* Attention ring on the Set badge — a dot travels the pill's outline,
+     switching red/white as it goes, on an endless loop. Pure CSS (no
+     images or scripts), so it adds effectively nothing to load time. */
+  .set-badge-ring { position: absolute; inset: 0; border-radius: 3px; pointer-events: none; }
+  .set-badge-ring::before {
+    content: ''; position: absolute; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px;
+    border-radius: 50%; background: #ff2d2d; box-shadow: 0 0 5px 1.5px rgba(255,45,45,.85);
+    offset-path: inset(0 round 3px); offset-distance: 0%;
+    animation: set-badge-run-lap 2.4s linear infinite;
+  }
+  @keyframes set-badge-run-lap {
+    0%    { offset-distance: 0%;   background: #ff2d2d; box-shadow: 0 0 5px 1.5px rgba(255,45,45,.85); }
+    49.9% { background: #ff2d2d; box-shadow: 0 0 5px 1.5px rgba(255,45,45,.85); }
+    50%   { offset-distance: 50%;  background: #ffffff; box-shadow: 0 0 5px 1.5px rgba(255,255,255,.85); }
+    99.9% { background: #ffffff; box-shadow: 0 0 5px 1.5px rgba(255,255,255,.85); }
+    100%  { offset-distance: 100%; background: #ff2d2d; box-shadow: 0 0 5px 1.5px rgba(255,45,45,.85); }
+  }
+
   .set-modal-backdrop {
     position: fixed; inset: 0; background: rgba(23,19,15,.55);
     display: flex; align-items: center; justify-content: center;
@@ -1675,6 +1693,7 @@
           : '') +
         (setMates.length > 1
           ? '<button class="set-badge" data-view-set="' + p.id + '" type="button" title="View the full set">' +
+            '<span class="set-badge-ring"></span>' +
             '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2 9 4.9-9 4.9-9-4.9L12 2Z"/><path d="m3 12 9 4.9 9-4.9M3 17l9 4.9 9-4.9"/></svg>' +
             'Set ×' + setMates.length + '</button>'
           : '') +
