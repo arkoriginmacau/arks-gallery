@@ -347,6 +347,17 @@
     border: 1px solid rgba(255,255,255,.35); background: rgba(34,31,28,.55); color: #fff;
     transition: background .12s;
   }
+  /* The pill itself is ~70×21px — well under the ~44px a thumb reliably
+     lands on — sitting right on top of the much bigger photo, which has
+     its own tap target (opens the full-size image, and on the embedded
+     Wix site that's a window.open() a mobile browser's popup blocker can
+     silently swallow). A slightly-off tap on a real phone misses the
+     badge, hits the photo instead, and the "view the set" action never
+     fires — reads as the button doing nothing. This ::before pads the
+     actual hit area out to a proper touch-target size on every side that
+     faces open image (not the opposite top-left corner, where the N/S
+     admin toggle sits) without changing how the pill itself looks. */
+  .set-badge::before { content: ''; position: absolute; top: -10px; right: -10px; bottom: -16px; left: -8px; }
   .set-badge:hover { background: rgba(34,31,28,.8); }
   .set-assign-btn.has-set { color: var(--ochre); }
 
