@@ -433,6 +433,20 @@
   .card-meta { display: flex; gap: 10px; color: var(--ink-soft-2); font-size: 12px; }
   .card-meta .mono { font-variant-numeric: tabular-nums; }
   .card-desc { font-size: 12.5px; color: var(--ink-soft-2); line-height: 1.45; }
+  /* Admin-only shortcut: double-click Name/Number/Date/Size/Description on
+     a card to edit that one field in place, instead of opening the full
+     "Edit" modal (see wireInlineEdit). The dashed underline only shows up
+     on hover so a read-only visitor's view (and print) stay unchanged —
+     isAdmin already keeps the attribute off entirely for them. */
+  .inline-field { cursor: text; border-radius: 2px; }
+  .inline-field:hover { text-decoration: underline dashed 1px; text-decoration-color: var(--ink-faint-2); text-underline-offset: 3px; }
+  .inline-edit-input {
+    font: inherit; color: inherit; background: var(--paper-2); border: 1px solid var(--ochre);
+    border-radius: 3px; padding: 1px 4px; width: 100%; box-sizing: border-box;
+  }
+  .inline-edit-input:focus { outline: 2px solid var(--ochre); outline-offset: 1px; }
+  textarea.inline-edit-input { resize: vertical; line-height: 1.45; }
+  @media print { .inline-field:hover { text-decoration: none; } }
   /* A suffix is a small admin-managed vocabulary of colored tags (see
      openSuffixManagerModal) — "Painting set" is the first, more follow
      later, each with its own color, Diablo-rarity style. A piece carries
@@ -1593,6 +1607,14 @@
     grid.innerHTML = items.map(function (p0) {
       var p = testView(p0);
       var red = p.__red || {};
+      /* Double-click-to-edit (see wireInlineEdit) is a quick shortcut for
+         touching up a single field without opening the full "Edit" modal.
+         Turned off for a not-yet-saved PDF-import placeholder (nothing to
+         update yet) and while a PDF-import preview is open at all — that
+         preview already owns its own red/edit/discard/Apply flow, and
+         letting a direct save race against it is exactly the kind of
+         two-writers bug worth just not having. */
+      var canInlineEdit = isAdmin && !p.__testNew && !testOverlay;
       var thumbSrc = publicImgUrl(p.thumb_path) || publicImgUrl(p.image_path);
       var fullSrc = publicImgUrl(p.image_path) || thumbSrc;
       var suffix = suffixById(p.suffix_id);
@@ -1640,17 +1662,17 @@
         ((p.__testNew || p.__red) ? '<button class="test-discard" type="button" data-tid="' + esc(String(p.id)) + '">' + (p.__testNew ? 'Skip this one' : 'Discard change') + '</button>' : '') +
         '<div class="card-name"><span class="field-label">Name:</span> ' + (red.name
           ? '<input class="test-edit" type="text" data-tid="' + esc(String(p.id)) + '" data-f="name" value="' + esc(p.name || '') + '">'
-          : esc(p.name || 'Untitled')) + '</div>' +
-        '<div class="card-meta"><span class="field-label">Number:</span> <span class="mono' + (red.number ? ' test-red' : '') + '">' + esc(catalogNum(p)) + '</span></div>' +
+          : '<span' + (canInlineEdit ? ' class="inline-field" data-inline-field="name" data-inline-pid="' + esc(String(p.id)) + '" title="Double-click to edit"' : '') + '>' + esc(p.name || 'Untitled') + '</span>') + '</div>' +
+        '<div class="card-meta"><span class="field-label">Number:</span> <span class="mono' + (red.number ? ' test-red' : '') + (canInlineEdit ? ' inline-field" data-inline-field="number" data-inline-pid="' + esc(String(p.id)) + '" title="Double-click to edit' : '') + '">' + esc(catalogNum(p)) + '</span></div>' +
         '<div class="card-meta"><span class="field-label">Date:</span> ' + (red.date
           ? '<input class="test-edit" type="date" data-tid="' + esc(String(p.id)) + '" data-f="date" value="' + esc(p.date ? String(p.date).slice(0, 10) : '') + '">'
-          : '<span class="mono">' + esc(fmtPieceDate(p)) + '</span>') + '</div>' +
+          : '<span class="mono' + (canInlineEdit ? ' inline-field" data-inline-field="date" data-inline-pid="' + esc(String(p.id)) + '" title="Double-click to edit' : '') + '">' + esc(fmtPieceDate(p)) + '</span>') + '</div>' +
         (p.size ? '<div class="card-meta"><span class="field-label">Size:</span> ' + (red.size
           ? '<input class="test-edit" type="text" data-tid="' + esc(String(p.id)) + '" data-f="size" value="' + esc(p.size) + '">'
-          : '<span class="mono">' + esc(p.size) + '</span>') + '</div>' : '') +
+          : '<span class="mono' + (canInlineEdit ? ' inline-field" data-inline-field="size" data-inline-pid="' + esc(String(p.id)) + '" title="Double-click to edit' : '') + '">' + esc(p.size) + '</span>') + '</div>' : '') +
         ((p.description || red.description) ? '<div class="card-desc"><span class="field-label">Description:</span> ' + (red.description
           ? '<textarea class="test-edit" data-tid="' + esc(String(p.id)) + '" data-f="description" rows="3">' + esc(p.description || '') + '</textarea>'
-          : esc(p.description)) + '</div>' : '') +
+          : '<span' + (canInlineEdit ? ' class="inline-field" data-inline-field="description" data-inline-pid="' + esc(String(p.id)) + '" title="Double-click to edit"' : '') + '>' + esc(p.description) + '</span>') + '</div>' : '') +
         '<div class="card-bottom">' +
         (suffix
           ? '<div class="suffix-tag' + animatedSuffixClass + '"' + (animatedSuffixClass ? '' : ' style="color:' + esc(suffix.color) + '"') + '>' + esc(suffix.label) + '</div>'
@@ -1894,6 +1916,82 @@
         openLightbox(src, el);
       });
     });
+    wireInlineEdit(grid);
+  }
+
+  /* ---------------- inline (double-click) field editing ----------------
+     A quicker alternative to the full "Edit" modal for touching up one
+     field at a time — double-click Name/Number/Date/Size/Description
+     right on the card, type the new value, then Enter/blur to save (Esc
+     to back out). Only the elements the render carries data-inline-field
+     on exist at all (admin, real saved piece, no PDF-import preview open
+     — see canInlineEdit in renderGrid), so this only needs to wire them. */
+  function wireInlineEdit(grid) {
+    grid.querySelectorAll('[data-inline-field]').forEach(function (el) {
+      el.addEventListener('dblclick', function () {
+        beginInlineEdit(el, el.getAttribute('data-inline-pid'), el.getAttribute('data-inline-field'));
+      });
+    });
+  }
+
+  function beginInlineEdit(fieldEl, id, field) {
+    if (fieldEl.querySelector('.inline-edit-input')) return; // already editing
+    var p = state.paintings.find(function (x) { return x.id === id; });
+    if (!p) return;
+    var tab = tabById(p.tab_id);
+    var isYearOnlyTab = !!(tab && !tab.prefix);
+    var isMultiline = field === 'description';
+    var raw;
+    if (field === 'number') raw = p.number || '';
+    else if (field === 'date') raw = p.date ? (isYearOnlyTab ? String(p.date).slice(0, 4) : String(p.date).slice(0, 10)) : '';
+    else if (field === 'size') raw = p.size || '';
+    else if (field === 'description') raw = p.description || '';
+    else raw = p.name || '';
+
+    var input = document.createElement(isMultiline ? 'textarea' : 'input');
+    input.className = 'inline-edit-input';
+    if (!isMultiline) input.type = (field === 'date' ? (isYearOnlyTab ? 'number' : 'date') : 'text');
+    if (field === 'date' && isYearOnlyTab) { input.min = '1000'; input.max = '9999'; input.step = '1'; }
+    if (isMultiline) input.rows = 3;
+    input.value = raw;
+    fieldEl.innerHTML = '';
+    fieldEl.appendChild(input);
+    input.focus();
+    if (input.select) input.select();
+
+    var settled = false;
+    function commit() {
+      if (settled) return;
+      settled = true;
+      saveInlineField(id, field, input.value.trim(), isYearOnlyTab);
+    }
+    function cancel() {
+      if (settled) return;
+      settled = true;
+      renderAll(); // no state change — just redraw to drop the temp input
+    }
+    input.addEventListener('blur', commit);
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+      else if (e.key === 'Enter' && (!isMultiline || e.metaKey || e.ctrlKey)) { e.preventDefault(); input.blur(); }
+    });
+  }
+
+  async function saveInlineField(id, field, newRaw, isYearOnlyTab) {
+    var p = state.paintings.find(function (x) { return x.id === id; });
+    if (!p) return;
+    var newValue;
+    if (field === 'date') {
+      newValue = isYearOnlyTab ? (/^\d{4}$/.test(newRaw) ? (newRaw + '-01-01') : null) : (newRaw || null);
+    } else {
+      newValue = newRaw;
+    }
+    var prevValue = p[field];
+    if (newValue === (prevValue || (field === 'date' ? null : ''))) { renderAll(); return; } // unchanged
+    p[field] = newValue; renderAll(); // optimistic
+    var data = {}; data[field] = newValue;
+    var res = await sb.from('paintings').update(data).eq('id', id);
+    if (res.error) { p[field] = prevValue; renderAll(); toast('Could not save — try again.'); }
   }
 
   /* ---------------- lightbox (full-size view, never affects card layout) ---------------- */
