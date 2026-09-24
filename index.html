@@ -1950,14 +1950,25 @@
 
     var input = document.createElement(isMultiline ? 'textarea' : 'input');
     input.className = 'inline-edit-input';
-    if (!isMultiline) input.type = (field === 'date' ? (isYearOnlyTab ? 'number' : 'date') : 'text');
+    var isFullDate = field === 'date' && !isYearOnlyTab;
+    if (!isMultiline) input.type = (field === 'date' ? (isYearOnlyTab ? 'number' : 'text') : 'text');
     if (field === 'date' && isYearOnlyTab) { input.min = '1000'; input.max = '9999'; input.step = '1'; }
+    /* The native <input type="date"> picker used to sit here, but its
+       year segment doesn't reliably hand off to month after 4 digits —
+       Chromium keeps accepting more (a "202626" year is what tipped this
+       off) since it stays open to a 6-digit year per the HTML date spec.
+       A plain digits-only text field with a hand-rolled YYYY-MM-DD mask
+       sidesteps that entirely: reformatDateInput below caps the year at
+       exactly 4 digits before it inserts the next dash, so typing never
+       drifts into a slot it shouldn't. */
+    if (isFullDate) { input.inputMode = 'numeric'; input.placeholder = 'YYYY-MM-DD'; input.maxLength = 10; }
     if (isMultiline) input.rows = 3;
     input.value = raw;
     fieldEl.innerHTML = '';
     fieldEl.appendChild(input);
     input.focus();
     if (input.select) input.select();
+    if (isFullDate) input.addEventListener('input', function () { reformatDateInput(input); });
 
     var settled = false;
     function commit() {
@@ -1977,12 +1988,38 @@
     });
   }
 
+  /* Reformats a date field's raw typing into YYYY-MM-DD as-you-go: strip
+     everything but digits, cap at 8 of them (4 year + 2 month + 2 day),
+     and drop the dashes back in after the 4th and 6th digit. Always
+     rewrites the whole value from the digits rather than patching around
+     the cursor — simple, and correct for the overwhelmingly common case
+     of typing left-to-right; a caret parked mid-value and used to insert
+     digits will jump to the end, same trade-off most masked-input fields
+     make. */
+  function reformatDateInput(input) {
+    var digits = input.value.replace(/\D/g, '').slice(0, 8);
+    var out = digits.slice(0, 4);
+    if (digits.length > 4) out += '-' + digits.slice(4, 6);
+    if (digits.length > 6) out += '-' + digits.slice(6, 8);
+    input.value = out;
+  }
+
   async function saveInlineField(id, field, newRaw, isYearOnlyTab) {
     var p = state.paintings.find(function (x) { return x.id === id; });
     if (!p) return;
     var newValue;
     if (field === 'date') {
-      newValue = isYearOnlyTab ? (/^\d{4}$/.test(newRaw) ? (newRaw + '-01-01') : null) : (newRaw || null);
+      if (isYearOnlyTab) {
+        newValue = /^\d{4}$/.test(newRaw) ? (newRaw + '-01-01') : null;
+      } else if (!newRaw) {
+        newValue = null;
+      } else if (/^\d{4}-\d{2}-\d{2}$/.test(newRaw) && !isNaN(new Date(newRaw + 'T00:00:00').getTime())) {
+        newValue = newRaw;
+      } else {
+        renderAll();
+        toast('That date looks incomplete — try YYYY-MM-DD.');
+        return;
+      }
     } else {
       newValue = newRaw;
     }
