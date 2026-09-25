@@ -783,10 +783,12 @@
   .pa-photo.hidden-photo { display: flex; align-items: center; justify-content: center; color: #9a9285; font-family: 'Archivo', sans-serif; font-size: calc(2.4mm * var(--s)); text-transform: uppercase; letter-spacing: .06em; }
   .pa-text { padding-top: 1.6mm; display: flex; flex-direction: column; gap: 0.5mm; flex-shrink: 0; }
   .pa-cell.text-only .pa-text { padding-top: 0; }
-  .pa-top { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; }
+  .pa-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 2mm; }
   .pa-num { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: calc(2.8mm * var(--s)); }
   .pa-status { font-family: 'Archivo', sans-serif; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; font-size: calc(2.2mm * var(--s)); color: #6b6459; white-space: nowrap; }
   .pa-status.sold { color: #a53a2a; }
+  .pa-statcol { display: flex; flex-direction: column; align-items: flex-end; gap: 0.4mm; min-width: 0; }
+  .pa-suffix { font-family: 'Archivo', sans-serif; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; font-size: calc(2.1mm * var(--s)); text-align: right; white-space: nowrap; }
   .pa-status.nfs { color: #2f5f8a; }
   .pa-name { font-family: 'Fraunces', serif; font-weight: 600; font-size: calc(3.5mm * var(--s)); line-height: 1.2; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
   .pa-meta { font-family: 'IBM Plex Mono', monospace; font-size: calc(2.4mm * var(--s)); color: #6b6459; }
@@ -1358,7 +1360,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
      everyone (site_theme row 4); anyone else's tweaks last until they leave. */
   var PRINT_ADV_DEFAULTS = {
     page: 'A4', orient: 'portrait', cols: 3, rows: 4, fit: 'cover', borders: true,
-    show: { photo: true, number: true, name: true, date: true, size: true, desc: false, price: false, status: true },
+    show: { photo: true, number: true, name: true, date: true, size: true, desc: false, price: false, status: true, suffix: true },
     descLines: 3,
     title: "Ark's Gallery", showTab: true, pageNum: true,
     website: '', contact: '',
@@ -2232,7 +2234,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           chk('show.photo', 'Photo', sh.photo) + chk('show.number', 'Number', sh.number) +
           chk('show.name', 'Name', sh.name) + chk('show.date', 'Date', sh.date) +
           chk('show.size', 'Size', sh.size) + chk('show.price', 'Price', sh.price) +
-          chk('show.status', 'Sold / status', sh.status) + chk('show.desc', 'Description', sh.desc) +
+          chk('show.status', 'Sold / status', sh.status) + chk('show.suffix', 'Suffix tag', sh.suffix) +
+          chk('show.desc', 'Description', sh.desc) +
         '</div>' +
         '<div class="pa-row"><span>Description lines</span><select class="print-select" data-adv="descLines"' + (sh.desc ? '' : ' disabled') + '>' +
           [2, 3, 4, 5, 6, 8, 10, 99].map(function (n) { return '<option value="' + n + '"' + (a.descLines === n ? ' selected' : '') + '>' + (n === 99 ? 'Full' : n) + '</option>'; }).join('') +
@@ -2283,16 +2286,26 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     return pages.map(function (list, pi) {
       var cells = list.map(function (e) {
         var p = e.p;
+        var sfx = suffixById(p.suffix_id);
+        var isHiddenSfx = !!(sfx && /^hidden$/i.test(sfx.label || ''));
         var photo = '';
         if (sh.photo) {
           var src = publicImgUrl(p.thumb_path) || publicImgUrl(p.image_path);
-          if (a.hideCensored && p.censored) photo = '<div class="pa-photo hidden-photo">Photo hidden</div>';
+          if (a.hideCensored && (p.censored || isHiddenSfx)) photo = '<div class="pa-photo hidden-photo">Photo hidden</div>';
           else if (src) photo = '<div class="pa-photo' + (a.fit === 'contain' ? ' contain' : '') + '"><img src="' + esc(src) + '" alt=""' + (a.fit === 'contain' ? '' : thumbPosStyle(p)) + '></div>';
           else if (isNoPiece(p)) photo = '<div class="pa-photo" style="background:#000"></div>';
           else photo = '<div class="pa-photo swatch" style="background:' + swatchGradient(p.hue || 30) + '">' + esc((p.name || '?').charAt(0).toUpperCase()) + '</div>';
         }
         var status = p.sold ? '<span class="pa-status sold">Sold</span>' : (p.not_for_sale ? '<span class="pa-status nfs">Not for sale</span>' : '<span class="pa-status">Available</span>');
-        var top = (sh.number || sh.status) ? '<div class="pa-top">' + (sh.number ? '<span class="pa-num">' + esc(catalogNum(p)) + '</span>' : '<span></span>') + (sh.status ? status : '') + '</div>' : '';
+        /* Suffix tag printed under the status, in its own colour (animated ones get a fixed print colour). */
+        var sfxHtml = '';
+        if (sh.suffix && sfx) {
+          var sfxColor = /^in progress$/i.test(sfx.label || '') ? '#b0479a' : (/^pending( for)? remake$/i.test(sfx.label || '') ? '#b30000' : (sfx.color || '#6b6459'));
+          sfxHtml = '<span class="pa-suffix" style="color:' + esc(sfxColor) + '">' + esc(sfx.label) + '</span>';
+        }
+        var right = (sh.status ? status : '') + sfxHtml;
+        var top = (sh.number || right) ? '<div class="pa-top">' + (sh.number ? '<span class="pa-num">' + esc(catalogNum(p)) + '</span>' : '<span></span>') +
+          (right ? '<span class="pa-statcol">' + right + '</span>' : '') + '</div>' : '';
         var meta = [];
         if (sh.date) meta.push(esc(fmtPieceDate(p)));
         if (sh.size && p.size) meta.push(esc(p.size));
