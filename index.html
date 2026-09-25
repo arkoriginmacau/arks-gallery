@@ -750,9 +750,35 @@
 
   #printPageStyle { display: none; }
 
+  /* Admin-chosen grid layout (see openGridLayoutModal). "Auto" keeps the
+     plain auto-fill rule above; a fixed count overrides it on either device. */
+  .grid.fixed-cols { grid-template-columns: repeat(var(--grid-cols), minmax(0, 1fr)); }
+  .grid.fixed-cols .card { min-width: 0; }
+  .grid-pager { display: flex; gap: 6px; justify-content: center; align-items: center; flex-wrap: wrap; margin-top: 22px; }
+  .grid-pager:empty { display: none; }
+  .grid-pager button.pg { min-width: 36px; height: 36px; padding: 0 8px; border: 1px solid var(--line); background: var(--paper-2); color: var(--ink-2); border-radius: 4px; cursor: pointer; font: inherit; font-variant-numeric: tabular-nums; }
+  .grid-pager button.pg.on { background: var(--ochre); border-color: var(--ochre); color: #fff; }
+  .grid-pager button.pg:disabled { opacity: .4; cursor: default; }
+  .grid-pager .pg-gap { color: var(--ink-faint); padding: 0 2px; }
+  .grid-pager .pg-info { width: 100%; text-align: center; font-size: 12px; color: var(--ink-soft); }
+  .grid-layout-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0 4px; }
+  .grid-layout-cols fieldset { border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px 4px; margin: 0; min-width: 0; }
+  .grid-layout-cols legend { font-weight: 600; font-size: 13px; padding: 0 6px; }
+  .grid-layout-cols select { width: 100%; }
+  .grid-layout-calc { font-size: 12px; color: var(--ochre-readable); margin-bottom: 10px; min-height: 2.8em; }
+  @media (max-width: 520px) { .grid-layout-cols { grid-template-columns: 1fr; } }
+  @media print { .grid-pager { display: none; } }
+
   @media (max-width: 640px) {
     header.top { padding-top: 24px; }
     .grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+    .grid.fixed-cols.dense { gap: 8px; }
+    /* 3-4 columns on a phone: stack label over value and tighten the card so text fits */
+    .grid.fixed-cols.dense .card-body { padding: 8px 8px 9px; gap: 4px; }
+    .grid.fixed-cols.dense .card-name { font-size: 13px; }
+    .grid.fixed-cols.dense .card-meta { flex-direction: column; gap: 0; font-size: 11px; }
+    .grid.fixed-cols.dense .card-meta > span:not(.field-label) { overflow-wrap: anywhere; }
+    .grid.fixed-cols.dense .field-label { font-size: 8.5px; }
     .print-toolbar { padding: 14px; gap: 14px; }
   }
 </style>
@@ -778,6 +804,7 @@
       </div>
     </div>
     <div class="grid" id="grid"></div>
+    <div class="grid-pager" id="gridPager"></div>
   </main>
 
   <main class="panel" id="printView" hidden></main>
@@ -890,7 +917,7 @@
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
 
-  var state = { thumbPos: {}, tabs: [], paintings: [], suffixes: [], activeTabId: null, printMode: 'A4', printRows: 8, printScope: 'current', loaded: false };
+  var state = { thumbPos: {}, tabs: [], paintings: [], suffixes: [], activeTabId: null, printMode: 'A4', printRows: 8, printScope: 'current', loaded: false, gridLayout: null, gridPage: 1, gridShown: 1, gridPageKey: null };
   var isAdmin = false;
   var currentUserEmail = null;
   /* When this page is loaded inside someone else's site (e.g. embedded on the
@@ -1214,8 +1241,31 @@
     var res = await sb.from('site_theme').select('colors').eq('id', 2).maybeSingle();
     state.thumbPos = (res && res.data && res.data.colors && typeof res.data.colors === 'object') ? res.data.colors : {};
   }
+  /* Grid layout (columns / rows per page, separately for PC and mobile), kept in
+     site_theme row 3 like the theme (row 1) and thumbnail crops (row 2). */
+  var GRID_MOBILE_QUERY = '(max-width: 640px)';
+  var GRID_LAYOUT_DEFAULTS = {
+    desktop: { cols: 'auto', rows: 'all', mode: 'pages' },
+    mobile: { cols: 'auto', rows: 'all', mode: 'more' }
+  };
+  function normalizeGridLayout(raw) {
+    var out = JSON.parse(JSON.stringify(GRID_LAYOUT_DEFAULTS));
+    ['desktop', 'mobile'].forEach(function (d) {
+      var r = raw && raw[d];
+      if (!r) return;
+      if (r.cols === 'auto' || (+r.cols >= 1 && +r.cols <= 8)) out[d].cols = r.cols === 'auto' ? 'auto' : +r.cols;
+      if (r.rows === 'all' || (+r.rows >= 1 && +r.rows <= 50)) out[d].rows = r.rows === 'all' ? 'all' : +r.rows;
+      if (r.mode === 'pages' || r.mode === 'more') out[d].mode = r.mode;
+    });
+    return out;
+  }
+  async function fetchGridLayout() {
+    var res = await sb.from('site_theme').select('colors').eq('id', 3).maybeSingle();
+    state.gridLayout = normalizeGridLayout(res && res.data && res.data.colors);
+  }
+  function gridDevice() { return window.matchMedia(GRID_MOBILE_QUERY).matches ? 'mobile' : 'desktop'; }
   async function loadAll() {
-    await Promise.all([fetchTabs(), fetchPaintings(), fetchSuffixes(), fetchThumbPos()]);
+    await Promise.all([fetchTabs(), fetchPaintings(), fetchSuffixes(), fetchThumbPos(), fetchGridLayout()]);
     state.loaded = true;
     renderAll();
   }
@@ -1252,6 +1302,7 @@
     if (isAdmin) {
       el.innerHTML = printBtn +
         '<button class="btn btn-ghost btn-sm" id="btnTheme" type="button" title="Change site colors">Theme</button>' +
+        '<button class="btn btn-ghost btn-sm" id="btnGridLayout" type="button" title="How many columns and rows show at once, separately for PC and mobile">Layout</button>' +
         '<button class="btn btn-ghost btn-sm" id="btnSuffixes" type="button" title="Manage colored tags like &quot;Painting set&quot;">Suffixes</button>' +
         '<button class="btn btn-ghost btn-sm" id="btnFindMissing" type="button" title="Find gaps in the current tab\'s catalogue numbering">Find missing #</button>' +
         '<button class="btn btn-ghost btn-sm" id="btnBulkUpload" type="button" title="Add several photos at once">Bulk upload</button>' +
@@ -1267,6 +1318,7 @@
         '<span class="admin-pill"><span class="dot"></span>' + esc(currentUserEmail) + '</span>' +
         '<button class="btn btn-ghost btn-sm" id="btnSignOut" type="button">Sign out</button>';
       document.getElementById('btnTheme').addEventListener('click', openThemeModal);
+      document.getElementById('btnGridLayout').addEventListener('click', openGridLayoutModal);
       document.getElementById('btnSuffixes').addEventListener('click', openSuffixManagerModal);
       document.getElementById('btnFindMissing').addEventListener('click', function () {
         if (!state.activeTabId) { toast('Pick a tab first.'); return; }
@@ -1616,6 +1668,168 @@
     });
   }
 
+  /* ---------------- grid layout: columns + paging ---------------- */
+  function currentGridLayout() {
+    return (state.gridLayout || GRID_LAYOUT_DEFAULTS)[gridDevice()];
+  }
+  function applyGridColumns(grid) {
+    var L = currentGridLayout();
+    var fixed = L.cols !== 'auto';
+    grid.classList.toggle('fixed-cols', fixed);
+    grid.classList.toggle('dense', fixed && L.cols >= 3);
+    if (fixed) grid.style.setProperty('--grid-cols', L.cols); else grid.style.removeProperty('--grid-cols');
+  }
+  /* How many columns the browser is actually drawing — needed when columns
+     are "Auto", so "N rows" still means N full rows at any screen width. */
+  function measuredGridCols(grid) {
+    var L = currentGridLayout();
+    if (L.cols !== 'auto') return L.cols;
+    var tracks = getComputedStyle(grid).gridTemplateColumns.split(' ').filter(function (t) { return t && t !== 'none'; });
+    return Math.max(1, tracks.length);
+  }
+  var lastGridSignature = null;
+  function paginateGridItems(grid, items, pagerEl) {
+    var L = currentGridLayout();
+    var cols = measuredGridCols(grid);
+    lastGridSignature = gridDevice() + ':' + cols;
+    /* A PDF-import preview needs every red row on screen to review, so paging
+       is switched off while one is open. */
+    if (L.rows === 'all' || testOverlay) return items;
+    var per = cols * L.rows;
+    var pages = Math.max(1, Math.ceil(items.length / per));
+    var key = state.activeTabId + '|' + lastGridSignature + '|' + L.rows + '|' + L.mode;
+    if (state.gridPageKey !== key) { state.gridPageKey = key; state.gridPage = 1; state.gridShown = 1; }
+    if (state.gridPage > pages) state.gridPage = pages;
+    if (pages <= 1) return items;
+
+    var slice, html;
+    if (L.mode === 'more') {
+      slice = items.slice(0, per * state.gridShown);
+      html = slice.length < items.length
+        ? '<button class="btn" type="button" data-grid-more>Load more</button><div class="pg-info">Showing ' + slice.length + ' of ' + items.length + '</div>'
+        : '<div class="pg-info">Showing all ' + items.length + '</div>';
+    } else {
+      var cur = state.gridPage;
+      slice = items.slice((cur - 1) * per, cur * per);
+      html = '<button class="pg" type="button" data-grid-page="' + (cur - 1) + '"' + (cur === 1 ? ' disabled' : '') + ' aria-label="Previous page">&lsaquo;</button>';
+      var gap = false;
+      for (var i = 1; i <= pages; i++) {
+        if (pages > 7 && i > 1 && i < pages && Math.abs(i - cur) > 1) {
+          if (!gap) { html += '<span class="pg-gap">&hellip;</span>'; gap = true; }
+          continue;
+        }
+        gap = false;
+        html += '<button class="pg' + (i === cur ? ' on' : '') + '" type="button" data-grid-page="' + i + '">' + i + '</button>';
+      }
+      html += '<button class="pg" type="button" data-grid-page="' + (cur + 1) + '"' + (cur === pages ? ' disabled' : '') + ' aria-label="Next page">&rsaquo;</button>' +
+        '<div class="pg-info">Page ' + cur + ' of ' + pages + ' &middot; ' + items.length + ' pieces</div>';
+    }
+    pagerEl.innerHTML = html;
+    return slice;
+  }
+  function bindGridPager() {
+    var pagerEl = document.getElementById('gridPager');
+    if (!pagerEl || pagerEl.__wired) return;
+    pagerEl.__wired = true;
+    pagerEl.addEventListener('click', function (e) {
+      var more = e.target.closest('[data-grid-more]');
+      var pg = e.target.closest('[data-grid-page]');
+      if (more) { state.gridShown++; renderAll(); return; }
+      if (pg && !pg.disabled) {
+        state.gridPage = +pg.getAttribute('data-grid-page');
+        renderAll();
+        var top = document.getElementById('browseView');
+        if (top) top.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  }
+  /* Re-flow when the window crosses the mobile breakpoint or the "Auto"
+     column count changes, so pages always hold full rows. */
+  var gridResizeTimer = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(gridResizeTimer);
+    gridResizeTimer = setTimeout(function () {
+      var grid = document.getElementById('grid');
+      if (!grid || !state.loaded || document.getElementById('browseView').hidden) return;
+      applyGridColumns(grid);
+      if (gridDevice() + ':' + measuredGridCols(grid) !== lastGridSignature) renderAll();
+    }, 150);
+  });
+
+  function openGridLayoutModal() {
+    var saved = JSON.parse(JSON.stringify(state.gridLayout || GRID_LAYOUT_DEFAULTS));
+    var root = document.getElementById('modalRoot');
+    function opts(list, cur) {
+      return list.map(function (o) { return '<option value="' + o[0] + '"' + (String(o[0]) === String(cur) ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('');
+    }
+    var rowOpts = [['all', 'All (no paging)']].concat([1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20].map(function (n) { return [n, n + (n === 1 ? ' row' : ' rows')]; }));
+    var colOpts = {
+      desktop: [['auto', 'Auto (fit screen)']].concat([2, 3, 4, 5, 6, 7, 8].map(function (n) { return [n, n + ' columns']; })),
+      mobile: [['auto', 'Auto (fit screen)']].concat([1, 2, 3, 4].map(function (n) { return [n, n + (n === 1 ? ' column' : ' columns')]; }))
+    };
+    function side(d, title) {
+      var L = saved[d];
+      return '<fieldset><legend>' + title + '</legend>' +
+        '<div class="field"><label>Columns</label><select class="print-select" data-gl="' + d + '.cols">' + opts(colOpts[d], L.cols) + '</select></div>' +
+        '<div class="field"><label>Rows per page</label><select class="print-select" data-gl="' + d + '.rows">' + opts(rowOpts, L.rows) + '</select></div>' +
+        '<div class="field"><label>When there are more</label><select class="print-select" data-gl="' + d + '.mode">' +
+        opts([['pages', 'Page numbers'], ['more', '&ldquo;Load more&rdquo; button']], L.mode) + '</select></div>' +
+        '<div class="grid-layout-calc" id="glCalc-' + d + '"></div></fieldset>';
+    }
+    root.innerHTML = '<div class="modal-backdrop" id="glBackdrop"><div class="modal modal-wide">' +
+      '<h2>Grid layout</h2>' +
+      '<p class="field-hint">Separate settings for PC and mobile (screens 640px wide or less). Changes preview on this screen as you pick them, and apply for every visitor — including the Wix embed — once you save.</p>' +
+      '<div class="grid-layout-cols">' + side('desktop', 'PC') + side('mobile', 'Mobile') + '</div>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" id="glReset" type="button" style="margin-right:auto">Reset to default</button>' +
+      '<button class="btn btn-ghost" id="glCancel" type="button">Cancel</button>' +
+      '<button class="btn btn-primary" id="glSave" type="button">Save for everyone</button></div>' +
+      '</div></div>';
+
+    function readForm() {
+      var raw = { desktop: {}, mobile: {} };
+      root.querySelectorAll('[data-gl]').forEach(function (sel) {
+        var k = sel.getAttribute('data-gl').split('.');
+        raw[k[0]][k[1]] = isNaN(+sel.value) ? sel.value : +sel.value;
+      });
+      return normalizeGridLayout(raw);
+    }
+    function writeForm(L) {
+      root.querySelectorAll('[data-gl]').forEach(function (sel) {
+        var k = sel.getAttribute('data-gl').split('.');
+        sel.value = String(L[k[0]][k[1]]);
+      });
+    }
+    function calcText(L) {
+      if (L.rows === 'all') return 'Shows every piece in the tab at once.';
+      if (L.cols === 'auto') return 'Each page: ' + L.rows + ' full row' + (L.rows === 1 ? '' : 's') + ' &times; however many columns fit the screen.';
+      return 'Each page: ' + L.cols + ' &times; ' + L.rows + ' = ' + (L.cols * L.rows) + ' pieces.';
+    }
+    function preview() {
+      var L = readForm();
+      document.getElementById('glCalc-desktop').innerHTML = calcText(L.desktop);
+      document.getElementById('glCalc-mobile').innerHTML = calcText(L.mobile);
+      state.gridLayout = L;
+      renderGrid(); bindGridEvents();
+    }
+    function cancel() { state.gridLayout = saved; closeModal(); renderAll(); }
+    root.querySelectorAll('[data-gl]').forEach(function (sel) { sel.addEventListener('change', preview); });
+    document.getElementById('glBackdrop').addEventListener('click', function (e) { if (e.target.id === 'glBackdrop') cancel(); });
+    document.getElementById('glCancel').addEventListener('click', cancel);
+    document.getElementById('glReset').addEventListener('click', function () { writeForm(GRID_LAYOUT_DEFAULTS); preview(); });
+    document.getElementById('glSave').addEventListener('click', async function () {
+      var btn = this;
+      var L = readForm();
+      btn.disabled = true;
+      var res = await sb.from('site_theme').upsert({ id: 3, colors: L, updated_at: new Date().toISOString() });
+      btn.disabled = false;
+      if (res.error) { toast('Could not save layout: ' + res.error.message); return; }
+      state.gridLayout = L;
+      closeModal(); renderAll();
+      toast('Grid layout saved for everyone.');
+    });
+    preview();
+  }
+
   /* ---------------- render: grid ---------------- */
   function renderGrid() {
     var tab = tabById(state.activeTabId);
@@ -1624,6 +1838,9 @@
     document.getElementById('tabSub').textContent = items.length + (items.length === 1 ? ' piece' : ' pieces');
 
     var grid = document.getElementById('grid');
+    var pagerEl = document.getElementById('gridPager');
+    pagerEl.innerHTML = '';
+    applyGridColumns(grid);
     if (!tab) {
       if (!state.loaded) { grid.innerHTML = ''; return; }
       grid.innerHTML = isAdmin
@@ -1645,6 +1862,7 @@
       return;
     }
 
+    items = paginateGridItems(grid, items, pagerEl);
     grid.innerHTML = items.map(function (p0) {
       var p = testView(p0);
       var red = p.__red || {};
@@ -1846,6 +2064,7 @@
     else renderGrid();
     bindGridEvents();
     bindTabEvents();
+    bindGridPager();
   }
 
   /* ---------------- events: tabs / grid ---------------- */
