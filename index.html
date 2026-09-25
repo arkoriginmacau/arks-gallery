@@ -3230,7 +3230,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     root.innerHTML = '<div class="modal-backdrop" id="tabBackdrop"><div class="modal">' +
       '<h2>' + (t ? 'Edit tab' : 'New tab') + '</h2>' +
       '<div class="field"><label for="tabName">Material / tab name</label><input type="text" id="tabName" value="' + esc(t ? t.name : '') + '" placeholder="e.g. Watercolour"></div>' +
-      '<div class="field"><label for="tabPrefix">Prefix</label><input type="text" id="tabPrefix" value="' + esc(t ? t.prefix : '') + '" placeholder="e.g. W- (leave blank for none)"></div>' +
+      '<div class="field"><label for="tabPrefix">Prefix <span style="text-transform:none;font-weight:400">(optional)</span></label><input type="text" id="tabPrefix" value="' + esc(t ? t.prefix : '') + '" placeholder="e.g. W- (leave blank for none)"></div>' +
       '<p class="field-hint">The prefix applies to every piece in this tab — past and future — so changing it updates all of them.</p>' +
       '<div class="modal-actions"><button class="btn btn-ghost" id="tabCancel" type="button">Cancel</button>' +
       '<button class="btn btn-primary" id="tabSave" type="button">' + (t ? 'Save' : 'Create tab') + '</button></div>' +
