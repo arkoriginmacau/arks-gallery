@@ -1357,7 +1357,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     descLines: 3,
     title: "Ark's Gallery", showTab: true, pageNum: true,
     website: '', contact: '',
-    qr: 'none', qrImage: '', qrLabel: '',
+    qr: 'none', qrLink: '', qrImage: '', qrLabel: '',
     skipNoPiece: true, onlyAvailable: false, hideCensored: true
   };
   function normalizePrintAdv(raw) {
@@ -2193,7 +2193,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     } catch (e) { return ''; }
   }
   function advQrHtml(a) {
-    if (a.qr === 'auto' && a.website.trim()) return qrSvgFor(normalizeUrl(a.website));
+    var link = (a.qrLink || '').trim() || a.website.trim();
+    if (a.qr === 'auto' && link) return qrSvgFor(normalizeUrl(link));
     if (a.qr === 'upload' && a.qrImage) return '<img src="' + esc(a.qrImage) + '" alt="QR code">';
     return '';
   }
@@ -2239,11 +2240,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         '<div class="pa-stack">Contact line<input type="text" data-adv="contact" value="' + esc(a.contact) + '" placeholder="e.g. Instagram @arkorigin · email"></div>' +
       '</fieldset>' +
       '<fieldset><legend>QR code</legend>' +
-        '<div class="pa-row">' + seg('qr', a.qr, [['none', 'None'], ['auto', 'From website'], ['upload', 'Upload']]) + '</div>' +
+        '<div class="pa-row">' + seg('qr', a.qr, [['none', 'None'], ['auto', 'From a link'], ['upload', 'Upload']]) + '</div>' +
         (a.qr === 'upload'
           ? '<div class="pa-row"><button class="btn btn-ghost btn-sm" id="btnQrUpload" type="button">' + (a.qrImage ? 'Replace image' : 'Choose QR image') + '</button><input type="file" id="qrFileInput" accept="image/*" style="display:none"></div>'
           : '') +
-        (a.qr === 'auto' ? '<div class="pa-note">' + (a.website.trim() ? 'Made from your website address — a plain QR, it never expires.' : 'Type your website under Header &amp; footer first.') + '</div>' : '') +
+        (a.qr === 'auto'
+          ? '<div class="pa-stack">Link for the QR code<input type="text" data-adv="qrLink" value="' + esc(a.qrLink || '') + '" placeholder="' + esc(a.website.trim() || 'e.g. instagram.com/yourname') + '"></div>' +
+            '<div class="pa-note">Paste any link — your site, Instagram, a shop page. ' + (a.website.trim() ? 'Left empty, it uses your website. ' : '') + 'A plain QR code: it never expires.</div>'
+          : '') +
         (qrPrev ? '<div class="pa-row"><div class="qr-preview" id="qrPreview">' + qrPrev + '</div></div>' : '') +
         (a.qr !== 'none' ? '<div class="pa-stack">Text beside it<input type="text" data-adv="qrLabel" value="' + esc(a.qrLabel) + '" placeholder="e.g. Scan to visit"></div>' : '') +
       '</fieldset>' +
@@ -2384,7 +2388,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       clearTimeout(typeTimer);
       typeTimer = setTimeout(function () {
         renderPrintPages();
-        if (key === 'website' && state.printAdv.qr === 'auto') {
+        if ((key === 'website' || key === 'qrLink') && state.printAdv.qr === 'auto') {
           var prev = document.getElementById('qrPreview');
           if (prev) prev.innerHTML = advQrHtml(state.printAdv);
           else renderPrintKeepFocus(t);
