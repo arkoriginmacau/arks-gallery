@@ -1069,7 +1069,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       qrNoteWeb: 'Left empty, it uses your website.', qrNoteExp: 'A plain QR code: it never expires.',
       qrText: 'Text beside it', qrTextPh: 'e.g. Scan to visit', websitePh: 'e.g. arks-gallery.vercel.app',
       contactPh: 'e.g. Instagram @arkorigin · email', linkPh: 'e.g. instagram.com/yourname',
-      filter: 'Filter', skipNo: 'Leave out “Dont Exist”', onlyAvail: 'Only available (not sold)', blankCens: 'Blank out censored photos',
+      filter: 'Filter', skipNo: 'Leave out pieces without a photo', onlyAvail: 'Only available (not sold)', blankCens: 'Blank out censored photos',
       photoHidden: 'Photo hidden', scanMe: 'Scan me'
     },
     'zh-Hant': {
@@ -1099,7 +1099,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       qrNoteWeb: '留空則使用你的網站。', qrNoteExp: '普通二維碼，永不過期。',
       qrText: '旁邊文字', qrTextPh: '例如：掃描瀏覽', websitePh: '例如：arks-gallery.vercel.app',
       contactPh: '例如：Instagram @arkorigin · 電郵', linkPh: '例如：instagram.com/你的名字',
-      filter: '篩選', skipNo: '不包括「Dont Exist」', onlyAvail: '只限可供出售（未售）', blankCens: '隱藏已遮蔽的相片',
+      filter: '篩選', skipNo: '不包括沒有相片的作品', onlyAvail: '只限可供出售（未售）', blankCens: '隱藏已遮蔽的相片',
       photoHidden: '相片已隱藏', scanMe: '掃描我'
     },
     'zh-Hans': {
@@ -1129,7 +1129,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       qrNoteWeb: '留空则使用你的网站。', qrNoteExp: '普通二维码，永不过期。',
       qrText: '旁边文字', qrTextPh: '例如：扫码浏览', websitePh: '例如：arks-gallery.vercel.app',
       contactPh: '例如：Instagram @arkorigin · 邮箱', linkPh: '例如：instagram.com/你的名字',
-      filter: '筛选', skipNo: '不包括“Dont Exist”', onlyAvail: '仅限可供出售（未售）', blankCens: '隐藏已遮蔽的照片',
+      filter: '筛选', skipNo: '不包括没有照片的作品', onlyAvail: '仅限可供出售（未售）', blankCens: '隐藏已遮蔽的照片',
       photoHidden: '照片已隐藏', scanMe: '扫一扫'
     },
     pt: {
@@ -1159,7 +1159,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       qrNoteWeb: 'Se ficar vazio, usa o seu site.', qrNoteExp: 'Um código QR simples: nunca expira.',
       qrText: 'Texto ao lado', qrTextPh: 'ex.: Digitalize para visitar', websitePh: 'ex.: arks-gallery.vercel.app',
       contactPh: 'ex.: Instagram @arkorigin · email', linkPh: 'ex.: instagram.com/o-seu-nome',
-      filter: 'Filtro', skipNo: 'Excluir “Dont Exist”', onlyAvail: 'Só disponíveis (não vendidas)', blankCens: 'Ocultar fotografias censuradas',
+      filter: 'Filtro', skipNo: 'Excluir obras sem fotografia', onlyAvail: 'Só disponíveis (não vendidas)', blankCens: 'Ocultar fotografias censuradas',
       photoHidden: 'Fotografia oculta', scanMe: 'Digitalize-me'
     }
   };
@@ -2453,7 +2453,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   function advancedPagesHtml() {
     var a = state.printAdv, sh = a.show, dims = advDims(a);
     var items = printSourceItems().filter(function (e) {
-      if (a.skipNoPiece && isNoPiece(e.p)) return false;
+      /* "Leave out pieces without a photo" — anything with no uploaded image (this includes Dont Exist placeholders). */
+      if (a.skipNoPiece && !e.p.thumb_path && !e.p.image_path) return false;
       if (a.onlyAvailable && (e.p.sold || e.p.not_for_sale)) return false;
       return true;
     });
