@@ -26,6 +26,7 @@
     --ochre-bg: #f4e9d3;
     --sold: #a53a2a;
     --sold-2: var(--sold);
+    --ochre-card: var(--ochre);
     --sold-on-bg: var(--sold);
     --sold-ink: #7e2c20;
     --sold-soft: #ecd2cb;
@@ -478,8 +479,8 @@
   .card-desc.clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: var(--desc-lines, 4); line-clamp: var(--desc-lines, 4); overflow: hidden; }
   .card-desc.clamped.expanded, .card-desc.clamped:has(textarea, input) { display: block; -webkit-line-clamp: unset; line-clamp: none; overflow: visible; }
   .desc-more { align-self: flex-start; background: none; border: 0; padding: 0; margin-top: -2px; cursor: pointer;
-    font-family: 'Archivo', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ochre-readable); }
-  .desc-more:hover { text-decoration: underline; }
+    font-family: 'Archivo', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ochre-card); text-decoration: underline; text-underline-offset: 2px; }
+  .desc-more:hover { opacity: .8; }
   .desc-more[hidden] { display: none; }
   @media print { .card-desc.clamped { display: block; -webkit-line-clamp: unset; overflow: visible; } .desc-more { display: none; } }
   /* Admin-only shortcut: double-click Name/Number/Date/Size/Description on
@@ -3512,7 +3513,7 @@
   }
   var DERIVED_INK_VARS = [
     '--ink-2', '--ink-on-accent', '--ink-soft-2', '--ink-faint', '--ink-faint-2', '--sold-2',
-    '--sold-on-bg', '--toast-ink', '--hover-ink', '--ochre-on-bg', '--ochre-readable'
+    '--sold-on-bg', '--toast-ink', '--hover-ink', '--ochre-on-bg', '--ochre-readable', '--ochre-card'
   ];
   function applyThemeColors(colors) {
     var rootStyle = document.documentElement.style;
@@ -3573,6 +3574,7 @@
       '--ink-faint': pickReadableAgainst(get('--ink-faint'), [get('--canvas'), get('--paper')]),
       '--ink-faint-2': pickReadableAgainst(get('--ink-faint'), [get('--paper-2')]),
       '--sold-2': pickReadableAgainst(get('--sold'), [get('--paper-2')]),
+      '--ochre-card': pickReadableAgainst(get('--ochre'), [get('--paper-2')]),
       /* Fixed (non-editable) surfaces text can also land on: the sold price
          tag's pale sold-bg chip, the toast's ink-colored background, the
          line-soft/ochre-bg hover highlights, and canvas/paper behind the
