@@ -761,6 +761,7 @@
   .print-adv .stepper span { background: var(--paper-2); color: var(--ink-2); align-self: stretch; display: flex; align-items: center; justify-content: center; }
   .print-adv .pa-checks { color: var(--ink-soft); }
   .print-adv input[type="text"] { width: 100%; border: 1px solid var(--line); background: var(--paper-2); color: var(--ink-2); border-radius: 3px; padding: 7px 9px; font: inherit; font-size: 13px; }
+  .print-adv input[type="text"]::placeholder { color: #8f8f8f; opacity: 1; }
   .print-adv .pa-stack { display: flex; flex-direction: column; gap: 4px; margin: 7px 0; font-size: 12px; color: var(--ink-soft); }
   .print-adv .qr-preview { width: 64px; height: 64px; border: 1px solid var(--line); background: #fff; display: flex; align-items: center; justify-content: center; }
   .print-adv .qr-preview img, .print-adv .qr-preview svg { width: 100%; height: 100%; object-fit: contain; }
@@ -1356,7 +1357,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     descLines: 3,
     title: "Ark's Gallery", showTab: true, pageNum: true,
     website: '', contact: '',
-    qr: 'none', qrImage: '', qrLabel: 'Scan to visit',
+    qr: 'none', qrImage: '', qrLabel: '',
     skipNoPiece: true, onlyAvailable: false, hideCensored: true
   };
   function normalizePrintAdv(raw) {
@@ -1366,6 +1367,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (k === 'show') { if (raw.show) Object.keys(d.show).forEach(function (f) { if (typeof raw.show[f] === 'boolean') d.show[f] = raw.show[f]; }); return; }
       if (raw[k] !== undefined && typeof raw[k] === typeof d[k]) d[k] = raw[k];
     });
+    if (d.qrLabel === 'Scan to visit') d.qrLabel = ''; // old built-in default, now just a grey hint
     d.cols = Math.min(6, Math.max(1, d.cols | 0)); d.rows = Math.min(10, Math.max(1, d.rows | 0));
     return d;
   }
@@ -2243,7 +2245,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           : '') +
         (a.qr === 'auto' ? '<div class="pa-note">' + (a.website.trim() ? 'Made from your website address — a plain QR, it never expires.' : 'Type your website under Header &amp; footer first.') + '</div>' : '') +
         (qrPrev ? '<div class="pa-row"><div class="qr-preview" id="qrPreview">' + qrPrev + '</div></div>' : '') +
-        (a.qr !== 'none' ? '<div class="pa-stack">Text beside it<input type="text" data-adv="qrLabel" value="' + esc(a.qrLabel) + '" placeholder="Scan to visit"></div>' : '') +
+        (a.qr !== 'none' ? '<div class="pa-stack">Text beside it<input type="text" data-adv="qrLabel" value="' + esc(a.qrLabel) + '" placeholder="e.g. Scan to visit"></div>' : '') +
       '</fieldset>' +
       '<fieldset><legend>Filter</legend>' +
         '<div class="pa-row">' + chk('skipNoPiece', 'Leave out &ldquo;Dont Exist&rdquo;', a.skipNoPiece) + '</div>' +
