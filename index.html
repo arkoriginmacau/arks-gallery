@@ -793,7 +793,9 @@
   .pa-desc { font-size: calc(2.4mm * var(--s)); color: #4a443b; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: var(--dl, 3); overflow: hidden; }
   .pa-footer { display: flex; justify-content: space-between; align-items: flex-end; gap: 6mm; border-top: 0.25mm solid #d9cfbc; padding-top: 3mm; margin-top: 4mm; }
   .pa-foot-left { display: flex; align-items: center; gap: 4mm; min-width: 0; }
+  .pa-qr-wrap { display: flex; flex-direction: column; align-items: center; gap: 1mm; flex-shrink: 0; }
   .pa-qr { width: 20mm; height: 20mm; flex-shrink: 0; }
+  .pa-scanme { font-family: 'Archivo', sans-serif; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; font-size: 2.4mm; color: #1a1712; }
   .pa-qr img, .pa-qr svg { width: 100%; height: 100%; object-fit: contain; display: block; }
   .pa-foot-text { display: flex; flex-direction: column; gap: 0.8mm; min-width: 0; }
   .pa-qr-label { font-family: 'Archivo', sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; font-size: 2.3mm; color: #6b6459; }
@@ -2306,7 +2308,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         '<div class="pa-grid" style="grid-template-columns:repeat(' + a.cols + ',minmax(0,1fr));grid-template-rows:repeat(' + a.rows + ',minmax(0,1fr))">' + cells + '</div>' +
         (hasFooterInfo || a.pageNum
           ? '<div class="pa-footer"><div class="pa-foot-left">' +
-              (qrHtml ? '<div class="pa-qr">' + qrHtml + '</div>' : '') +
+              (qrHtml ? '<div class="pa-qr-wrap"><div class="pa-qr">' + qrHtml + '</div><div class="pa-scanme">Scan me</div></div>' : '') +
               '<div class="pa-foot-text">' +
                 (qrHtml && a.qrLabel.trim() ? '<div class="pa-qr-label">' + esc(a.qrLabel) + '</div>' : '') +
                 (site ? '<div class="pa-site">' + esc(site) + '</div>' : '') +
