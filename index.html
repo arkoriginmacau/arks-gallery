@@ -745,6 +745,10 @@
     position: absolute; bottom: 6mm; right: 12mm; font-family: 'IBM Plex Mono', monospace; font-size: 2.6mm; color: #9a9285;
   }
 
+  /* Standard/Advanced switch: one rectangle with a blinking red frame around both buttons. */
+  .seg.mode-seg { border: 2px solid #e53935; border-radius: 3px; animation: modeSegBlink 1.1s ease-in-out infinite; }
+  .seg.mode-seg:hover { animation-play-state: paused; border-color: #e53935; }
+  @keyframes modeSegBlink { 0%, 100% { border-color: #e53935; } 50% { border-color: rgba(229, 57, 53, 0); } }
   /* ---------- advanced print ---------- */
   .print-adv { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin: -8px 0 22px; }
   .print-adv fieldset { border: 1px solid var(--line); border-radius: 4px; background: var(--paper); padding: 10px 14px 12px; margin: 0; min-width: 0; }
@@ -2099,7 +2103,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var adv = state.printStyle === 'advanced';
     var closeBtn = '<button class="print-close" id="btnClosePrint" type="button" aria-label="Close print view and go back to the gallery" title="Back to gallery (Esc)">' +
       '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="square"><path d="M5 5l14 14M19 5L5 19"/></svg></button>';
-    var styleSeg = '<div class="print-field"><label>Mode</label><div class="seg">' +
+    var styleSeg = '<div class="print-field"><label>Mode</label><div class="seg mode-seg">' +
       '<button type="button" data-pstyle="standard" class="' + (!adv ? 'active' : '') + '">Standard</button>' +
       '<button type="button" data-pstyle="advanced" class="' + (adv ? 'active' : '') + '">Advanced</button></div></div>';
     var scopeSel = '<div class="print-field"><label>Include</label><select class="print-select" id="printScopeSel">' +
