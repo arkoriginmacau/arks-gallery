@@ -1305,7 +1305,10 @@
   /* ---------------- render: header ---------------- */
   function renderTopActions() {
     var el = document.getElementById('topActions');
-    var printBtn = '<button class="btn" id="btnPrintView" type="button">' +
+    var inPrint = !document.getElementById('printView').hidden;
+    var printBtn = inPrint
+      ? '<button class="btn" id="btnPrintView" type="button">&larr; Back to gallery</button>'
+      : '<button class="btn" id="btnPrintView" type="button">' +
       '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg>' +
       'Print &amp; export</button>';
 
@@ -2015,7 +2018,7 @@
       '<option value="all"' + (state.printScope === 'all' ? ' selected' : '') + '>All tabs</option>' +
       '</select></div>' +
       '<div class="print-field"><label>&nbsp;</label><button class="btn btn-primary" id="btnDoPrint" type="button">Print / Save as PDF</button></div>' +
-      '<div class="print-field"><label>&nbsp;</label><button class="btn btn-ghost" id="btnClosePrint" type="button">Back to gallery</button></div>' +
+      '<div class="print-field"><label>&nbsp;</label><button class="btn" id="btnClosePrint" type="button">&larr; Back to gallery</button></div>' +
       '</div>';
 
     var pagesHtml = pages.map(function (rowsOnPage, pageIdx) {
@@ -2074,14 +2077,21 @@
   function showBrowse() {
     document.getElementById('browseView').hidden = false;
     document.getElementById('printView').hidden = true;
-    var pv = document.getElementById('btnPrintView');
-    if (pv) pv.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg> Print & export';
+    renderAll();
   }
   function showPrint() {
     document.getElementById('browseView').hidden = true;
     document.getElementById('printView').hidden = false;
-    renderPrint();
+    renderAll();
+    window.scrollTo(0, 0);
   }
+  /* Esc also leaves the print planner (unless a modal is open on top). */
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (document.getElementById('printView').hidden) return;
+    if (document.getElementById('modalRoot').innerHTML.trim()) return;
+    showBrowse();
+  });
 
   function renderAll() {
     renderTopActions();
