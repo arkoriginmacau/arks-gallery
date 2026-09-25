@@ -474,6 +474,14 @@
   .card-meta { display: flex; gap: 10px; color: var(--ink-soft-2); font-size: 12px; }
   .card-meta .mono { font-variant-numeric: tabular-nums; }
   .card-desc { font-size: 12.5px; color: var(--ink-soft-2); line-height: 1.45; }
+  /* Long descriptions are cut to N lines (Layout setting) with a More / Less toggle. */
+  .card-desc.clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: var(--desc-lines, 4); line-clamp: var(--desc-lines, 4); overflow: hidden; }
+  .card-desc.clamped.expanded, .card-desc.clamped:has(textarea, input) { display: block; -webkit-line-clamp: unset; line-clamp: none; overflow: visible; }
+  .desc-more { align-self: flex-start; background: none; border: 0; padding: 0; margin-top: -2px; cursor: pointer;
+    font-family: 'Archivo', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ochre-readable); }
+  .desc-more:hover { text-decoration: underline; }
+  .desc-more[hidden] { display: none; }
+  @media print { .card-desc.clamped { display: block; -webkit-line-clamp: unset; overflow: visible; } .desc-more { display: none; } }
   /* Admin-only shortcut: double-click Name/Number/Date/Size/Description on
      a card to edit that one field in place, instead of opening the full
      "Edit" modal (see wireInlineEdit). The dashed underline only shows up
@@ -917,7 +925,7 @@
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
 
-  var state = { thumbPos: {}, tabs: [], paintings: [], suffixes: [], activeTabId: null, printMode: 'A4', printRows: 8, printScope: 'current', loaded: false, gridLayout: null, gridPage: 1, gridShown: 1, gridPageKey: null };
+  var state = { thumbPos: {}, tabs: [], paintings: [], suffixes: [], activeTabId: null, printMode: 'A4', printRows: 8, printScope: 'current', loaded: false, descOpen: {}, gridLayout: null, gridPage: 1, gridShown: 1, gridPageKey: null };
   var isAdmin = false;
   var currentUserEmail = null;
   /* When this page is loaded inside someone else's site (e.g. embedded on the
@@ -1245,8 +1253,8 @@
      site_theme row 3 like the theme (row 1) and thumbnail crops (row 2). */
   var GRID_MOBILE_QUERY = '(max-width: 640px)';
   var GRID_LAYOUT_DEFAULTS = {
-    desktop: { cols: 'auto', rows: 'all', mode: 'pages' },
-    mobile: { cols: 'auto', rows: 'all', mode: 'more' }
+    desktop: { cols: 'auto', rows: 'all', mode: 'pages', descLines: 4 },
+    mobile: { cols: 'auto', rows: 'all', mode: 'more', descLines: 4 }
   };
   function normalizeGridLayout(raw) {
     var out = JSON.parse(JSON.stringify(GRID_LAYOUT_DEFAULTS));
@@ -1256,6 +1264,7 @@
       if (r.cols === 'auto' || (+r.cols >= 1 && +r.cols <= 8)) out[d].cols = r.cols === 'auto' ? 'auto' : +r.cols;
       if (r.rows === 'all' || (+r.rows >= 1 && +r.rows <= 50)) out[d].rows = r.rows === 'all' ? 'all' : +r.rows;
       if (r.mode === 'pages' || r.mode === 'more') out[d].mode = r.mode;
+      if (r.descLines === 'all' || (+r.descLines >= 1 && +r.descLines <= 30)) out[d].descLines = r.descLines === 'all' ? 'all' : +r.descLines;
     });
     return out;
   }
@@ -1678,6 +1687,18 @@
     grid.classList.toggle('fixed-cols', fixed);
     grid.classList.toggle('dense', fixed && L.cols >= 3);
     if (fixed) grid.style.setProperty('--grid-cols', L.cols); else grid.style.removeProperty('--grid-cols');
+    grid.style.setProperty('--desc-lines', L.descLines === 'all' ? 999 : L.descLines);
+  }
+  /* Show "More" only on descriptions that actually overflow their clamp. */
+  function updateDescToggles(grid) {
+    if (!grid) return;
+    grid.querySelectorAll('.card-desc.clamped').forEach(function (el) {
+      var btn = el.nextElementSibling;
+      if (!btn || !btn.classList.contains('desc-more')) return;
+      if (el.classList.contains('expanded')) { btn.hidden = false; btn.textContent = 'Less'; return; }
+      btn.hidden = !(el.scrollHeight > el.clientHeight + 2);
+      btn.textContent = 'More';
+    });
   }
   /* How many columns the browser is actually drawing — needed when columns
      are "Auto", so "N rows" still means N full rows at any screen width. */
@@ -1753,6 +1774,7 @@
       if (!grid || !state.loaded || document.getElementById('browseView').hidden) return;
       applyGridColumns(grid);
       if (gridDevice() + ':' + measuredGridCols(grid) !== lastGridSignature) renderAll();
+      else updateDescToggles(grid);
     }, 150);
   });
 
@@ -1774,6 +1796,8 @@
         '<div class="field"><label>Rows per page</label><select class="print-select" data-gl="' + d + '.rows">' + opts(rowOpts, L.rows) + '</select></div>' +
         '<div class="field"><label>When there are more</label><select class="print-select" data-gl="' + d + '.mode">' +
         opts([['pages', 'Page numbers'], ['more', '&ldquo;Load more&rdquo; button']], L.mode) + '</select></div>' +
+        '<div class="field"><label>Description lines</label><select class="print-select" data-gl="' + d + '.descLines">' +
+        opts([[2, '2 lines, then More'], [3, '3 lines, then More'], [4, '4 lines, then More'], [5, '5 lines, then More'], [6, '6 lines, then More'], [8, '8 lines, then More'], [10, '10 lines, then More'], ['all', 'Show full text']], L.descLines) + '</select></div>' +
         '<div class="grid-layout-calc" id="glCalc-' + d + '"></div></fieldset>';
     }
     root.innerHTML = '<div class="modal-backdrop" id="glBackdrop"><div class="modal modal-wide">' +
@@ -1930,9 +1954,10 @@
         (p.size ? '<div class="card-meta"><span class="field-label">Size:</span> ' + (red.size
           ? '<input class="test-edit" type="text" data-tid="' + esc(String(p.id)) + '" data-f="size" value="' + esc(p.size) + '">'
           : '<span class="mono' + (canInlineEdit ? ' inline-field" data-inline-field="size" data-inline-pid="' + esc(String(p.id)) + '" title="Double-click to edit' : '') + '">' + esc(p.size) + '</span>') + '</div>' : '') +
-        ((p.description || red.description) ? '<div class="card-desc"><span class="field-label">Description:</span> ' + (red.description
+        ((p.description || red.description) ? '<div class="card-desc' + (red.description ? '' : ' clamped' + (state.descOpen[p.id] ? ' expanded' : '')) + '"><span class="field-label">Description:</span> ' + (red.description
           ? '<textarea class="test-edit" data-tid="' + esc(String(p.id)) + '" data-f="description" rows="3">' + esc(p.description || '') + '</textarea>'
-          : '<span' + (canInlineEdit ? ' class="inline-field" data-inline-field="description" data-inline-pid="' + esc(String(p.id)) + '" title="Double-click to edit"' : '') + '>' + esc(p.description) + '</span>') + '</div>' : '') +
+          : '<span' + (canInlineEdit ? ' class="inline-field" data-inline-field="description" data-inline-pid="' + esc(String(p.id)) + '" title="Double-click to edit"' : '') + '>' + esc(p.description) + '</span>') + '</div>' +
+          (red.description ? '' : '<button class="desc-more" type="button" data-desc-toggle="' + esc(String(p.id)) + '" hidden>More</button>') : '') +
         '<div class="card-bottom">' +
         (suffix
           ? '<div class="suffix-tag' + animatedSuffixClass + '"' + (animatedSuffixClass ? '' : ' style="color:' + esc(suffix.color) + '"') + '>' + esc(suffix.label) + '</div>'
@@ -2134,6 +2159,22 @@
     var grid = document.getElementById('grid');
     if (!grid) return;
     pixelateCensoredThumbs(grid);
+    updateDescToggles(grid);
+    if (!grid.__descWired) {
+      grid.__descWired = true;
+      grid.addEventListener('click', function (e) {
+        var btn = e.target.closest ? e.target.closest('[data-desc-toggle]') : null;
+        if (!btn) return;
+        e.stopPropagation();
+        var desc = btn.previousElementSibling;
+        var open = !desc.classList.contains('expanded');
+        desc.classList.toggle('expanded', open);
+        if (open) state.descOpen[btn.getAttribute('data-desc-toggle')] = true;
+        else delete state.descOpen[btn.getAttribute('data-desc-toggle')];
+        updateDescToggles(grid);
+      });
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { updateDescToggles(document.getElementById('grid')); });
+    }
     grid.querySelectorAll('[data-toggle-sold]').forEach(function (el) {
       el.addEventListener('click', function () { toggleSold(el.getAttribute('data-toggle-sold')); });
     });
