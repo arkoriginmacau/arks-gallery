@@ -822,6 +822,12 @@
 
   #printPageStyle { display: none; }
 
+  /* Language picker in the header */
+  .lang-pick { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px 0 9px; background: var(--paper-2); color: var(--ink-2); }
+  .lang-pick svg { flex-shrink: 0; opacity: .75; }
+  .lang-pick select { border: 0; background: transparent; color: var(--ink-2); font: inherit; font-size: 13px; font-weight: 600; padding: 8px 4px; cursor: pointer; }
+  .lang-pick select option { color: #221f1c; background: #fff; }
+  @media print { .lang-pick { display: none; } }
   /* Red blinking X in the top-right corner of the print planner — closes it. */
   #printView { position: relative; padding-top: 52px; }
   @media print { #printView { padding-top: 0; position: static; } }
@@ -1029,6 +1035,181 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     { varName: '--sold', label: 'Sold tag' },
     { varName: '--not-for-sale', label: 'Not-for-sale tag' }
   ];
+
+  /* ---------------- language (interface text only) ----------------
+     Painting names, descriptions, tab names, the gallery title and
+     website stay exactly as written. Suffix tags translate through
+     SUFFIX_I18N below. A visitor's choice is remembered per browser. */
+  var LANGS = [['en', 'English'], ['zh-Hant', '繁體中文'], ['zh-Hans', '简体中文'], ['pt', 'Português']];
+  var I18N = {
+    en: {
+      language: 'Language', printExport: 'Print & export', backToGallery: '← Back to gallery', closeTitle: 'Back to gallery (Esc)',
+      viewing: 'Viewing gallery', admin: 'Admin', theme: 'Theme', layout: 'Layout', suffixes: 'Suffixes', findMissing: 'Find missing #',
+      bulkUpload: 'Bulk upload', importPdf: 'Import from PDF', importDesc: 'Import descriptions from PDF', exportXlsx: 'Export to Excel',
+      downloadPdf: 'Download PDF', addPainting: 'Add painting', signOut: 'Sign out', addTab: '+ Tab',
+      loading: 'Loading…', noTabs: 'No tabs yet', setupTitle: 'Gallery is being set up', setupSub: 'Check back soon.',
+      nothingIn: 'Nothing in {tab} yet', moreOnWay: 'More work is on its way.', piece: '{n} piece', pieces: '{n} pieces',
+      name: 'Name:', number: 'Number:', date: 'Date:', size: 'Size:', description: 'Description:', untitled: 'Untitled',
+      more: 'More', less: 'Less', available: 'Available', sold: 'Sold', nfs: 'Not for sale', markSold: 'Mark sold',
+      hiddenChip: 'Hidden', clickToView: 'Click to view', zoomTitle: 'Click to view full size', zoomTitleEmbed: 'Click to view full size (opens in a new tab)',
+      viewSet: 'View the full set', setN: 'Set ×{n}', loadMore: 'Load more', showingOf: 'Showing {a} of {b}', showingAll: 'Showing all {n}',
+      pageOfPieces: 'Page {a} of {b} · {n} pieces', prevPage: 'Previous page', nextPage: 'Next page',
+      lbClose: 'Close full-size view', lbHint: 'Click image to zoom', lbHintZoomed: 'Move to explore · click to reset', close: 'Close',
+      mode: 'Mode', standard: 'Standard', advanced: 'Advanced', pageSize: 'Page size', rowsPerPage: 'Rows per page',
+      include: 'Include', onlyTab: '{tab} only', allTabs: 'All tabs', printPdf: 'Print / Save as PDF', saveDefault: 'Save as default',
+      soldCaps: 'SOLD', noPieces: 'No pieces to list yet.', noPiecesAdv: 'No pieces to list.', fullCatalogue: 'Full catalogue', pageSlash: 'Page {a} / {b}',
+      pageGrid: 'Page & grid', sizeLbl: 'Size', orientation: 'Orientation', portrait: 'Portrait', landscape: 'Landscape',
+      columns: 'Columns', rows: 'Rows', photo: 'Photo', fill: 'Fill', whole: 'Whole', frame: 'Frame around each piece',
+      perPage: '{n} pieces per page', showOn: 'Show on each piece', fPhoto: 'Photo', fNumber: 'Number', fName: 'Name',
+      fDate: 'Date', fSize: 'Size', fPrice: 'Price', fStatus: 'Sold / status', fSuffix: 'Suffix tag', fDesc: 'Description',
+      descLines: 'Description lines', full: 'Full', headerFooter: 'Header & footer', title: 'Title', addTabName: 'Add tab name',
+      pageNumbers: 'Page numbers', website: 'Website', contact: 'Contact line', qrCode: 'QR code', none: 'None',
+      fromLink: 'From a link', upload: 'Upload', chooseQr: 'Choose QR image', replaceQr: 'Replace image',
+      qrLink: 'Link for the QR code', qrNote: 'Paste any link — your site, Instagram, a shop page.',
+      qrNoteWeb: 'Left empty, it uses your website.', qrNoteExp: 'A plain QR code: it never expires.',
+      qrText: 'Text beside it', qrTextPh: 'e.g. Scan to visit', websitePh: 'e.g. arks-gallery.vercel.app',
+      contactPh: 'e.g. Instagram @arkorigin · email', linkPh: 'e.g. instagram.com/yourname',
+      filter: 'Filter', skipNo: 'Leave out “Dont Exist”', onlyAvail: 'Only available (not sold)', blankCens: 'Blank out censored photos',
+      photoHidden: 'Photo hidden', scanMe: 'Scan me'
+    },
+    'zh-Hant': {
+      language: '語言', printExport: '列印及匯出', backToGallery: '← 返回畫廊', closeTitle: '返回畫廊（Esc）',
+      viewing: '瀏覽畫廊', admin: '管理', theme: '主題', layout: '版面', suffixes: '標籤', findMissing: '查找缺號',
+      bulkUpload: '批量上載', importPdf: '從 PDF 匯入', importDesc: '從 PDF 匯入描述', exportXlsx: '匯出至 Excel',
+      downloadPdf: '下載 PDF', addPainting: '新增畫作', signOut: '登出', addTab: '+ 分頁',
+      loading: '載入中…', noTabs: '暫無分頁', setupTitle: '畫廊正在準備中', setupSub: '請稍後再來。',
+      nothingIn: '{tab} 暫時未有作品', moreOnWay: '更多作品即將推出。', piece: '共 {n} 件', pieces: '共 {n} 件',
+      name: '名稱：', number: '編號：', date: '日期：', size: '尺寸：', description: '描述：', untitled: '無題',
+      more: '更多', less: '收起', available: '可供出售', sold: '已售', nfs: '非賣品', markSold: '標記已售',
+      hiddenChip: '已隱藏', clickToView: '點擊查看', zoomTitle: '點擊查看大圖', zoomTitleEmbed: '點擊查看大圖（在新分頁開啟）',
+      viewSet: '查看整套作品', setN: '一套 ×{n}', loadMore: '載入更多', showingOf: '顯示 {a} / {b}', showingAll: '已顯示全部 {n} 件',
+      pageOfPieces: '第 {a} 頁，共 {b} 頁 · {n} 件', prevPage: '上一頁', nextPage: '下一頁',
+      lbClose: '關閉大圖', lbHint: '點擊圖片放大', lbHintZoomed: '移動查看 · 點擊還原', close: '關閉',
+      mode: '模式', standard: '標準', advanced: '進階', pageSize: '紙張尺寸', rowsPerPage: '每頁行數',
+      include: '包括', onlyTab: '只限{tab}', allTabs: '所有分頁', printPdf: '列印 / 儲存為 PDF', saveDefault: '設為預設',
+      soldCaps: '已售', noPieces: '暫無作品。', noPiecesAdv: '沒有作品。', fullCatalogue: '完整目錄', pageSlash: '第 {a} / {b} 頁',
+      pageGrid: '紙張及格線', sizeLbl: '尺寸', orientation: '方向', portrait: '直向', landscape: '橫向',
+      columns: '欄數', rows: '行數', photo: '相片', fill: '填滿', whole: '完整', frame: '每件作品加框',
+      perPage: '每頁 {n} 件', showOn: '每件作品顯示', fPhoto: '相片', fNumber: '編號', fName: '名稱',
+      fDate: '日期', fSize: '尺寸', fPrice: '價格', fStatus: '已售 / 狀態', fSuffix: '標籤', fDesc: '描述',
+      descLines: '描述行數', full: '全部', headerFooter: '頁首及頁尾', title: '標題', addTabName: '加上分頁名稱',
+      pageNumbers: '頁碼', website: '網站', contact: '聯絡資料', qrCode: '二維碼', none: '無',
+      fromLink: '從連結', upload: '上載', chooseQr: '選擇二維碼圖片', replaceQr: '更換圖片',
+      qrLink: '二維碼連結', qrNote: '貼上任何連結——你的網站、Instagram、網店頁面。',
+      qrNoteWeb: '留空則使用你的網站。', qrNoteExp: '普通二維碼，永不過期。',
+      qrText: '旁邊文字', qrTextPh: '例如：掃描瀏覽', websitePh: '例如：arks-gallery.vercel.app',
+      contactPh: '例如：Instagram @arkorigin · 電郵', linkPh: '例如：instagram.com/你的名字',
+      filter: '篩選', skipNo: '不包括「Dont Exist」', onlyAvail: '只限可供出售（未售）', blankCens: '隱藏已遮蔽的相片',
+      photoHidden: '相片已隱藏', scanMe: '掃描我'
+    },
+    'zh-Hans': {
+      language: '语言', printExport: '打印及导出', backToGallery: '← 返回画廊', closeTitle: '返回画廊（Esc）',
+      viewing: '浏览画廊', admin: '管理', theme: '主题', layout: '版面', suffixes: '标签', findMissing: '查找缺号',
+      bulkUpload: '批量上传', importPdf: '从 PDF 导入', importDesc: '从 PDF 导入描述', exportXlsx: '导出至 Excel',
+      downloadPdf: '下载 PDF', addPainting: '新增画作', signOut: '退出登录', addTab: '+ 分页',
+      loading: '加载中…', noTabs: '暂无分页', setupTitle: '画廊正在准备中', setupSub: '请稍后再来。',
+      nothingIn: '{tab} 暂时没有作品', moreOnWay: '更多作品即将推出。', piece: '共 {n} 件', pieces: '共 {n} 件',
+      name: '名称：', number: '编号：', date: '日期：', size: '尺寸：', description: '描述：', untitled: '无题',
+      more: '更多', less: '收起', available: '可供出售', sold: '已售', nfs: '非卖品', markSold: '标记已售',
+      hiddenChip: '已隐藏', clickToView: '点击查看', zoomTitle: '点击查看大图', zoomTitleEmbed: '点击查看大图（在新标签页打开）',
+      viewSet: '查看整套作品', setN: '一套 ×{n}', loadMore: '加载更多', showingOf: '显示 {a} / {b}', showingAll: '已显示全部 {n} 件',
+      pageOfPieces: '第 {a} 页，共 {b} 页 · {n} 件', prevPage: '上一页', nextPage: '下一页',
+      lbClose: '关闭大图', lbHint: '点击图片放大', lbHintZoomed: '移动查看 · 点击还原', close: '关闭',
+      mode: '模式', standard: '标准', advanced: '高级', pageSize: '纸张尺寸', rowsPerPage: '每页行数',
+      include: '包括', onlyTab: '仅限{tab}', allTabs: '所有分页', printPdf: '打印 / 保存为 PDF', saveDefault: '设为默认',
+      soldCaps: '已售', noPieces: '暂无作品。', noPiecesAdv: '没有作品。', fullCatalogue: '完整目录', pageSlash: '第 {a} / {b} 页',
+      pageGrid: '纸张及网格', sizeLbl: '尺寸', orientation: '方向', portrait: '纵向', landscape: '横向',
+      columns: '列数', rows: '行数', photo: '照片', fill: '填满', whole: '完整', frame: '每件作品加框',
+      perPage: '每页 {n} 件', showOn: '每件作品显示', fPhoto: '照片', fNumber: '编号', fName: '名称',
+      fDate: '日期', fSize: '尺寸', fPrice: '价格', fStatus: '已售 / 状态', fSuffix: '标签', fDesc: '描述',
+      descLines: '描述行数', full: '全部', headerFooter: '页眉及页脚', title: '标题', addTabName: '加上分页名称',
+      pageNumbers: '页码', website: '网站', contact: '联系信息', qrCode: '二维码', none: '无',
+      fromLink: '从链接', upload: '上传', chooseQr: '选择二维码图片', replaceQr: '更换图片',
+      qrLink: '二维码链接', qrNote: '粘贴任何链接——你的网站、Instagram、网店页面。',
+      qrNoteWeb: '留空则使用你的网站。', qrNoteExp: '普通二维码，永不过期。',
+      qrText: '旁边文字', qrTextPh: '例如：扫码浏览', websitePh: '例如：arks-gallery.vercel.app',
+      contactPh: '例如：Instagram @arkorigin · 邮箱', linkPh: '例如：instagram.com/你的名字',
+      filter: '筛选', skipNo: '不包括“Dont Exist”', onlyAvail: '仅限可供出售（未售）', blankCens: '隐藏已遮蔽的照片',
+      photoHidden: '照片已隐藏', scanMe: '扫一扫'
+    },
+    pt: {
+      language: 'Idioma', printExport: 'Imprimir e exportar', backToGallery: '← Voltar à galeria', closeTitle: 'Voltar à galeria (Esc)',
+      viewing: 'A ver a galeria', admin: 'Admin', theme: 'Tema', layout: 'Disposição', suffixes: 'Etiquetas', findMissing: 'Números em falta',
+      bulkUpload: 'Carregar em lote', importPdf: 'Importar de PDF', importDesc: 'Importar descrições de PDF', exportXlsx: 'Exportar para Excel',
+      downloadPdf: 'Descarregar PDF', addPainting: 'Adicionar pintura', signOut: 'Terminar sessão', addTab: '+ Separador',
+      loading: 'A carregar…', noTabs: 'Ainda não há separadores', setupTitle: 'A galeria está a ser preparada', setupSub: 'Volte em breve.',
+      nothingIn: 'Ainda não há nada em {tab}', moreOnWay: 'Mais obras a caminho.', piece: '{n} obra', pieces: '{n} obras',
+      name: 'Nome:', number: 'Número:', date: 'Data:', size: 'Dimensões:', description: 'Descrição:', untitled: 'Sem título',
+      more: 'Mais', less: 'Menos', available: 'Disponível', sold: 'Vendido', nfs: 'Não está à venda', markSold: 'Marcar vendido',
+      hiddenChip: 'Oculto', clickToView: 'Clique para ver', zoomTitle: 'Clique para ver em tamanho real', zoomTitleEmbed: 'Clique para ver em tamanho real (abre num novo separador)',
+      viewSet: 'Ver o conjunto completo', setN: 'Conjunto ×{n}', loadMore: 'Carregar mais', showingOf: 'A mostrar {a} de {b}', showingAll: 'A mostrar todas as {n}',
+      pageOfPieces: 'Página {a} de {b} · {n} obras', prevPage: 'Página anterior', nextPage: 'Página seguinte',
+      lbClose: 'Fechar vista ampliada', lbHint: 'Clique na imagem para ampliar', lbHintZoomed: 'Mova para explorar · clique para repor', close: 'Fechar',
+      mode: 'Modo', standard: 'Padrão', advanced: 'Avançado', pageSize: 'Tamanho da página', rowsPerPage: 'Linhas por página',
+      include: 'Incluir', onlyTab: 'Só {tab}', allTabs: 'Todos os separadores', printPdf: 'Imprimir / Guardar em PDF', saveDefault: 'Guardar como padrão',
+      soldCaps: 'VENDIDO', noPieces: 'Ainda não há obras.', noPiecesAdv: 'Sem obras.', fullCatalogue: 'Catálogo completo', pageSlash: 'Página {a} / {b}',
+      pageGrid: 'Página e grelha', sizeLbl: 'Tamanho', orientation: 'Orientação', portrait: 'Vertical', landscape: 'Horizontal',
+      columns: 'Colunas', rows: 'Linhas', photo: 'Fotografia', fill: 'Preencher', whole: 'Inteira', frame: 'Moldura em cada obra',
+      perPage: '{n} obras por página', showOn: 'Mostrar em cada obra', fPhoto: 'Fotografia', fNumber: 'Número', fName: 'Nome',
+      fDate: 'Data', fSize: 'Dimensões', fPrice: 'Preço', fStatus: 'Vendido / estado', fSuffix: 'Etiqueta', fDesc: 'Descrição',
+      descLines: 'Linhas da descrição', full: 'Completa', headerFooter: 'Cabeçalho e rodapé', title: 'Título', addTabName: 'Adicionar nome do separador',
+      pageNumbers: 'Números de página', website: 'Site', contact: 'Linha de contacto', qrCode: 'Código QR', none: 'Nenhum',
+      fromLink: 'De um link', upload: 'Carregar', chooseQr: 'Escolher imagem QR', replaceQr: 'Substituir imagem',
+      qrLink: 'Link do código QR', qrNote: 'Cole qualquer link — o seu site, Instagram, uma loja.',
+      qrNoteWeb: 'Se ficar vazio, usa o seu site.', qrNoteExp: 'Um código QR simples: nunca expira.',
+      qrText: 'Texto ao lado', qrTextPh: 'ex.: Digitalize para visitar', websitePh: 'ex.: arks-gallery.vercel.app',
+      contactPh: 'ex.: Instagram @arkorigin · email', linkPh: 'ex.: instagram.com/o-seu-nome',
+      filter: 'Filtro', skipNo: 'Excluir “Dont Exist”', onlyAvail: 'Só disponíveis (não vendidas)', blankCens: 'Ocultar fotografias censuradas',
+      photoHidden: 'Fotografia oculta', scanMe: 'Digitalize-me'
+    }
+  };
+  /* Built-in translations for the suffix tags (matched by their English label). */
+  var SUFFIX_I18N = {
+    'painting set':       { 'zh-Hant': '系列畫作', 'zh-Hans': '系列画作', pt: 'Conjunto de pinturas' },
+    'award winner':       { 'zh-Hant': '得獎作品', 'zh-Hans': '得奖作品', pt: 'Premiado' },
+    'hidden':             { 'zh-Hant': '已隱藏',   'zh-Hans': '已隐藏',   pt: 'Oculto' },
+    'in progress':        { 'zh-Hant': '進行中',   'zh-Hans': '进行中',   pt: 'Em curso' },
+    'pending for remake': { 'zh-Hant': '待重繪',   'zh-Hans': '待重绘',   pt: 'A refazer' },
+    'pending remake':     { 'zh-Hant': '待重繪',   'zh-Hans': '待重绘',   pt: 'A refazer' }
+  };
+  var LANG_KEY = 'arks_lang';
+  var curLang = (function () {
+    var saved = null;
+    try { saved = localStorage.getItem(LANG_KEY); } catch (e) {}
+    if (saved && I18N[saved]) return saved;
+    var nav = String((navigator.languages && navigator.languages[0]) || navigator.language || 'en').toLowerCase();
+    if (/^zh-(tw|hk|mo)|^zh-hant/.test(nav)) return 'zh-Hant';
+    if (/^zh/.test(nav)) return 'zh-Hans';
+    if (/^pt/.test(nav)) return 'pt';
+    return 'en';
+  })();
+  document.documentElement.lang = curLang;
+  function tx(key, vars) {
+    var s = (I18N[curLang] && I18N[curLang][key]) || I18N.en[key] || key;
+    if (vars) Object.keys(vars).forEach(function (k) { s = s.split('{' + k + '}').join(String(vars[k])); });
+    return s;
+  }
+  /* Escaped version for building HTML strings. */
+  function txe(key, vars) { return esc(tx(key, vars)); }
+  function suffixText(sfx) {
+    if (!sfx) return '';
+    var m = SUFFIX_I18N[String(sfx.label || '').trim().toLowerCase()];
+    return (curLang !== 'en' && m && m[curLang]) || sfx.label || '';
+  }
+  function langPickerHtml() {
+    return '<label class="lang-pick" title="' + txe('language') + '">' +
+      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg>' +
+      '<select id="langSelect" aria-label="' + txe('language') + '">' +
+      LANGS.map(function (l) { return '<option value="' + l[0] + '"' + (l[0] === curLang ? ' selected' : '') + '>' + l[1] + '</option>'; }).join('') +
+      '</select></label>';
+  }
+  function setLanguage(code) {
+    if (!I18N[code]) return;
+    curLang = code;
+    document.documentElement.lang = code;
+    try { localStorage.setItem(LANG_KEY, code); } catch (e) {}
+    renderAll();
+  }
 
   /* ---------------- toast ---------------- */
   function toast(msg) {
@@ -1417,29 +1598,29 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var el = document.getElementById('topActions');
     var inPrint = !document.getElementById('printView').hidden;
     var printBtn = inPrint
-      ? '<button class="btn" id="btnPrintView" type="button">&larr; Back to gallery</button>'
+      ? '<button class="btn" id="btnPrintView" type="button">' + txe('backToGallery') + '</button>'
       : '<button class="btn" id="btnPrintView" type="button">' +
       '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg>' +
-      'Print &amp; export</button>';
+      txe('printExport') + '</button>';
 
     if (isAdmin) {
       el.innerHTML = printBtn +
-        '<button class="btn btn-ghost btn-sm" id="btnTheme" type="button" title="Change site colors">Theme</button>' +
-        '<button class="btn btn-ghost btn-sm" id="btnGridLayout" type="button" title="How many columns and rows show at once, separately for PC and mobile">Layout</button>' +
-        '<button class="btn btn-ghost btn-sm" id="btnSuffixes" type="button" title="Manage colored tags like &quot;Painting set&quot;">Suffixes</button>' +
-        '<button class="btn btn-ghost btn-sm" id="btnFindMissing" type="button" title="Find gaps in the current tab\'s catalogue numbering">Find missing #</button>' +
-        '<button class="btn btn-ghost btn-sm" id="btnBulkUpload" type="button" title="Add several photos at once">Bulk upload</button>' +
+        '<button class="btn btn-ghost btn-sm" id="btnTheme" type="button" title="Change site colors">' + txe('theme') + '</button>' +
+        '<button class="btn btn-ghost btn-sm" id="btnGridLayout" type="button" title="How many columns and rows show at once, separately for PC and mobile">' + txe('layout') + '</button>' +
+        '<button class="btn btn-ghost btn-sm" id="btnSuffixes" type="button" title="Manage colored tags like &quot;Painting set&quot;">' + txe('suffixes') + '</button>' +
+        '<button class="btn btn-ghost btn-sm" id="btnFindMissing" type="button" title="Find gaps in the current tab\'s catalogue numbering">' + txe('findMissing') + '</button>' +
+        '<button class="btn btn-ghost btn-sm" id="btnBulkUpload" type="button" title="Add several photos at once">' + txe('bulkUpload') + '</button>' +
         '<input type="file" id="bulkFileInput" accept="image/*" multiple style="display:none">' +
-        '<button class="btn btn-ghost btn-sm" id="btnPdfTest" type="button" title="Read an inventory PDF, preview the changes in red, fix anything wrong, then apply">Import from PDF</button>' +
+        '<button class="btn btn-ghost btn-sm" id="btnPdfTest" type="button" title="Read an inventory PDF, preview the changes in red, fix anything wrong, then apply">' + txe('importPdf') + '</button>' +
         '<input type="file" id="pdfTestInput" accept="application/pdf" style="display:none">' +
-        '<button class="btn btn-ghost btn-sm" id="btnDescPdfTest" type="button" title="Read a catalogue PDF (one numbered piece per page) and pull its description text in, preview in red, fix anything wrong, then apply">Import descriptions from PDF</button>' +
+        '<button class="btn btn-ghost btn-sm" id="btnDescPdfTest" type="button" title="Read a catalogue PDF (one numbered piece per page) and pull its description text in, preview in red, fix anything wrong, then apply">' + txe('importDesc') + '</button>' +
         '<input type="file" id="descPdfTestInput" accept="application/pdf" style="display:none">' +
-        '<button class="btn btn-ghost btn-sm" id="btnXlsxExport" type="button" title="Download the inventory (date, number, name, size) as an Excel file — edit it, print it to PDF, then re-import with Import from PDF">Export to Excel</button>' +
-        '<button class="btn btn-ghost btn-sm" id="btnPdfExport" type="button" title="Download the current inventory as a PDF, in the exact layout Import from PDF reads — a ready-made master copy to correct offline and bring back in">Download PDF</button>' +
+        '<button class="btn btn-ghost btn-sm" id="btnXlsxExport" type="button" title="Download the inventory (date, number, name, size) as an Excel file — edit it, print it to PDF, then re-import with Import from PDF">' + txe('exportXlsx') + '</button>' +
+        '<button class="btn btn-ghost btn-sm" id="btnPdfExport" type="button" title="Download the current inventory as a PDF, in the exact layout Import from PDF reads — a ready-made master copy to correct offline and bring back in">' + txe('downloadPdf') + '</button>' +
         '<button class="btn btn-primary" id="btnAddPainting" type="button">' +
-        '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>Add painting</button>' +
+        '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>' + txe('addPainting') + '</button>' +
         '<span class="admin-pill"><span class="dot"></span>' + esc(currentUserEmail) + '</span>' +
-        '<button class="btn btn-ghost btn-sm" id="btnSignOut" type="button">Sign out</button>';
+        '<button class="btn btn-ghost btn-sm" id="btnSignOut" type="button">' + txe('signOut') + '</button>';
       document.getElementById('btnTheme').addEventListener('click', openThemeModal);
       document.getElementById('btnGridLayout').addEventListener('click', openGridLayoutModal);
       document.getElementById('btnSuffixes').addEventListener('click', openSuffixManagerModal);
@@ -1487,13 +1668,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       el.innerHTML = printBtn;
     } else {
       el.innerHTML = printBtn +
-        '<span class="view-badge">Viewing gallery</span>' +
-        '<button class="btn btn-ghost btn-sm" id="btnAdminSignIn" type="button" title="Studio admin sign-in">Admin</button>';
+        '<span class="view-badge">' + txe('viewing') + '</span>' +
+        '<button class="btn btn-ghost btn-sm" id="btnAdminSignIn" type="button" title="Studio admin sign-in">' + txe('admin') + '</button>';
       document.getElementById('btnAdminSignIn').addEventListener('click', sendAdminLink);
     }
     document.getElementById('btnPrintView').addEventListener('click', function () {
       if (document.getElementById('printView').hidden) showPrint(); else showBrowse();
     });
+    el.insertAdjacentHTML('beforeend', langPickerHtml());
+    document.getElementById('langSelect').addEventListener('change', function (e) { setLanguage(e.target.value); });
   }
 
   /* ---------------- render: tabs ---------------- */
@@ -1511,7 +1694,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>' +
         '</button>' : '') + '</div>';
     }).join('');
-    if (isAdmin) html += '<button class="tab-add" id="btnAddTab" type="button">+ Tab</button>';
+    if (isAdmin) html += '<button class="tab-add" id="btnAddTab" type="button">' + txe('addTab') + '</button>';
     bar.innerHTML = html;
   }
 
@@ -1809,9 +1992,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     grid.querySelectorAll('.card-desc.clamped').forEach(function (el) {
       var btn = el.nextElementSibling;
       if (!btn || !btn.classList.contains('desc-more')) return;
-      if (el.classList.contains('expanded')) { btn.hidden = false; btn.textContent = 'Less'; return; }
+      if (el.classList.contains('expanded')) { btn.hidden = false; btn.textContent = tx('less'); return; }
       btn.hidden = !(el.scrollHeight > el.clientHeight + 2);
-      btn.textContent = 'More';
+      btn.textContent = tx('more');
     });
   }
   /* How many columns the browser is actually drawing — needed when columns
@@ -1841,12 +2024,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (L.mode === 'more') {
       slice = items.slice(0, per * state.gridShown);
       html = slice.length < items.length
-        ? '<button class="btn" type="button" data-grid-more>Load more</button><div class="pg-info">Showing ' + slice.length + ' of ' + items.length + '</div>'
-        : '<div class="pg-info">Showing all ' + items.length + '</div>';
+        ? '<button class="btn" type="button" data-grid-more>' + txe('loadMore') + '</button><div class="pg-info">' + txe('showingOf', { a: slice.length, b: items.length }) + '</div>'
+        : '<div class="pg-info">' + txe('showingAll', { n: items.length }) + '</div>';
     } else {
       var cur = state.gridPage;
       slice = items.slice((cur - 1) * per, cur * per);
-      html = '<button class="pg" type="button" data-grid-page="' + (cur - 1) + '"' + (cur === 1 ? ' disabled' : '') + ' aria-label="Previous page">&lsaquo;</button>';
+      html = '<button class="pg" type="button" data-grid-page="' + (cur - 1) + '"' + (cur === 1 ? ' disabled' : '') + ' aria-label="' + txe('prevPage') + '">&lsaquo;</button>';
       var gap = false;
       for (var i = 1; i <= pages; i++) {
         if (pages > 7 && i > 1 && i < pages && Math.abs(i - cur) > 1) {
@@ -1856,8 +2039,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         gap = false;
         html += '<button class="pg' + (i === cur ? ' on' : '') + '" type="button" data-grid-page="' + i + '">' + i + '</button>';
       }
-      html += '<button class="pg" type="button" data-grid-page="' + (cur + 1) + '"' + (cur === pages ? ' disabled' : '') + ' aria-label="Next page">&rsaquo;</button>' +
-        '<div class="pg-info">Page ' + cur + ' of ' + pages + ' &middot; ' + items.length + ' pieces</div>';
+      html += '<button class="pg" type="button" data-grid-page="' + (cur + 1) + '"' + (cur === pages ? ' disabled' : '') + ' aria-label="' + txe('nextPage') + '">&rsaquo;</button>' +
+        '<div class="pg-info">' + txe('pageOfPieces', { a: cur, b: pages, n: items.length }) + '</div>';
     }
     pagerEl.innerHTML = html;
     return slice;
@@ -1971,9 +2154,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   /* ---------------- render: grid ---------------- */
   function renderGrid() {
     var tab = tabById(state.activeTabId);
-    document.getElementById('tabTitle').textContent = tab ? tab.name : (state.loaded ? 'No tabs yet' : 'Loading…');
+    document.getElementById('tabTitle').textContent = tab ? tab.name : (state.loaded ? tx('noTabs') : tx('loading'));
     var items = sortByNumber(state.paintings.concat(testOverlay ? testOverlay.extras : []).filter(function (p) { return p.tab_id === state.activeTabId; }));
-    document.getElementById('tabSub').textContent = items.length + (items.length === 1 ? ' piece' : ' pieces');
+    document.getElementById('tabSub').textContent = tx(items.length === 1 ? 'piece' : 'pieces', { n: items.length });
 
     var grid = document.getElementById('grid');
     var pagerEl = document.getElementById('gridPager');
@@ -1984,7 +2167,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       grid.innerHTML = isAdmin
         ? '<div class="empty-state" style="grid-column:1/-1"><h3>No tabs yet</h3><p>Create a tab for the first material you work in — Oil, Watercolour, Sketch…</p>' +
           '<button class="btn btn-primary" id="emptyAddTab" type="button">+ Add a tab</button></div>'
-        : '<div class="empty-state" style="grid-column:1/-1"><h3>Gallery is being set up</h3><p>Check back soon.</p></div>';
+        : '<div class="empty-state" style="grid-column:1/-1"><h3>' + txe('setupTitle') + '</h3><p>' + txe('setupSub') + '</p></div>';
       var b = document.getElementById('emptyAddTab');
       if (b) b.addEventListener('click', openTabModal);
       return;
@@ -1994,7 +2177,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ? '<div class="empty-state" style="grid-column:1/-1"><h3>Nothing catalogued in ' + esc(tab.name) + ' yet</h3>' +
           '<p>Add your first piece — its photo\'s filename can double as the catalogue number.</p>' +
           '<button class="btn btn-primary" id="emptyAddPainting" type="button">+ Add painting</button></div>'
-        : '<div class="empty-state" style="grid-column:1/-1"><h3>Nothing in ' + esc(tab.name) + ' yet</h3><p>More work is on its way.</p></div>';
+        : '<div class="empty-state" style="grid-column:1/-1"><h3>' + txe('nothingIn', { tab: tab.name }) + '</h3><p>' + txe('moreOnWay') + '</p></div>';
       var b2 = document.getElementById('emptyAddPainting');
       if (b2) b2.addEventListener('click', openPaintingModal);
       return;
@@ -2035,50 +2218,50 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           : '<div class="swatch" style="background:' + swatchGradient(p.hue || 30) + '"><span>' + esc((p.name || '?').charAt(0).toUpperCase()) + '</span></div>');
       var setMates = setMembers(p);
       return '<div class="card' + (p.sold ? ' is-sold' : '') + (p.__testNew ? ' is-test-new' : '') + '" data-card="' + p.id + '">' +
-        '<div class="card-image' + (isCensoredView ? ' is-censored' : '') + '"' + (canZoom ? ' data-lightbox="' + esc(fullSrc) + '" title="' + (isEmbedded ? 'Click to view full size (opens in a new tab)' : 'Click to view full size') + '"' : '') + '>' + imageInner +
+        '<div class="card-image' + (isCensoredView ? ' is-censored' : '') + '"' + (canZoom ? ' data-lightbox="' + esc(fullSrc) + '" title="' + (isEmbedded ? txe('zoomTitleEmbed') : txe('zoomTitle')) + '"' : '') + '>' + imageInner +
         (isCensoredView
-          ? '<div class="censored-badge"><div class="censored-chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>' + (isHidden ? 'Hidden' : 'Click to view') + '</div></div>'
+          ? '<div class="censored-badge"><div class="censored-chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>' + (isHidden ? txe('hiddenChip') : txe('clickToView')) + '</div></div>'
           : '') +
         (p.price ? '<span class="price-tag">' + fmtPrice(p.price) + '</span>' : '') +
         (p.sold
-          ? '<div class="sold-slash"></div><div class="sold-stamp">Sold</div>'
-          : (p.not_for_sale ? '<div class="notforsale-slash"></div><div class="notforsale-stamp">Not for sale</div>' : '')) +
+          ? '<div class="sold-slash"></div><div class="sold-stamp">' + txe('sold') + '</div>'
+          : (p.not_for_sale ? '<div class="notforsale-slash"></div><div class="notforsale-stamp">' + txe('nfs') + '</div>' : '')) +
         ((isAdmin && !p.__testNew)
           ? '<button class="nfs-toggle' + (p.not_for_sale ? ' active' : '') + '" data-toggle-nfs="' + p.id + '" type="button" ' +
             'title="' + (p.not_for_sale ? 'Remove not-for-sale mark' : 'Mark as not for sale') + '">N/S</button>'
           : '') +
         (setMates.length > 1
-          ? '<button class="set-badge" data-view-set="' + p.id + '" type="button" title="View the full set">' +
+          ? '<button class="set-badge" data-view-set="' + p.id + '" type="button" title="' + txe('viewSet') + '">' +
             '<span class="set-badge-ring"></span>' +
             '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2 9 4.9-9 4.9-9-4.9L12 2Z"/><path d="m3 12 9 4.9 9-4.9M3 17l9 4.9 9-4.9"/></svg>' +
-            'Set ×' + setMates.length + '</button>'
+            txe('setN', { n: setMates.length }) + '</button>'
           : '') +
         (canZoom ? '<span class="expand-hint"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 3H5a2 2 0 0 0-2 2v3m0 8v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3m0-8V5a2 2 0 0 0-2-2h-3"/></svg></span>' : '') +
         '</div>' +
         '<div class="card-body">' +
         (p.__testNew ? '<div class="test-new-tag">NEW — from PDF</div> ' : '') +
         ((p.__testNew || p.__red) ? '<button class="test-discard" type="button" data-tid="' + esc(String(p.id)) + '">' + (p.__testNew ? 'Skip this one' : 'Discard change') + '</button>' : '') +
-        '<div class="card-name"><span class="field-label">Name:</span> ' + (red.name
+        '<div class="card-name"><span class="field-label">' + txe('name') + '</span> ' + (red.name
           ? '<input class="test-edit" type="text" data-tid="' + esc(String(p.id)) + '" data-f="name" value="' + esc(p.name || '') + '">'
-          : '<span' + (canInlineEdit ? ' class="inline-field" data-inline-field="name" data-inline-pid="' + esc(String(p.id)) + '" title="Double-click to edit"' : '') + '>' + esc(p.name || 'Untitled') + '</span>') + '</div>' +
-        '<div class="card-meta"><span class="field-label">Number:</span> <span class="mono' + (red.number ? ' test-red' : '') + (canInlineEdit ? ' inline-field" data-inline-field="number" data-inline-pid="' + esc(String(p.id)) + '" title="Double-click to edit' : '') + '">' + esc(catalogNum(p)) + '</span></div>' +
-        '<div class="card-meta"><span class="field-label">Date:</span> ' + (red.date
+          : '<span' + (canInlineEdit ? ' class="inline-field" data-inline-field="name" data-inline-pid="' + esc(String(p.id)) + '" title="Double-click to edit"' : '') + '>' + esc(p.name || tx('untitled')) + '</span>') + '</div>' +
+        '<div class="card-meta"><span class="field-label">' + txe('number') + '</span> <span class="mono' + (red.number ? ' test-red' : '') + (canInlineEdit ? ' inline-field" data-inline-field="number" data-inline-pid="' + esc(String(p.id)) + '" title="Double-click to edit' : '') + '">' + esc(catalogNum(p)) + '</span></div>' +
+        '<div class="card-meta"><span class="field-label">' + txe('date') + '</span> ' + (red.date
           ? '<input class="test-edit" type="date" data-tid="' + esc(String(p.id)) + '" data-f="date" value="' + esc(p.date ? String(p.date).slice(0, 10) : '') + '">'
           : '<span class="mono' + (canInlineEdit ? ' inline-field" data-inline-field="date" data-inline-pid="' + esc(String(p.id)) + '" title="Double-click to edit' : '') + '">' + esc(fmtPieceDate(p)) + '</span>') + '</div>' +
-        (p.size ? '<div class="card-meta"><span class="field-label">Size:</span> ' + (red.size
+        (p.size ? '<div class="card-meta"><span class="field-label">' + txe('size') + '</span> ' + (red.size
           ? '<input class="test-edit" type="text" data-tid="' + esc(String(p.id)) + '" data-f="size" value="' + esc(p.size) + '">'
           : '<span class="mono' + (canInlineEdit ? ' inline-field" data-inline-field="size" data-inline-pid="' + esc(String(p.id)) + '" title="Double-click to edit' : '') + '">' + esc(p.size) + '</span>') + '</div>' : '') +
-        ((p.description || red.description) ? '<div class="card-desc' + (red.description ? '' : ' clamped' + (state.descOpen[p.id] ? ' expanded' : '')) + '"><span class="field-label">Description:</span> ' + (red.description
+        ((p.description || red.description) ? '<div class="card-desc' + (red.description ? '' : ' clamped' + (state.descOpen[p.id] ? ' expanded' : '')) + '"><span class="field-label">' + txe('description') + '</span> ' + (red.description
           ? '<textarea class="test-edit" data-tid="' + esc(String(p.id)) + '" data-f="description" rows="3">' + esc(p.description || '') + '</textarea>'
           : '<span' + (canInlineEdit ? ' class="inline-field" data-inline-field="description" data-inline-pid="' + esc(String(p.id)) + '" title="Double-click to edit"' : '') + '>' + esc(p.description) + '</span>') + '</div>' +
-          (red.description ? '' : '<button class="desc-more" type="button" data-desc-toggle="' + esc(String(p.id)) + '" hidden>More</button>') : '') +
+          (red.description ? '' : '<button class="desc-more" type="button" data-desc-toggle="' + esc(String(p.id)) + '" hidden>' + txe('more') + '</button>') : '') +
         '<div class="card-bottom">' +
         (suffix
-          ? '<div class="suffix-tag' + animatedSuffixClass + '"' + (animatedSuffixClass ? '' : ' style="color:' + esc(suffix.color) + '"') + '>' + esc(suffix.label) + '</div>'
+          ? '<div class="suffix-tag' + animatedSuffixClass + '"' + (animatedSuffixClass ? '' : ' style="color:' + esc(suffix.color) + '"') + '>' + esc(suffixText(suffix)) + '</div>'
           : '') +
         '<div class="card-footer">' +
         ((isAdmin && !p.__testNew)
-          ? '<button class="sold-toggle" data-toggle-sold="' + p.id + '"><span class="switch"></span>' + (p.sold ? 'Sold' : 'Mark sold') + '</button>' +
+          ? '<button class="sold-toggle" data-toggle-sold="' + p.id + '"><span class="switch"></span>' + (p.sold ? txe('sold') : txe('markSold')) + '</button>' +
             '<div class="card-actions">' +
             '<button class="icon-btn set-assign-btn' + (p.set_id ? ' has-set' : '') + '" data-assign-set="' + p.id + '" aria-label="Add to set" title="' + (p.set_id ? 'In set bucket ' + esc(String(p.set_id)) + ' — click to change' : 'Add to a set') + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2 9 4.9-9 4.9-9-4.9L12 2Z"/><path d="m3 12 9 4.9 9-4.9M3 17l9 4.9 9-4.9"/></svg></button>' +
             '<button class="icon-btn censor-toggle-btn' + (p.censored ? ' active' : '') + '" data-toggle-censor="' + p.id + '" aria-label="' + (p.censored ? 'Remove censor' : 'Censor thumbnail') + '" title="' + (p.censored ? 'Remove censor — thumbnail will show normally' : 'Censor thumbnail — blurs it in the grid, full image still opens on click') + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg></button>' +
@@ -2086,7 +2269,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             '<button class="icon-btn danger" data-del-painting="' + p.id + '" aria-label="Delete" title="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg></button>' +
             '</div>'
           : '<span class="sold-static' + (p.sold ? ' is-sold' : (p.not_for_sale ? ' is-nfs' : '')) + '">' +
-            (p.sold ? 'Sold' : (p.not_for_sale ? 'Not for sale' : 'Available')) + '</span>') +
+            (p.sold ? txe('sold') : (p.not_for_sale ? txe('nfs') : txe('available'))) + '</span>') +
         '</div></div></div></div>';
     }).join('');
   }
@@ -2110,29 +2293,29 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var view = document.getElementById('printView');
     if (!state.printAdv) state.printAdv = normalizePrintAdv(null);
     var adv = state.printStyle === 'advanced';
-    var closeBtn = '<button class="print-close" id="btnClosePrint" type="button" aria-label="Close print view and go back to the gallery" title="Back to gallery (Esc)">' +
+    var closeBtn = '<button class="print-close" id="btnClosePrint" type="button" aria-label="Close print view and go back to the gallery" title="' + txe('closeTitle') + '">' +
       '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="square"><path d="M5 5l14 14M19 5L5 19"/></svg></button>';
-    var styleSeg = '<div class="print-field"><label>Mode</label><div class="seg mode-seg">' +
-      '<button type="button" data-pstyle="standard" class="' + (!adv ? 'active' : '') + '">Standard</button>' +
-      '<button type="button" data-pstyle="advanced" class="' + (adv ? 'active' : '') + '">Advanced</button></div></div>';
-    var scopeSel = '<div class="print-field"><label>Include</label><select class="print-select" id="printScopeSel">' +
-      '<option value="current"' + (state.printScope === 'current' ? ' selected' : '') + '>' + esc((tabById(state.activeTabId) || {}).name || 'Current tab') + ' only</option>' +
-      '<option value="all"' + (state.printScope === 'all' ? ' selected' : '') + '>All tabs</option>' +
+    var styleSeg = '<div class="print-field"><label>' + txe('mode') + '</label><div class="seg mode-seg">' +
+      '<button type="button" data-pstyle="standard" class="' + (!adv ? 'active' : '') + '">' + txe('standard') + '</button>' +
+      '<button type="button" data-pstyle="advanced" class="' + (adv ? 'active' : '') + '">' + txe('advanced') + '</button></div></div>';
+    var scopeSel = '<div class="print-field"><label>' + txe('include') + '</label><select class="print-select" id="printScopeSel">' +
+      '<option value="current"' + (state.printScope === 'current' ? ' selected' : '') + '>' + txe('onlyTab', { tab: (tabById(state.activeTabId) || {}).name || '' }) + '</option>' +
+      '<option value="all"' + (state.printScope === 'all' ? ' selected' : '') + '>' + txe('allTabs') + '</option>' +
       '</select></div>';
-    var printBtn = '<div class="print-field"><label>&nbsp;</label><button class="btn btn-primary" id="btnDoPrint" type="button">Print / Save as PDF</button></div>';
+    var printBtn = '<div class="print-field"><label>&nbsp;</label><button class="btn btn-primary" id="btnDoPrint" type="button">' + txe('printPdf') + '</button></div>';
     var toolbar;
     if (!adv) {
       toolbar = '<div class="print-toolbar">' + styleSeg +
-        '<div class="print-field"><label>Page size</label><div class="seg">' +
+        '<div class="print-field"><label>' + txe('pageSize') + '</label><div class="seg">' +
         '<button type="button" data-page="A4" class="' + (state.printMode === 'A4' ? 'active' : '') + '">A4</button>' +
         '<button type="button" data-page="A3" class="' + (state.printMode === 'A3' ? 'active' : '') + '">A3</button>' +
         '</div></div>' +
-        '<div class="print-field"><label>Rows per page</label><div class="stepper">' +
+        '<div class="print-field"><label>' + txe('rowsPerPage') + '</label><div class="stepper">' +
         '<button type="button" data-step="stdrows" data-d="-1">–</button><span>' + state.printRows + '</span><button type="button" data-step="stdrows" data-d="1">+</button>' +
         '</div></div>' + scopeSel + printBtn + '</div>';
     } else {
       toolbar = '<div class="print-toolbar">' + styleSeg + scopeSel + printBtn +
-        (isAdmin ? '<div class="print-field"><label>&nbsp;</label><button class="btn btn-ghost" id="btnSavePrintDefaults" type="button" title="Visitors (and the Wix embed) will start from these settings">Save as default</button></div>' : '') +
+        (isAdmin ? '<div class="print-field"><label>&nbsp;</label><button class="btn btn-ghost" id="btnSavePrintDefaults" type="button" title="Visitors (and the Wix embed) will start from these settings">' + txe('saveDefault') + '</button></div>' : '') +
         '</div>' + advancedPanelHtml(state.printAdv);
     }
     view.innerHTML = closeBtn + toolbar + '<div class="print-scroll"><div class="page-stack" id="printArea"></div></div>';
@@ -2164,18 +2347,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             : '<div class="p-thumb swatch" style="background:' + swatchGradient(p.hue || 30) + '">' + esc((p.name || '?').charAt(0).toUpperCase()) + '</div>');
         return '<div class="print-row' + (p.sold ? ' sold' : '') + '">' + thumb +
           '<div class="p-num">' + esc(catalogNum(p)) + '</div>' +
-          '<div class="p-info"><div class="p-name"><span class="p-label">Name:</span> ' + esc(p.name || 'Untitled') + '</div>' +
-          (p.description ? '<div class="p-desc"><span class="p-label">Description:</span> ' + esc(p.description) + '</div>' : '') +
-          '<div class="p-date-line"><span class="p-label">Date:</span> ' + esc(fmtPieceDate(p)) + '</div></div>' +
+          '<div class="p-info"><div class="p-name"><span class="p-label">' + txe('name') + '</span> ' + esc(p.name || tx('untitled')) + '</div>' +
+          (p.description ? '<div class="p-desc"><span class="p-label">' + txe('description') + '</span> ' + esc(p.description) + '</div>' : '') +
+          '<div class="p-date-line"><span class="p-label">' + txe('date') + '</span> ' + esc(fmtPieceDate(p)) + '</div></div>' +
           '<div class="p-price">' + (p.price ? fmtPrice(p.price) : '') + '</div>' +
-          '<div class="p-sold-mark">' + (p.sold ? 'SOLD' : '') + '</div>' +
+          '<div class="p-sold-mark">' + (p.sold ? txe('soldCaps') : '') + '</div>' +
           '</div>';
-      }).join('') || '<p style="color:#9a9285;font-size:12px;padding:8mm 0;">No pieces to list yet.</p>';
-      var headerLabel = state.printScope === 'all' ? 'Full catalogue' : ((tabById(state.activeTabId) || {}).name || '');
+      }).join('') || '<p style="color:#9a9285;font-size:12px;padding:8mm 0;">' + txe('noPieces') + '</p>';
+      var headerLabel = state.printScope === 'all' ? tx('fullCatalogue') : ((tabById(state.activeTabId) || {}).name || '');
       return '<div class="print-page ' + dims.cls + '">' +
         '<div class="p-header"><h3>Ark\'s Gallery — ' + esc(headerLabel) + '</h3><span class="p-meta">' + dims.w + '×' + dims.h + 'mm</span></div>' +
         '<div class="print-rows">' + rowsHtml + '</div>' +
-        '<div class="p-footer">Page ' + (pageIdx + 1) + ' / ' + pages.length + '</div>' +
+        '<div class="p-footer">' + txe('pageSlash', { a: pageIdx + 1, b: pages.length }) + '</div>' +
         '</div>';
     }).join('');
   }
@@ -2206,63 +2389,64 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     return '';
   }
   function advancedPanelHtml(a) {
-    function chk(key, label, checked) {
-      return '<label class="pa-check"><input type="checkbox" data-adv="' + key + '"' + (checked ? ' checked' : '') + '> ' + label + '</label>';
+    function chk(key, labelKey, checked) {
+      return '<label class="pa-check"><input type="checkbox" data-adv="' + key + '"' + (checked ? ' checked' : '') + '> ' + txe(labelKey) + '</label>';
     }
     function stepper(key, val) {
       return '<div class="stepper"><button type="button" data-step="' + key + '" data-d="-1">–</button><span>' + val + '</span><button type="button" data-step="' + key + '" data-d="1">+</button></div>';
     }
+    /* list items: [value, translation key] — or [value, literal text, true] for things like A4/A3 */
     function seg(key, cur, list) {
       return '<div class="seg">' + list.map(function (o) {
-        return '<button type="button" data-advseg="' + key + '" data-val="' + o[0] + '" class="' + (cur === o[0] ? 'active' : '') + '">' + o[1] + '</button>';
+        return '<button type="button" data-advseg="' + key + '" data-val="' + o[0] + '" class="' + (cur === o[0] ? 'active' : '') + '">' + (o[2] ? esc(o[1]) : txe(o[1])) + '</button>';
       }).join('') + '</div>';
     }
     var sh = a.show;
     var qrPrev = advQrHtml(a);
     return '<div class="print-adv">' +
-      '<fieldset><legend>Page &amp; grid</legend>' +
-        '<div class="pa-row"><span>Size</span>' + seg('page', a.page, [['A4', 'A4'], ['A3', 'A3']]) + '</div>' +
-        '<div class="pa-row"><span>Orientation</span>' + seg('orient', a.orient, [['portrait', 'Portrait'], ['landscape', 'Landscape']]) + '</div>' +
-        '<div class="pa-row"><span>Columns</span>' + stepper('cols', a.cols) + '</div>' +
-        '<div class="pa-row"><span>Rows</span>' + stepper('rows', a.rows) + '</div>' +
-        '<div class="pa-row"><span>Photo</span>' + seg('fit', a.fit, [['cover', 'Fill'], ['contain', 'Whole']]) + '</div>' +
-        '<div class="pa-row">' + chk('borders', 'Frame around each piece', a.borders) + '</div>' +
-        '<div class="pa-note">' + (a.cols * a.rows) + ' pieces per page</div>' +
+      '<fieldset><legend>' + txe('pageGrid') + '</legend>' +
+        '<div class="pa-row"><span>' + txe('sizeLbl') + '</span>' + seg('page', a.page, [['A4', 'A4', true], ['A3', 'A3', true]]) + '</div>' +
+        '<div class="pa-row"><span>' + txe('orientation') + '</span>' + seg('orient', a.orient, [['portrait', 'portrait'], ['landscape', 'landscape']]) + '</div>' +
+        '<div class="pa-row"><span>' + txe('columns') + '</span>' + stepper('cols', a.cols) + '</div>' +
+        '<div class="pa-row"><span>' + txe('rows') + '</span>' + stepper('rows', a.rows) + '</div>' +
+        '<div class="pa-row"><span>' + txe('photo') + '</span>' + seg('fit', a.fit, [['cover', 'fill'], ['contain', 'whole']]) + '</div>' +
+        '<div class="pa-row">' + chk('borders', 'frame', a.borders) + '</div>' +
+        '<div class="pa-note">' + txe('perPage', { n: a.cols * a.rows }) + '</div>' +
       '</fieldset>' +
-      '<fieldset><legend>Show on each piece</legend>' +
+      '<fieldset><legend>' + txe('showOn') + '</legend>' +
         '<div class="pa-checks">' +
-          chk('show.photo', 'Photo', sh.photo) + chk('show.number', 'Number', sh.number) +
-          chk('show.name', 'Name', sh.name) + chk('show.date', 'Date', sh.date) +
-          chk('show.size', 'Size', sh.size) + chk('show.price', 'Price', sh.price) +
-          chk('show.status', 'Sold / status', sh.status) + chk('show.suffix', 'Suffix tag', sh.suffix) +
-          chk('show.desc', 'Description', sh.desc) +
+          chk('show.photo', 'fPhoto', sh.photo) + chk('show.number', 'fNumber', sh.number) +
+          chk('show.name', 'fName', sh.name) + chk('show.date', 'fDate', sh.date) +
+          chk('show.size', 'fSize', sh.size) + chk('show.price', 'fPrice', sh.price) +
+          chk('show.status', 'fStatus', sh.status) + chk('show.suffix', 'fSuffix', sh.suffix) +
+          chk('show.desc', 'fDesc', sh.desc) +
         '</div>' +
-        '<div class="pa-row"><span>Description lines</span><select class="print-select" data-adv="descLines"' + (sh.desc ? '' : ' disabled') + '>' +
-          [2, 3, 4, 5, 6, 8, 10, 99].map(function (n) { return '<option value="' + n + '"' + (a.descLines === n ? ' selected' : '') + '>' + (n === 99 ? 'Full' : n) + '</option>'; }).join('') +
+        '<div class="pa-row"><span>' + txe('descLines') + '</span><select class="print-select" data-adv="descLines"' + (sh.desc ? '' : ' disabled') + '>' +
+          [2, 3, 4, 5, 6, 8, 10, 99].map(function (n) { return '<option value="' + n + '"' + (a.descLines === n ? ' selected' : '') + '>' + (n === 99 ? txe('full') : n) + '</option>'; }).join('') +
         '</select></div>' +
       '</fieldset>' +
-      '<fieldset><legend>Header &amp; footer</legend>' +
-        '<div class="pa-stack">Title<input type="text" data-adv="title" value="' + esc(a.title) + '" placeholder="Ark\'s Gallery"></div>' +
-        '<div class="pa-row">' + chk('showTab', 'Add tab name', a.showTab) + chk('pageNum', 'Page numbers', a.pageNum) + '</div>' +
-        '<div class="pa-stack">Website<input type="text" data-adv="website" value="' + esc(a.website) + '" placeholder="e.g. arks-gallery.vercel.app"></div>' +
-        '<div class="pa-stack">Contact line<input type="text" data-adv="contact" value="' + esc(a.contact) + '" placeholder="e.g. Instagram @arkorigin · email"></div>' +
+      '<fieldset><legend>' + txe('headerFooter') + '</legend>' +
+        '<div class="pa-stack">' + txe('title') + '<input type="text" data-adv="title" value="' + esc(a.title) + '" placeholder="Ark\'s Gallery"></div>' +
+        '<div class="pa-row">' + chk('showTab', 'addTabName', a.showTab) + chk('pageNum', 'pageNumbers', a.pageNum) + '</div>' +
+        '<div class="pa-stack">' + txe('website') + '<input type="text" data-adv="website" value="' + esc(a.website) + '" placeholder="' + txe('websitePh') + '"></div>' +
+        '<div class="pa-stack">' + txe('contact') + '<input type="text" data-adv="contact" value="' + esc(a.contact) + '" placeholder="' + txe('contactPh') + '"></div>' +
       '</fieldset>' +
-      '<fieldset><legend>QR code</legend>' +
-        '<div class="pa-row">' + seg('qr', a.qr, [['none', 'None'], ['auto', 'From a link'], ['upload', 'Upload']]) + '</div>' +
+      '<fieldset><legend>' + txe('qrCode') + '</legend>' +
+        '<div class="pa-row">' + seg('qr', a.qr, [['none', 'none'], ['auto', 'fromLink'], ['upload', 'upload']]) + '</div>' +
         (a.qr === 'upload'
-          ? '<div class="pa-row"><button class="btn btn-ghost btn-sm" id="btnQrUpload" type="button">' + (a.qrImage ? 'Replace image' : 'Choose QR image') + '</button><input type="file" id="qrFileInput" accept="image/*" style="display:none"></div>'
+          ? '<div class="pa-row"><button class="btn btn-ghost btn-sm" id="btnQrUpload" type="button">' + txe(a.qrImage ? 'replaceQr' : 'chooseQr') + '</button><input type="file" id="qrFileInput" accept="image/*" style="display:none"></div>'
           : '') +
         (a.qr === 'auto'
-          ? '<div class="pa-stack">Link for the QR code<input type="text" data-adv="qrLink" value="' + esc(a.qrLink || '') + '" placeholder="' + esc(a.website.trim() || 'e.g. instagram.com/yourname') + '"></div>' +
-            '<div class="pa-note">Paste any link — your site, Instagram, a shop page. ' + (a.website.trim() ? 'Left empty, it uses your website. ' : '') + 'A plain QR code: it never expires.</div>'
+          ? '<div class="pa-stack">' + txe('qrLink') + '<input type="text" data-adv="qrLink" value="' + esc(a.qrLink || '') + '" placeholder="' + esc(a.website.trim() || tx('linkPh')) + '"></div>' +
+            '<div class="pa-note">' + txe('qrNote') + ' ' + (a.website.trim() ? txe('qrNoteWeb') + ' ' : '') + txe('qrNoteExp') + '</div>'
           : '') +
         (qrPrev ? '<div class="pa-row"><div class="qr-preview" id="qrPreview">' + qrPrev + '</div></div>' : '') +
-        (a.qr !== 'none' ? '<div class="pa-stack">Text beside it<input type="text" data-adv="qrLabel" value="' + esc(a.qrLabel) + '" placeholder="e.g. Scan to visit"></div>' : '') +
+        (a.qr !== 'none' ? '<div class="pa-stack">' + txe('qrText') + '<input type="text" data-adv="qrLabel" value="' + esc(a.qrLabel) + '" placeholder="' + txe('qrTextPh') + '"></div>' : '') +
       '</fieldset>' +
-      '<fieldset><legend>Filter</legend>' +
-        '<div class="pa-row">' + chk('skipNoPiece', 'Leave out &ldquo;Dont Exist&rdquo;', a.skipNoPiece) + '</div>' +
-        '<div class="pa-row">' + chk('onlyAvailable', 'Only available (not sold)', a.onlyAvailable) + '</div>' +
-        '<div class="pa-row">' + chk('hideCensored', 'Blank out censored photos', a.hideCensored) + '</div>' +
+      '<fieldset><legend>' + txe('filter') + '</legend>' +
+        '<div class="pa-row">' + chk('skipNoPiece', 'skipNo', a.skipNoPiece) + '</div>' +
+        '<div class="pa-row">' + chk('onlyAvailable', 'onlyAvail', a.onlyAvailable) + '</div>' +
+        '<div class="pa-row">' + chk('hideCensored', 'blankCens', a.hideCensored) + '</div>' +
       '</fieldset>' +
     '</div>';
   }
@@ -2278,7 +2462,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (!pages.length) pages = [[]];
     var cellW = (dims.w - 20 - (a.cols - 1) * 4) / a.cols;
     var scale = Math.max(0.55, Math.min(1.35, cellW / 62));
-    var tabLabel = state.printScope === 'all' ? 'Full catalogue' : ((tabById(state.activeTabId) || {}).name || '');
+    var tabLabel = state.printScope === 'all' ? tx('fullCatalogue') : ((tabById(state.activeTabId) || {}).name || '');
     var title = a.title.trim() + (a.showTab && tabLabel ? (a.title.trim() ? ' — ' : '') + tabLabel : '');
     var qrHtml = advQrHtml(a);
     var site = a.website.trim();
@@ -2291,17 +2475,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         var photo = '';
         if (sh.photo) {
           var src = publicImgUrl(p.thumb_path) || publicImgUrl(p.image_path);
-          if (a.hideCensored && (p.censored || isHiddenSfx)) photo = '<div class="pa-photo hidden-photo">Photo hidden</div>';
+          if (a.hideCensored && (p.censored || isHiddenSfx)) photo = '<div class="pa-photo hidden-photo">' + txe('photoHidden') + '</div>';
           else if (src) photo = '<div class="pa-photo' + (a.fit === 'contain' ? ' contain' : '') + '"><img src="' + esc(src) + '" alt=""' + (a.fit === 'contain' ? '' : thumbPosStyle(p)) + '></div>';
           else if (isNoPiece(p)) photo = '<div class="pa-photo" style="background:#000"></div>';
           else photo = '<div class="pa-photo swatch" style="background:' + swatchGradient(p.hue || 30) + '">' + esc((p.name || '?').charAt(0).toUpperCase()) + '</div>';
         }
-        var status = p.sold ? '<span class="pa-status sold">Sold</span>' : (p.not_for_sale ? '<span class="pa-status nfs">Not for sale</span>' : '<span class="pa-status">Available</span>');
+        var status = p.sold ? '<span class="pa-status sold">' + txe('sold') + '</span>' : (p.not_for_sale ? '<span class="pa-status nfs">' + txe('nfs') + '</span>' : '<span class="pa-status">' + txe('available') + '</span>');
         /* Suffix tag printed under the status, in its own colour (animated ones get a fixed print colour). */
         var sfxHtml = '';
         if (sh.suffix && sfx) {
           var sfxColor = /^in progress$/i.test(sfx.label || '') ? '#b0479a' : (/^pending( for)? remake$/i.test(sfx.label || '') ? '#b30000' : (sfx.color || '#6b6459'));
-          sfxHtml = '<span class="pa-suffix" style="color:' + esc(sfxColor) + '">' + esc(sfx.label) + '</span>';
+          sfxHtml = '<span class="pa-suffix" style="color:' + esc(sfxColor) + '">' + esc(suffixText(sfx)) + '</span>';
         }
         var right = (sh.status ? status : '') + sfxHtml;
         var top = (sh.number || right) ? '<div class="pa-top">' + (sh.number ? '<span class="pa-num">' + esc(catalogNum(p)) + '</span>' : '<span></span>') +
@@ -2310,14 +2494,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (sh.date) meta.push(esc(fmtPieceDate(p)));
         if (sh.size && p.size) meta.push(esc(p.size));
         var text = top +
-          (sh.name ? '<div class="pa-name">' + esc(p.name || 'Untitled') + '</div>' : '') +
+          (sh.name ? '<div class="pa-name">' + esc(p.name || tx('untitled')) + '</div>' : '') +
           (meta.length ? '<div class="pa-meta">' + meta.join(' &middot; ') + '</div>' : '') +
           (sh.price && p.price ? '<div class="pa-price">' + fmtPrice(p.price) + '</div>' : '') +
           (sh.desc && p.description ? '<div class="pa-desc">' + esc(p.description) + '</div>' : '');
         return '<div class="pa-cell' + (p.sold ? ' sold' : '') + (a.borders ? '' : ' no-border') + (photo ? '' : ' text-only') + '">' +
           photo + (text ? '<div class="pa-text">' + text + '</div>' : '') + '</div>';
       }).join('');
-      if (!list.length) cells = '<p style="color:#9a9285;font-size:12px;">No pieces to list.</p>';
+      if (!list.length) cells = '<p style="color:#9a9285;font-size:12px;">' + txe('noPiecesAdv') + '</p>';
       return '<div class="print-page adv" style="width:' + dims.w + 'mm;height:' + dims.h + 'mm;--s:' + scale.toFixed(3) + ';--dl:' + a.descLines + '">' +
         /* Header: title on the left; website (+ QR text) and the QR code on the right. */
         (title || site || qrHtml
@@ -2330,7 +2514,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                           (site ? '<div class="pa-site">' + esc(site) + '</div>' : '') +
                         '</div>'
                       : '') +
-                    (qrHtml ? '<div class="pa-qr-wrap"><div class="pa-qr">' + qrHtml + '</div><div class="pa-scanme">Scan me</div></div>' : '') +
+                    (qrHtml ? '<div class="pa-qr-wrap"><div class="pa-qr">' + qrHtml + '</div><div class="pa-scanme">' + txe('scanMe') + '</div></div>' : '') +
                   '</div>'
                 : '') +
             '</div>'
@@ -2338,7 +2522,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         '<div class="pa-grid" style="grid-template-columns:repeat(' + a.cols + ',minmax(0,1fr));grid-template-rows:repeat(' + a.rows + ',minmax(0,1fr))">' + cells + '</div>' +
         (a.contact.trim() || a.pageNum
           ? '<div class="pa-footer"><div class="pa-contact">' + esc(a.contact) + '</div>' +
-              (a.pageNum ? '<div class="pa-pnum">Page ' + (pi + 1) + ' / ' + pages.length + '</div>' : '') +
+              (a.pageNum ? '<div class="pa-pnum">' + txe('pageSlash', { a: pi + 1, b: pages.length }) + '</div>' : '') +
             '</div>'
           : '') +
         '</div>';
@@ -2448,7 +2632,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     style.textContent = '@page { size: ' + dims.w + 'mm ' + dims.h + 'mm; margin: 0; }';
     /* The page title becomes the saved PDF's file name. */
     var oldTitle = document.title;
-    var tabName = state.printScope === 'all' ? 'Full catalogue' : ((tabById(state.activeTabId) || {}).name || '');
+    var tabName = state.printScope === 'all' ? tx('fullCatalogue') : ((tabById(state.activeTabId) || {}).name || '');
     document.title = "Ark's Gallery" + (tabName ? ' - ' + tabName : '');
     window.print();
     setTimeout(function () { document.title = oldTitle; }, 1000);
@@ -2753,11 +2937,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var nameEl = cardEl ? cardEl.querySelector('.card-name') : null;
     var caption = nameEl ? nameEl.textContent.replace(/^Name:\s*/, '') : '';
     root.innerHTML = '<div class="lightbox-backdrop" id="lbBackdrop">' +
-      '<button class="lightbox-close" id="lbClose" type="button" aria-label="Close full-size view">' +
+      '<button class="lightbox-close" id="lbClose" type="button" aria-label="' + txe('lbClose') + '">' +
       '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>' +
       '<img class="lightbox-img" id="lbImg" src="' + esc(src) + '" alt="">' +
       (caption ? '<div class="lightbox-cap">' + esc(caption) + '</div>' : '') +
-      '<div class="lightbox-zoom-hint" id="lbZoomHint">Click image to zoom</div>' +
+      '<div class="lightbox-zoom-hint" id="lbZoomHint">' + txe('lbHint') + '</div>' +
       '</div>';
     document.getElementById('lbBackdrop').addEventListener('click', function (e) {
       if (e.target.id === 'lbBackdrop' || e.target.closest('#lbClose')) closeLightbox();
@@ -2788,13 +2972,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         lbImg.classList.add('zoomed');
         lbImg.style.transform = 'scale(' + ZOOM_SCALE + ')';
         zoomed = true;
-        if (hintEl) hintEl.textContent = 'Move to explore · click to reset';
+        if (hintEl) hintEl.textContent = tx('lbHintZoomed');
       } else {
         lbImg.classList.remove('zoomed');
         lbImg.style.transform = 'scale(1)';
         lbImg.style.transformOrigin = 'center center';
         zoomed = false;
-        if (hintEl) hintEl.textContent = 'Click image to zoom';
+        if (hintEl) hintEl.textContent = tx('lbHint');
       }
     });
     lbImg.addEventListener('mousemove', function (e) {
@@ -3008,10 +3192,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (mates.length < 2) return;
     var root = document.getElementById('modalRoot');
     root.innerHTML = '<div class="set-modal-backdrop" id="setViewBackdrop"><div class="set-modal">' +
-      '<button class="set-modal-close" id="setViewClose" type="button" aria-label="Close">' +
+      '<button class="set-modal-close" id="setViewClose" type="button" aria-label="' + txe('close') + '">' +
       '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>' +
       '<div class="set-modal-head"><h2>' + esc(mates[0].name || 'Painting set') + '</h2>' +
-      '<span class="set-count">' + mates.length + ' piece' + (mates.length === 1 ? '' : 's') + '</span></div>' +
+      '<span class="set-count">' + txe(mates.length === 1 ? 'piece' : 'pieces', { n: mates.length }) + '</span></div>' +
       '<div class="set-row" data-count="' + mates.length + '">' +
       mates.map(function (m) {
         var src = publicImgUrl(m.thumb_path) || publicImgUrl(m.image_path);
@@ -3020,7 +3204,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           ? '<img class="set-piece-img" src="' + esc(src) + '" alt="' + esc(m.name || '') + '">'
           : '<div class="set-piece-img swatch" style="background:' + swatchGradient(m.hue || 30) + ';display:flex;align-items:center;justify-content:center;"><span style="font-family:\'Fraunces\',serif;font-size:28px;color:rgba(255,255,255,.78);">' + esc((m.name || '?').charAt(0).toUpperCase()) + '</span></div>';
         return '<div class="set-piece" data-set-piece-full="' + esc(full || '') + '">' + img +
-          '<div class="set-piece-cap">' + esc(m.name || 'Untitled') +
+          '<div class="set-piece-cap">' + esc(m.name || tx('untitled')) +
           '<span class="mono">' + esc(catalogNum(m)) + (m.size ? ' · ' + esc(m.size) : '') + '</span></div></div>';
       }).join('') +
       '</div></div></div>';
