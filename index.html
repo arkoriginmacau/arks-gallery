@@ -792,10 +792,11 @@
   .pa-suffix { font-family: 'Archivo', sans-serif; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; font-size: calc(2.1mm * var(--s)); text-align: right; white-space: nowrap; }
   .pa-status.nfs { color: #2f5f8a; }
   .pa-name { font-family: 'Fraunces', serif; font-weight: 600; font-size: calc(3.5mm * var(--s)); line-height: 1.2; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-  .pa-meta { font-family: 'IBM Plex Mono', monospace; font-size: calc(2.4mm * var(--s)); color: #6b6459; }
+  .pa-meta { font-family: 'IBM Plex Mono', monospace; font-size: calc(2.4mm * var(--s)); color: #8b0000; text-align: right; }
+  .pa-meta span { white-space: nowrap; }
   .pa-price { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: calc(3mm * var(--s)); }
   .pa-cell.sold .pa-price, .pa-cell.sold .pa-name { color: #a53a2a; }
-  .pa-desc { font-size: calc(2.4mm * var(--s)); color: #4a443b; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: var(--dl, 3); overflow: hidden; }
+  .pa-desc { font-size: calc(2.4mm * var(--s)); color: #4a443b; line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; }
   .pa-footer { display: flex; justify-content: space-between; align-items: flex-end; gap: 6mm; border-top: 0.25mm solid #d9cfbc; padding-top: 3mm; margin-top: 4mm; }
   .pa-foot-left { display: flex; align-items: center; gap: 4mm; min-width: 0; }
   .pa-qr-wrap { display: flex; flex-direction: column; align-items: center; gap: 1mm; flex-shrink: 0; }
@@ -2427,9 +2428,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           chk('show.status', 'fStatus', sh.status) + chk('show.suffix', 'fSuffix', sh.suffix) +
           chk('show.desc', 'fDesc', sh.desc) +
         '</div>' +
-        '<div class="pa-row"><span>' + txe('descLines') + '</span><select class="print-select" data-adv="descLines"' + (sh.desc ? '' : ' disabled') + '>' +
-          [2, 3, 4, 5, 6, 8, 10, 99].map(function (n) { return '<option value="' + n + '"' + (a.descLines === n ? ' selected' : '') + '>' + (n === 99 ? txe('full') : n) + '</option>'; }).join('') +
-        '</select></div>' +
       '</fieldset>' +
       '<fieldset><legend>' + txe('headerFooter') + '</legend>' +
         '<div class="pa-stack">' + txe('title') + '<input type="text" data-adv="title" value="' + esc(a.title) + '" placeholder="Ark\'s Gallery"></div>' +
@@ -2494,15 +2492,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           var sfxColor = /^in progress$/i.test(sfx.label || '') ? '#b0479a' : (/^pending( for)? remake$/i.test(sfx.label || '') ? '#b30000' : (sfx.color || '#6b6459'));
           sfxHtml = '<span class="pa-suffix" style="color:' + esc(sfxColor) + '">' + esc(suffixText(sfx)) + '</span>';
         }
-        var right = (sh.status ? status : '') + sfxHtml;
+        var meta = [];
+        if (sh.date) meta.push('<span>' + esc(fmtPieceDate(p)) + '</span>');
+        if (sh.size && p.size) meta.push('<span>' + esc(p.size) + '</span>');
+        /* Date & size sit under the status (or under the suffix when there is one), in deep red. */
+        var metaHtml = meta.length ? '<span class="pa-meta">' + meta.join(' &middot; ') + '</span>' : '';
+        var right = (sh.status ? status : '') + sfxHtml + metaHtml;
         var top = (sh.number || right) ? '<div class="pa-top">' + (sh.number ? '<span class="pa-num">' + esc(catalogNum(p)) + '</span>' : '<span></span>') +
           (right ? '<span class="pa-statcol">' + right + '</span>' : '') + '</div>' : '';
-        var meta = [];
-        if (sh.date) meta.push(esc(fmtPieceDate(p)));
-        if (sh.size && p.size) meta.push(esc(p.size));
         var text = top +
           (sh.name ? '<div class="pa-name">' + esc(p.name || tx('untitled')) + '</div>' : '') +
-          (meta.length ? '<div class="pa-meta">' + meta.join(' &middot; ') + '</div>' : '') +
           (sh.price && p.price ? '<div class="pa-price">' + fmtPrice(p.price) + '</div>' : '') +
           (sh.desc && p.description ? '<div class="pa-desc">' + esc(p.description) + '</div>' : '');
         return '<div class="pa-cell' + (p.sold ? ' sold' : '') + (a.borders ? '' : ' no-border') + (photo ? '' : ' text-only') + '">' +
