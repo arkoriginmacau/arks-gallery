@@ -694,6 +694,7 @@
     margin-bottom: 22px;
   }
   .print-field { display: flex; flex-direction: column; gap: 6px; }
+  .print-field label.std-check { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; font-weight: 400; text-transform: none; letter-spacing: 0; padding: 8px 0; }
   .print-field label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-soft); }
   .seg { display: flex; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
   .seg button {
@@ -2312,7 +2313,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         '</div></div>' +
         '<div class="print-field"><label>' + txe('rowsPerPage') + '</label><div class="stepper">' +
         '<button type="button" data-step="stdrows" data-d="-1">–</button><span>' + state.printRows + '</span><button type="button" data-step="stdrows" data-d="1">+</button>' +
-        '</div></div>' + scopeSel + printBtn + '</div>';
+        '</div></div>' + scopeSel +
+        '<div class="print-field"><label>' + txe('filter') + '</label><label class="std-check"><input type="checkbox" data-adv="skipNoPiece"' + (state.printAdv.skipNoPiece ? ' checked' : '') + '> ' + txe('skipNo') + '</label></div>' +
+        printBtn + '</div>';
     } else {
       toolbar = '<div class="print-toolbar">' + styleSeg + scopeSel + printBtn +
         (isAdmin ? '<div class="print-field"><label>&nbsp;</label><button class="btn btn-ghost" id="btnSavePrintDefaults" type="button" title="Visitors (and the Wix embed) will start from these settings">' + txe('saveDefault') + '</button></div>' : '') +
@@ -2331,7 +2334,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
   function standardPagesHtml() {
     var dims = pageDims();
-    var items = printSourceItems();
+    /* Same "Leave out pieces without a photo" filter as Advanced mode (shared setting). */
+    var items = printSourceItems().filter(function (e) {
+      return !(state.printAdv.skipNoPiece && !e.p.thumb_path && !e.p.image_path);
+    });
     var rows = state.printRows;
     var pages = [];
     for (var i = 0; i < items.length; i += rows) pages.push(items.slice(i, i + rows));
