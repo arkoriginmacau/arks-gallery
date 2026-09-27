@@ -779,7 +779,8 @@
   .pa-cell.no-border { border-color: transparent; }
   .pa-photo { flex: 1; min-height: 8mm; position: relative; overflow: hidden; border-radius: 0.6mm; background: #f3efe7; }
   .pa-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
-  .pa-photo.contain img { object-fit: contain; }
+  .pa-photo.contain { background: transparent; }
+  .pa-photo.contain img { object-fit: contain; object-position: center bottom; }
   .pa-photo.swatch { display: flex; align-items: center; justify-content: center; font-family: 'Fraunces', serif; color: rgba(255,255,255,.85); font-size: calc(7mm * var(--s)); }
   .pa-photo.hidden-photo { display: flex; align-items: center; justify-content: center; color: #9a9285; font-family: 'Archivo', sans-serif; font-size: calc(2.4mm * var(--s)); text-transform: uppercase; letter-spacing: .06em; }
   .pa-text { padding-top: 1.6mm; display: flex; flex-direction: column; gap: 0.5mm; flex-shrink: 0; }
@@ -2363,7 +2364,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         var p = entry.p;
         var thumbSrc = publicImgUrl(p.thumb_path) || publicImgUrl(p.image_path);
         var thumb = thumbSrc
-          ? '<img class="p-thumb" src="' + esc(thumbSrc) + '" alt=""' + thumbPosStyle(p) + '>'
+          ? '<img class="p-thumb" src="' + esc(thumbSrc) + '" alt="" style="object-fit:contain;background:#fff">'
           : (isNoPiece(p)
             ? '<div class="p-thumb swatch" style="background:#000"></div>'
             : '<div class="p-thumb swatch" style="background:' + swatchGradient(p.hue || 30) + '">' + esc((p.name || '?').charAt(0).toUpperCase()) + '</div>');
@@ -2447,7 +2448,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         '<div class="pa-row"><span>' + txe('orientation') + '</span>' + seg('orient', a.orient, [['portrait', 'portrait'], ['landscape', 'landscape']]) + '</div>' +
         '<div class="pa-row"><span>' + txe('columns') + '</span>' + stepper('cols', a.cols) + '</div>' +
         '<div class="pa-row"><span>' + txe('rows') + '</span>' + stepper('rows', a.rows) + '</div>' +
-        '<div class="pa-row"><span>' + txe('photo') + '</span>' + seg('fit', a.fit, [['cover', 'fill'], ['contain', 'whole']]) + '</div>' +
         '<div class="pa-row">' + chk('borders', 'frame', a.borders) + '</div>' +
         '<div class="pa-note">' + txe('perPage', { n: a.cols * a.rows }) + '</div>' +
       '</fieldset>' +
@@ -2508,7 +2508,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (sh.photo && !noPhoto) {
           var src = publicImgUrl(p.thumb_path) || publicImgUrl(p.image_path);
           if (a.hideCensored && (p.censored || isHiddenSfx)) photo = '<div class="pa-photo hidden-photo">' + txe('photoHidden') + '</div>';
-          else if (src) photo = '<div class="pa-photo' + (a.fit === 'contain' ? ' contain' : '') + '"><img src="' + esc(src) + '" alt=""' + (a.fit === 'contain' ? '' : thumbPosStyle(p)) + '></div>';
+          else if (src) photo = '<div class="pa-photo contain"><img src="' + esc(src) + '" alt=""></div>';
           else if (isNoPiece(p)) photo = '<div class="pa-photo" style="background:#000"></div>';
           else photo = '<div class="pa-photo swatch" style="background:' + swatchGradient(p.hue || 30) + '">' + esc((p.name || '?').charAt(0).toUpperCase()) + '</div>';
         }
@@ -2582,7 +2582,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var spans = items.map(function () { return 1; });
     if (m) {
       var shortMax = m.short.reduce(function (x, y) { return Math.max(x, y); }, 0);
-      /* A description may shrink the photo a little (to 2/3 of a normal card's photo); past that the card grows instead. */
+      /* A description may shrink the photo box a little (to 2/3 of a normal card's); past that the card grows
+         down into the next grid row instead. The painting itself is always drawn whole inside its box. */
       var minPhoto = sh.photo ? Math.max(m.cellH * 0.4, (m.cellH - shortMax) * 0.67) : 0;
       spans = m.full.map(function (h) {
         var need = h + minPhoto, k = 1;
