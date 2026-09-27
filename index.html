@@ -525,6 +525,26 @@
   @keyframes suffixRainbow { 0% { background-position: 0% 50%; } 100% { background-position: 300% 50%; } }
   @media (prefers-reduced-motion: reduce) { .suffix-tag.rainbow { animation: none; background-position: 0% 50%; } }
   @media print { .suffix-tag.rainbow { background: none; -webkit-text-fill-color: currentColor; color: #b0479a; } }
+  /* "In Progress" pieces: four small rainbow rectangles travel clockwise around the painting,
+     pausing at each corner (top-left → top-right → bottom-right → bottom-left). Pure CSS. */
+  .ip-corner {
+    position: absolute; z-index: 1; width: 12px; height: 5px; border-radius: 1px; pointer-events: none;
+    background: #ff2d2d; box-shadow: 0 0 6px 2px rgba(255,45,45,.85);
+    animation: ipTravel 6s ease-in-out infinite, ipHue 4s linear infinite;
+  }
+  .ip-corner.c2 { animation-delay: -1.5s, -1s; }
+  .ip-corner.c3 { animation-delay: -3s, -2s; }
+  .ip-corner.c4 { animation-delay: -4.5s, -3s; }
+  @keyframes ipTravel {
+    0%, 15%  { top: 6px; left: 6px; }
+    25%, 40% { top: 6px; left: calc(100% - 18px); }
+    50%, 65% { top: calc(100% - 11px); left: calc(100% - 18px); }
+    75%, 90% { top: calc(100% - 11px); left: 6px; }
+    100%     { top: 6px; left: 6px; }
+  }
+  @keyframes ipHue { from { filter: hue-rotate(0deg); } to { filter: hue-rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .ip-corner { animation: none; top: 6px; left: 6px; } .ip-corner.c2 { left: auto; right: 6px; } .ip-corner.c3 { top: auto; bottom: 6px; left: auto; right: 6px; } .ip-corner.c4 { top: auto; bottom: 6px; } }
+  @media print { .ip-corner { display: none; } }
 
   /* "Pending for remake" gets the same treatment as "In Progress" above,
      just a red pulse instead of a full rainbow — same mechanism, same
@@ -2224,6 +2244,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       var setMates = setMembers(p);
       return '<div class="card' + (p.sold ? ' is-sold' : '') + (p.__testNew ? ' is-test-new' : '') + '" data-card="' + p.id + '">' +
         '<div class="card-image' + (isCensoredView ? ' is-censored' : '') + '"' + (canZoom ? ' data-lightbox="' + esc(fullSrc) + '" title="' + (isEmbedded ? txe('zoomTitleEmbed') : txe('zoomTitle')) + '"' : '') + '>' + imageInner +
+        (isInProgress ? '<span class="ip-corner c1"></span><span class="ip-corner c2"></span><span class="ip-corner c3"></span><span class="ip-corner c4"></span>' : '') +
         (isCensoredView
           ? '<div class="censored-badge"><div class="censored-chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>' + (isHidden ? txe('hiddenChip') : txe('clickToView')) + '</div></div>'
           : '') +
