@@ -714,6 +714,18 @@
     margin-bottom: 22px;
   }
   .print-field { display: flex; flex-direction: column; gap: 6px; }
+  .print-custom { background: var(--paper); border: 1px solid var(--line); border-radius: 4px; padding: 12px 16px; margin: -8px 0 22px; max-width: 520px; }
+  .print-custom .pc-head { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-soft); margin-bottom: 8px; }
+  .pc-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+  .pc-row.off .pc-name, .pc-row.off .pc-pos { opacity: .45; }
+  .pc-pos { font-family: 'IBM Plex Mono', monospace; font-size: 12px; width: 18px; color: var(--ink-soft); }
+  .pc-name { flex: 1; display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; color: var(--ink-2); }
+  .pc-count { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-faint); }
+  .pc-move { border: 1px solid var(--line); background: var(--paper-2); color: var(--ink-2); border-radius: 3px; width: 30px; height: 26px; cursor: pointer; font-size: 11px; }
+  .pc-move:disabled { opacity: .3; cursor: default; }
+  .pc-warn { color: #b00020; font-size: 12.5px; margin-top: 8px; }
+  .pc-break { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; color: var(--ink-soft); cursor: pointer; }
+  @media print { .print-custom { display: none; } }
   .print-field label.std-check { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; font-weight: 400; text-transform: none; letter-spacing: 0; padding: 8px 0; }
   .print-field label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-soft); }
   .seg { display: flex; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
@@ -1039,7 +1051,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
 
-  var state = { thumbPos: {}, tabs: [], paintings: [], suffixes: [], activeTabId: null, printMode: 'A4', printRows: 8, printScope: 'current', printStyle: 'standard', printAdv: null, loaded: false, descOpen: {}, gridLayout: null, gridPage: 1, gridShown: 1, gridPageKey: null };
+  var state = { thumbPos: {}, tabs: [], paintings: [], suffixes: [], activeTabId: null, printMode: 'A4', printRows: 8, printScope: 'current', printCustom: null, printCustomBreak: false, printStyle: 'standard', printAdv: null, loaded: false, descOpen: {}, gridLayout: null, gridPage: 1, gridShown: 1, gridPageKey: null };
   var isAdmin = false;
   var currentUserEmail = null;
   /* When this page is loaded inside someone else's site (e.g. embedded on the
@@ -1081,7 +1093,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       pageOfPieces: 'Page {a} of {b} · {n} pieces', prevPage: 'Previous page', nextPage: 'Next page',
       lbClose: 'Close full-size view', lbHint: 'Click image to zoom', lbHintZoomed: 'Move to explore · click to reset', close: 'Close',
       mode: 'Mode', standard: 'Standard', advanced: 'Advanced', pageSize: 'Page size', rowsPerPage: 'Rows per page',
-      include: 'Include', onlyTab: '{tab} only', allTabs: 'All tabs', printPdf: 'Print / Save as PDF', saveDefault: 'Save as default',
+      include: 'Include', onlyTab: '{tab} only', allTabs: 'All tabs', customTabs: 'Custom (pick & order tabs)', customHead: 'Tabs to print, in this order', newPagePerTab: 'Start each tab on a new page', moveUp: 'Move up', moveDown: 'Move down', noTabsPicked: 'Tick at least one tab above.', printPdf: 'Print / Save as PDF', saveDefault: 'Save as default',
       soldCaps: 'SOLD', noPieces: 'No pieces to list yet.', noPiecesAdv: 'No pieces to list.', fullCatalogue: 'Full catalogue', pageSlash: 'Page {a} / {b}',
       pageGrid: 'Page & grid', sizeLbl: 'Size', orientation: 'Orientation', portrait: 'Portrait', landscape: 'Landscape',
       columns: 'Columns', rows: 'Rows', photo: 'Photo', fill: 'Fill', whole: 'Whole', frame: 'Frame around each piece',
@@ -1111,7 +1123,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       pageOfPieces: '第 {a} 頁，共 {b} 頁 · {n} 件', prevPage: '上一頁', nextPage: '下一頁',
       lbClose: '關閉大圖', lbHint: '點擊圖片放大', lbHintZoomed: '移動查看 · 點擊還原', close: '關閉',
       mode: '模式', standard: '標準', advanced: '進階', pageSize: '紙張尺寸', rowsPerPage: '每頁行數',
-      include: '包括', onlyTab: '只限{tab}', allTabs: '所有分頁', printPdf: '列印 / 儲存為 PDF', saveDefault: '設為預設',
+      include: '包括', onlyTab: '只限{tab}', allTabs: '所有分頁', customTabs: '自訂（選擇及排列分頁）', customHead: '要列印的分頁（按此次序）', newPagePerTab: '每個分頁由新一頁開始', moveUp: '上移', moveDown: '下移', noTabsPicked: '請在上面剔選最少一個分頁。', printPdf: '列印 / 儲存為 PDF', saveDefault: '設為預設',
       soldCaps: '已售', noPieces: '暫無作品。', noPiecesAdv: '沒有作品。', fullCatalogue: '完整目錄', pageSlash: '第 {a} / {b} 頁',
       pageGrid: '紙張及格線', sizeLbl: '尺寸', orientation: '方向', portrait: '直向', landscape: '橫向',
       columns: '欄數', rows: '行數', photo: '相片', fill: '填滿', whole: '完整', frame: '每件作品加框',
@@ -1141,7 +1153,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       pageOfPieces: '第 {a} 页，共 {b} 页 · {n} 件', prevPage: '上一页', nextPage: '下一页',
       lbClose: '关闭大图', lbHint: '点击图片放大', lbHintZoomed: '移动查看 · 点击还原', close: '关闭',
       mode: '模式', standard: '标准', advanced: '高级', pageSize: '纸张尺寸', rowsPerPage: '每页行数',
-      include: '包括', onlyTab: '仅限{tab}', allTabs: '所有分页', printPdf: '打印 / 保存为 PDF', saveDefault: '设为默认',
+      include: '包括', onlyTab: '仅限{tab}', allTabs: '所有分页', customTabs: '自定义（选择及排列分页）', customHead: '要打印的分页（按此顺序）', newPagePerTab: '每个分页从新一页开始', moveUp: '上移', moveDown: '下移', noTabsPicked: '请在上面勾选至少一个分页。', printPdf: '打印 / 保存为 PDF', saveDefault: '设为默认',
       soldCaps: '已售', noPieces: '暂无作品。', noPiecesAdv: '没有作品。', fullCatalogue: '完整目录', pageSlash: '第 {a} / {b} 页',
       pageGrid: '纸张及网格', sizeLbl: '尺寸', orientation: '方向', portrait: '纵向', landscape: '横向',
       columns: '列数', rows: '行数', photo: '照片', fill: '填满', whole: '完整', frame: '每件作品加框',
@@ -1171,7 +1183,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       pageOfPieces: 'Página {a} de {b} · {n} obras', prevPage: 'Página anterior', nextPage: 'Página seguinte',
       lbClose: 'Fechar vista ampliada', lbHint: 'Clique na imagem para ampliar', lbHintZoomed: 'Mova para explorar · clique para repor', close: 'Fechar',
       mode: 'Modo', standard: 'Padrão', advanced: 'Avançado', pageSize: 'Tamanho da página', rowsPerPage: 'Linhas por página',
-      include: 'Incluir', onlyTab: 'Só {tab}', allTabs: 'Todos os separadores', printPdf: 'Imprimir / Guardar em PDF', saveDefault: 'Guardar como padrão',
+      include: 'Incluir', onlyTab: 'Só {tab}', allTabs: 'Todos os separadores', customTabs: 'Personalizado (escolher e ordenar separadores)', customHead: 'Separadores a imprimir, por esta ordem', newPagePerTab: 'Cada separador começa numa página nova', moveUp: 'Subir', moveDown: 'Descer', noTabsPicked: 'Marque pelo menos um separador acima.', printPdf: 'Imprimir / Guardar em PDF', saveDefault: 'Guardar como padrão',
       soldCaps: 'VENDIDO', noPieces: 'Ainda não há obras.', noPiecesAdv: 'Sem obras.', fullCatalogue: 'Catálogo completo', pageSlash: 'Página {a} / {b}',
       pageGrid: 'Página e grelha', sizeLbl: 'Tamanho', orientation: 'Orientação', portrait: 'Vertical', landscape: 'Horizontal',
       columns: 'Colunas', rows: 'Linhas', photo: 'Fotografia', fill: 'Preencher', whole: 'Inteira', frame: 'Moldura em cada obra',
@@ -2303,8 +2315,39 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   /* ---------------- render: print planner ---------------- */
   function pageDims() { return state.printMode === 'A3' ? { w: 297, h: 420, cls: 'a3' } : { w: 210, h: 297, cls: 'a4' }; }
 
+  /* Custom print: which tabs to include and in what order. Kept per browser so it's there next time. */
+  function customTabList() {
+    var saved = state.printCustom;
+    if (!saved) { try { saved = JSON.parse(localStorage.getItem('arksPrintCustom') || 'null'); } catch (e) { saved = null; } }
+    if (!Array.isArray(saved)) saved = [];
+    var ids = state.tabs.map(function (t) { return t.id; });
+    var list = saved.filter(function (c) { return ids.indexOf(c.id) !== -1; });
+    state.tabs.forEach(function (t) { if (!list.some(function (c) { return c.id === t.id; })) list.push({ id: t.id, on: true }); });
+    state.printCustom = list;
+    return list;
+  }
+  function saveCustomTabs() { try { localStorage.setItem('arksPrintCustom', JSON.stringify(state.printCustom)); } catch (e) {} }
+  function pickedCustomTabs() {
+    return customTabList().filter(function (c) { return c.on; }).map(function (c) { return tabById(c.id); }).filter(Boolean);
+  }
+  /* The name printed in page headers / used as the PDF file name. For a custom print it's the tabs on that page. */
+  function printScopeLabel(tabNames) {
+    if (state.printScope === 'all') return tx('fullCatalogue');
+    if (state.printScope === 'custom') {
+      var names = tabNames || pickedCustomTabs().map(function (t) { return t.name; });
+      return names.filter(function (n, i) { return names.indexOf(n) === i; }).join(' + ');
+    }
+    return (tabById(state.activeTabId) || {}).name || '';
+  }
+  function pageTabNames(entries) { return entries.map(function (e) { return e.tabName; }); }
   function printSourceItems() {
     var list = state.paintings;
+    if (state.printScope === 'custom') {
+      return pickedCustomTabs().reduce(function (acc, t) {
+        var items = sortByNumber(list.filter(function (p) { return p.tab_id === t.id; }));
+        return acc.concat(items.map(function (p) { return { p: p, tabName: t.name }; }));
+      }, []);
+    }
     if (state.printScope === 'current') {
       return sortByNumber(list.filter(function (p) { return p.tab_id === state.activeTabId; }))
         .map(function (p) { return { p: p, tabName: (tabById(p.tab_id) || {}).name || '' }; });
@@ -2327,7 +2370,23 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var scopeSel = '<div class="print-field"><label>' + txe('include') + '</label><select class="print-select" id="printScopeSel">' +
       '<option value="current"' + (state.printScope === 'current' ? ' selected' : '') + '>' + txe('onlyTab', { tab: (tabById(state.activeTabId) || {}).name || '' }) + '</option>' +
       '<option value="all"' + (state.printScope === 'all' ? ' selected' : '') + '>' + txe('allTabs') + '</option>' +
+      '<option value="custom"' + (state.printScope === 'custom' ? ' selected' : '') + '>' + txe('customTabs') + '</option>' +
       '</select></div>';
+    var customPanel = '';
+    if (state.printScope === 'custom') {
+      var cl = customTabList();
+      customPanel = '<div class="print-custom"><div class="pc-head">' + txe('customHead') + '</div>' +
+        cl.map(function (c, i) {
+          var t = tabById(c.id) || {};
+          var n = state.paintings.filter(function (p) { return p.tab_id === c.id; }).length;
+          return '<div class="pc-row' + (c.on ? '' : ' off') + '"><span class="pc-pos">' + (i + 1) + '</span>' +
+            '<label class="pc-name"><input type="checkbox" data-cton="' + esc(String(c.id)) + '"' + (c.on ? ' checked' : '') + '> ' + esc(t.name || '') + ' <span class="pc-count">' + n + '</span></label>' +
+            '<button type="button" class="pc-move" data-cmove="' + esc(String(c.id)) + '" data-d="-1" title="' + txe('moveUp') + '"' + (i === 0 ? ' disabled' : '') + '>▲</button>' +
+            '<button type="button" class="pc-move" data-cmove="' + esc(String(c.id)) + '" data-d="1" title="' + txe('moveDown') + '"' + (i === cl.length - 1 ? ' disabled' : '') + '>▼</button></div>';
+        }).join('') +
+        (cl.some(function (c) { return c.on; }) ? '' : '<div class="pc-warn">' + txe('noTabsPicked') + '</div>') +
+        '<label class="pc-break"><input type="checkbox" id="printCustomBreak"' + (state.printCustomBreak ? ' checked' : '') + '> ' + txe('newPagePerTab') + '</label></div>';
+    }
     var printBtn = '<div class="print-field"><label>&nbsp;</label><button class="btn btn-primary" id="btnDoPrint" type="button">' + txe('printPdf') + '</button></div>';
     var toolbar;
     if (!adv) {
@@ -2340,11 +2399,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         '<button type="button" data-step="stdrows" data-d="-1">–</button><span>' + state.printRows + '</span><button type="button" data-step="stdrows" data-d="1">+</button>' +
         '</div></div>' + scopeSel +
         '<div class="print-field"><label>' + txe('filter') + '</label><label class="std-check"><input type="checkbox" data-adv="skipNoPiece"' + (state.printAdv.skipNoPiece ? ' checked' : '') + '> ' + txe('skipNo') + '</label></div>' +
-        printBtn + '</div>';
+        printBtn + '</div>' + customPanel;
     } else {
       toolbar = '<div class="print-toolbar">' + styleSeg + scopeSel + printBtn +
         (isAdmin ? '<div class="print-field"><label>&nbsp;</label><button class="btn btn-ghost" id="btnSavePrintDefaults" type="button" title="Visitors (and the Wix embed) will start from these settings">' + txe('saveDefault') + '</button></div>' : '') +
-        '</div>' + advancedPanelHtml(state.printAdv);
+        '</div>' + customPanel + advancedPanelHtml(state.printAdv);
     }
     view.innerHTML = closeBtn + toolbar + '<div class="print-scroll"><div class="page-stack" id="printArea"></div></div>';
     renderPrintPages();
@@ -2379,8 +2438,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return !(state.printAdv.skipNoPiece && !e.p.thumb_path && !e.p.image_path);
     });
     var rows = state.printRows;
-    var headerLabel = state.printScope === 'all' ? tx('fullCatalogue') : ((tabById(state.activeTabId) || {}).name || '');
-    var headerHtml = '<div class="p-header"><h3>Ark\'s Gallery — ' + esc(headerLabel) + '</h3><span class="p-meta">' + dims.w + '×' + dims.h + 'mm</span></div>';
+    function headerFor(entries) {
+      var label = printScopeLabel(state.printScope === 'custom' && entries.length ? pageTabNames(entries) : null);
+      return '<div class="p-header"><h3>Ark\'s Gallery — ' + esc(label) + '</h3><span class="p-meta">' + dims.w + '×' + dims.h + 'mm</span></div>';
+    }
+    var headerHtml = headerFor([]);
+    var breakPerTab = state.printScope === 'custom' && state.printCustomBreak;
     function rowHtml(entry) {
         var p = entry.p;
         var thumbSrc = publicImgUrl(p.thumb_path) || publicImgUrl(p.image_path);
@@ -2410,13 +2473,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var pages = [], cur = [], used = 0;
     rowsHtmlList.forEach(function (html, i) {
       var h = fit ? fit.heights[i] : 0;
-      if (cur.length && (cur.length >= rows || (fit && used + h > fit.avail))) { pages.push(cur); cur = []; used = 0; }
-      cur.push(html); used += h;
+      var newTab = breakPerTab && cur.length && cur[cur.length - 1].e.tabName !== items[i].tabName;
+      if (cur.length && (newTab || cur.length >= rows || (fit && used + h > fit.avail))) { pages.push(cur); cur = []; used = 0; }
+      cur.push({ html: html, e: items[i] }); used += h;
     });
     if (cur.length || !pages.length) pages.push(cur);
     return pages.map(function (rowsOnPage, pageIdx) {
-      var rowsHtml = rowsOnPage.join('') || '<p style="color:#9a9285;font-size:12px;padding:8mm 0;">' + txe('noPieces') + '</p>';
-      return '<div class="print-page ' + dims.cls + '">' + headerHtml +
+      var rowsHtml = rowsOnPage.map(function (r) { return r.html; }).join('') || '<p style="color:#9a9285;font-size:12px;padding:8mm 0;">' + txe('noPieces') + '</p>';
+      return '<div class="print-page ' + dims.cls + '">' + headerFor(rowsOnPage.map(function (r) { return r.e; })) +
         '<div class="print-rows">' + rowsHtml + '</div>' +
         '<div class="p-footer">' + txe('pageSlash', { a: pageIdx + 1, b: pages.length }) + '</div>' +
         '</div>';
@@ -2516,8 +2580,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     });
     var cellW = (dims.w - 20 - (a.cols - 1) * 4) / a.cols;
     var scale = Math.max(0.55, Math.min(1.35, cellW / 62));
-    var tabLabel = state.printScope === 'all' ? tx('fullCatalogue') : ((tabById(state.activeTabId) || {}).name || '');
-    var title = a.title.trim() + (a.showTab && tabLabel ? (a.title.trim() ? ' — ' : '') + tabLabel : '');
+    function titleFor(entries) {
+      var tabLabel = printScopeLabel(state.printScope === 'custom' && entries && entries.length ? pageTabNames(entries) : null);
+      return a.title.trim() + (a.showTab && tabLabel ? (a.title.trim() ? ' — ' : '') + tabLabel : '');
+    }
+    var title = titleFor(null);
+    var breakPerTab = state.printScope === 'custom' && a && state.printCustomBreak;
     var qrHtml = advQrHtml(a);
     var site = a.website.trim();
 
@@ -2555,7 +2623,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           photo + (text ? '<div class="pa-text">' + text + '</div>' : '') + '</div>';
     }
     var gridStyle = 'grid-template-columns:repeat(' + a.cols + ',minmax(0,1fr));grid-template-rows:repeat(' + a.rows + ',minmax(0,1fr))';
-    function pageHtml(cells, pi, total) {
+    function pageHtml(cells, pi, total, entries) {
+      var title = titleFor(entries);
       return '<div class="print-page adv" style="width:' + dims.w + 'mm;height:' + dims.h + 'mm;--s:' + scale.toFixed(3) + '">' +
         /* Header: title on the left; website (+ QR text) and the QR code on the right. */
         (title || site || qrHtml
@@ -2615,8 +2684,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     /* Pack cards in catalogue order into each page's grid; a tall card takes a column slot several rows high,
        and later cards fill the gaps beside it. A card that can't fit starts the next page. */
-    var pages = [], occ = null, cells = null;
-    function newPage() { occ = []; for (var r = 0; r < a.rows; r++) { occ.push([]); for (var c = 0; c < a.cols; c++) occ[r].push(false); } cells = []; pages.push(cells); }
+    var pages = [], pageEntries = [], occ = null, cells = null, ents = null;
+    function newPage() { occ = []; for (var r = 0; r < a.rows; r++) { occ.push([]); for (var c = 0; c < a.cols; c++) occ[r].push(false); } cells = []; ents = []; pages.push(cells); pageEntries.push(ents); }
     function place(k) {
       for (var r = 0; r + k <= a.rows; r++) for (var c = 0; c < a.cols; c++) {
         var ok = true;
@@ -2627,13 +2696,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
     newPage();
     items.forEach(function (e, i) {
+      if (breakPerTab && ents.length && ents[ents.length - 1].tabName !== e.tabName) newPage();
       var k = spans[i], pos = place(k);
       if (!pos) { newPage(); pos = place(k); }
+      ents.push(e);
       cells.push(cellHtml(e).replace('<div class="pa-cell', '<div style="grid-row:' + (pos.r + 1) + ' / span ' + k + ';grid-column:' + (pos.c + 1) + '" class="pa-cell'));
     });
     return pages.map(function (list, pi) {
       var html = list.join('') || '<p style="color:#9a9285;font-size:12px;">' + txe('noPiecesAdv') + '</p>';
-      return pageHtml(html, pi, pages.length);
+      return pageHtml(html, pi, pages.length, pageEntries[pi]);
     }).join('');
   }
   /* Uploaded QR images are shrunk to a crisp 600px PNG so saving them as the default stays small. */
@@ -2670,6 +2741,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (t.id === 'btnDoPrint') { doPrint(); return; }
       if (t.id === 'btnQrUpload') { document.getElementById('qrFileInput').click(); return; }
       if (t.id === 'btnSavePrintDefaults') { savePrintDefaults(t); return; }
+      if (t.hasAttribute('data-cmove')) {
+        var cl = customTabList(), id = t.getAttribute('data-cmove');
+        var i = cl.findIndex(function (c) { return String(c.id) === id; }), j = i + (+t.getAttribute('data-d'));
+        if (i >= 0 && j >= 0 && j < cl.length) { var tmp = cl[i]; cl[i] = cl[j]; cl[j] = tmp; saveCustomTabs(); renderPrint(); }
+        return;
+      }
       if (t.hasAttribute('data-pstyle')) { state.printStyle = t.getAttribute('data-pstyle'); renderPrint(); return; }
       if (t.hasAttribute('data-page')) { state.printMode = t.getAttribute('data-page'); renderPrint(); return; }
       if (t.hasAttribute('data-advseg')) { state.printAdv[t.getAttribute('data-advseg')] = t.getAttribute('data-val'); renderPrint(); return; }
@@ -2684,6 +2761,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     view.addEventListener('change', function (e) {
       var t = e.target;
       if (t.id === 'printScopeSel') { state.printScope = t.value; renderPrint(); return; }
+      if (t.id === 'printCustomBreak') { state.printCustomBreak = t.checked; renderPrintPages(); return; }
+      if (t.hasAttribute && t.hasAttribute('data-cton')) {
+        var cid = t.getAttribute('data-cton');
+        customTabList().forEach(function (c) { if (String(c.id) === cid) c.on = t.checked; });
+        saveCustomTabs(); renderPrint(); return;
+      }
       if (t.id === 'qrFileInput') {
         var f = t.files && t.files[0];
         t.value = '';
@@ -2740,7 +2823,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     style.textContent = '@page { size: ' + dims.w + 'mm ' + dims.h + 'mm; margin: 0; }';
     /* The page title becomes the saved PDF's file name. */
     var oldTitle = document.title;
-    var tabName = state.printScope === 'all' ? tx('fullCatalogue') : ((tabById(state.activeTabId) || {}).name || '');
+    var tabName = printScopeLabel();
     document.title = "Ark's Gallery" + (tabName ? ' - ' + tabName : '');
     window.print();
     setTimeout(function () { document.title = oldTitle; }, 1000);
