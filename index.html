@@ -794,6 +794,8 @@
   .pa-name { font-family: 'Fraunces', serif; font-weight: 600; font-size: calc(3.5mm * var(--s)); line-height: 1.2; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
   .pa-meta { font-family: 'IBM Plex Mono', monospace; font-size: calc(2.4mm * var(--s)); color: #8b0000; text-align: right; }
   .pa-meta span { white-space: nowrap; }
+  .pa-numcol { display: flex; flex-direction: column; gap: 0.4mm; min-width: 0; }
+  .pa-meta.pa-date { text-align: left; white-space: nowrap; }
   .pa-price { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: calc(3mm * var(--s)); }
   .pa-cell.sold .pa-price, .pa-cell.sold .pa-name { color: #a53a2a; }
   .pa-desc { font-size: calc(2.4mm * var(--s)); color: #4a443b; line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -2492,13 +2494,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           var sfxColor = /^in progress$/i.test(sfx.label || '') ? '#b0479a' : (/^pending( for)? remake$/i.test(sfx.label || '') ? '#b30000' : (sfx.color || '#6b6459'));
           sfxHtml = '<span class="pa-suffix" style="color:' + esc(sfxColor) + '">' + esc(suffixText(sfx)) + '</span>';
         }
-        var meta = [];
-        if (sh.date) meta.push('<span>' + esc(fmtPieceDate(p)) + '</span>');
-        if (sh.size && p.size) meta.push('<span>' + esc(p.size) + '</span>');
-        /* Date & size sit under the status (or under the suffix when there is one), in deep red. */
-        var metaHtml = meta.length ? '<span class="pa-meta">' + meta.join(' &middot; ') + '</span>' : '';
+        /* Date sits under the number; size sits under the status (or under the suffix), both in deep red. */
+        var dateHtml = sh.date ? '<span class="pa-meta pa-date">' + esc(fmtPieceDate(p)) + '</span>' : '';
+        var metaHtml = (sh.size && p.size) ? '<span class="pa-meta">' + esc(p.size) + '</span>' : '';
         var right = (sh.status ? status : '') + sfxHtml + metaHtml;
-        var top = (sh.number || right) ? '<div class="pa-top">' + (sh.number ? '<span class="pa-num">' + esc(catalogNum(p)) + '</span>' : '<span></span>') +
+        var left = (sh.number ? '<span class="pa-num">' + esc(catalogNum(p)) + '</span>' : '') + dateHtml;
+        var top = (left || right) ? '<div class="pa-top">' + (left ? '<span class="pa-numcol">' + left + '</span>' : '<span></span>') +
           (right ? '<span class="pa-statcol">' + right + '</span>' : '') + '</div>' : '';
         var text = top +
           (sh.name ? '<div class="pa-name">' + esc(p.name || tx('untitled')) + '</div>' : '') +
