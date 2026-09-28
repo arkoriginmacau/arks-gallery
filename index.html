@@ -150,6 +150,21 @@
     color: var(--ink-faint);
   }
 
+  /* ---------- search ---------- */
+  .gallery-search { position: relative; max-width: 460px; margin: 18px 0 0; }
+  .gallery-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--ink-soft); pointer-events: none; }
+  .gallery-search input {
+    width: 100%; box-sizing: border-box; font: inherit; font-size: 15px; padding: 10px 38px 10px 38px;
+    border: 1px solid var(--line); border-radius: 4px; background: var(--paper); color: var(--ink); outline: none;
+  }
+  .gallery-search input::-webkit-search-cancel-button { display: none; }
+  .gallery-search input:focus { border-color: var(--ink-soft); }
+  .gallery-search input::placeholder { color: var(--ink-soft); opacity: .75; }
+  .gallery-search button { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); border: 0; background: none; color: var(--ink-soft); font-size: 20px; line-height: 1; padding: 6px 9px; cursor: pointer; display: none; }
+  .gallery-search.has-q button { display: block; }
+  .gallery-search[hidden] { display: none; }
+  @media print { .gallery-search { display: none; } }
+
   /* ---------- tabs ---------- */
   .tabbar {
     display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
@@ -525,26 +540,35 @@
   @keyframes suffixRainbow { 0% { background-position: 0% 50%; } 100% { background-position: 300% 50%; } }
   @media (prefers-reduced-motion: reduce) { .suffix-tag.rainbow { animation: none; background-position: 0% 50%; } }
   @media print { .suffix-tag.rainbow { background: none; -webkit-text-fill-color: currentColor; color: #b0479a; } }
-  /* "In Progress" pieces: four small rainbow rectangles travel clockwise around the painting,
-     pausing at each corner (top-left → top-right → bottom-right → bottom-left). Pure CSS. */
-  .ip-corner {
-    position: absolute; z-index: 1; width: 12px; height: 5px; border-radius: 1px; pointer-events: none;
-    background: #ff2d2d; box-shadow: 0 0 6px 2px rgba(255,45,45,.85);
-    animation: ipTravel 6s ease-in-out infinite, ipHue 4s linear infinite;
+  /* "In Progress" pieces: four wine-red pens touch the painting's corners together, each draws
+     one side clockwise, lifts at the next corner, then the frame fades and it starts again. Pure CSS. */
+  .ip-pen {
+    position: absolute; z-index: 1; pointer-events: none; border-radius: 2px;
+    --in: 7px; --w: 3px;
+    background: linear-gradient(var(--ang), #3b0010, #7a0a24, #b3163a, #7a0a24, #3b0010);
+    background-size: var(--bs); box-shadow: 0 0 5px 0 rgba(170,20,60,.85);
+    animation: ipPenDraw 3.2s cubic-bezier(.55,.1,.35,1) infinite, ipPenShimmer 3s linear infinite;
   }
-  .ip-corner.c2 { animation-delay: -1.5s, -1s; }
-  .ip-corner.c3 { animation-delay: -3s, -2s; }
-  .ip-corner.c4 { animation-delay: -4.5s, -3s; }
-  @keyframes ipTravel {
-    0%, 15%  { top: 6px; left: 6px; }
-    25%, 40% { top: 6px; left: calc(100% - 18px); }
-    50%, 65% { top: calc(100% - 11px); left: calc(100% - 18px); }
-    75%, 90% { top: calc(100% - 11px); left: 6px; }
-    100%     { top: 6px; left: 6px; }
+  .ip-pen::after {
+    content: ''; position: absolute; width: 7px; height: 7px; border-radius: 50%;
+    background: #ff6b8a; box-shadow: 0 0 8px 3px rgba(170,20,60,.85);
+    animation: ipPenTip 3.2s cubic-bezier(.55,.1,.35,1) infinite;
   }
-  @keyframes ipHue { from { filter: hue-rotate(0deg); } to { filter: hue-rotate(360deg); } }
-  @media (prefers-reduced-motion: reduce) { .ip-corner { animation: none; top: 6px; left: 6px; } .ip-corner.c2 { left: auto; right: 6px; } .ip-corner.c3 { top: auto; bottom: 6px; left: auto; right: 6px; } .ip-corner.c4 { top: auto; bottom: 6px; } }
-  @media print { .ip-corner { display: none; } }
+  .ip-pen.top    { top: var(--in); left: var(--in); right: var(--in); height: var(--w); transform-origin: left center;   --ang: 90deg;  --bs: 200% 100%; --sx: 0; --sy: 1; }
+  .ip-pen.right  { top: var(--in); bottom: var(--in); right: var(--in); width: var(--w); transform-origin: center top;   --ang: 180deg; --bs: 100% 200%; --sx: 1; --sy: 0; }
+  .ip-pen.bottom { bottom: var(--in); left: var(--in); right: var(--in); height: var(--w); transform-origin: right center; --ang: 270deg; --bs: 200% 100%; --sx: 0; --sy: 1; }
+  .ip-pen.left   { top: var(--in); bottom: var(--in); left: var(--in); width: var(--w); transform-origin: center bottom; --ang: 0deg;   --bs: 100% 200%; --sx: 1; --sy: 0; }
+  .ip-pen.top::after { right: -3px; top: -2px; }  .ip-pen.bottom::after { left: -3px; top: -2px; }
+  .ip-pen.right::after { bottom: -3px; left: -2px; }  .ip-pen.left::after { top: -3px; left: -2px; }
+  @keyframes ipPenDraw {
+    0%, 12%  { transform: scale(var(--sx), var(--sy)); opacity: 1; }
+    62%, 78% { transform: scale(1, 1); opacity: 1; }
+    100%     { transform: scale(1, 1); opacity: 0; }
+  }
+  @keyframes ipPenTip { 0% { opacity: 0; transform: scale(.2); } 6%, 62% { opacity: 1; transform: scale(1); } 70%, 100% { opacity: 0; transform: scale(.3); } }
+  @keyframes ipPenShimmer { from { background-position: 0% 0%; } to { background-position: 200% 200%; } }
+  @media (prefers-reduced-motion: reduce) { .ip-pen, .ip-pen::after { animation: none; } .ip-pen::after { display: none; } }
+  @media print { .ip-pen { display: none; } }
 
   /* "Pending for remake" gets the same treatment as "In Progress" above,
      just a red pulse instead of a full rainbow — same mechanism, same
@@ -924,6 +948,11 @@
     <div class="top-actions" id="topActions"></div>
   </header>
 
+  <div class="gallery-search" id="gallerySearch">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="searchInput" type="search" autocomplete="off" spellcheck="false">
+    <button id="searchClear" type="button">×</button>
+  </div>
   <nav class="tabbar" id="tabbar"></nav>
 
   <main class="panel" id="browseView">
@@ -1051,7 +1080,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
 
-  var state = { thumbPos: {}, tabs: [], paintings: [], suffixes: [], activeTabId: null, printMode: 'A4', printRows: 8, printScope: 'current', printCustom: null, printCustomBreak: false, printStyle: 'standard', printAdv: null, loaded: false, descOpen: {}, gridLayout: null, gridPage: 1, gridShown: 1, gridPageKey: null };
+  var state = { thumbPos: {}, tabs: [], paintings: [], suffixes: [], activeTabId: null, printMode: 'A4', printRows: 8, printScope: 'current', printCustom: null, printCustomBreak: false, printStyle: 'standard', printAdv: null, loaded: false, descOpen: {}, gridLayout: null, gridPage: 1, gridShown: 1, gridPageKey: null, search: '' };
   var isAdmin = false;
   var currentUserEmail = null;
   /* When this page is loaded inside someone else's site (e.g. embedded on the
@@ -1084,7 +1113,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       viewing: 'Viewing gallery', admin: 'Admin', theme: 'Theme', layout: 'Layout', suffixes: 'Suffixes', findMissing: 'Find missing #',
       bulkUpload: 'Bulk upload', importPdf: 'Import from PDF', importDesc: 'Import descriptions from PDF', exportXlsx: 'Export to Excel',
       downloadPdf: 'Download PDF', addPainting: 'Add painting', signOut: 'Sign out', addTab: '+ Tab',
-      loading: 'Loading…', noTabs: 'No tabs yet', setupTitle: 'Gallery is being set up', setupSub: 'Check back soon.',
+      loading: 'Loading…', searchPh: 'Search by name, number or size…', searchResults: 'Search results', found: '{n} found', noMatch: 'No paintings match “{q}”', noMatchSub: 'Try a whole word from the name, a number like 240, or a size like 40x50.', clearSearch: 'Clear search', noTabs: 'No tabs yet', setupTitle: 'Gallery is being set up', setupSub: 'Check back soon.',
       nothingIn: 'Nothing in {tab} yet', moreOnWay: 'More work is on its way.', piece: '{n} piece', pieces: '{n} pieces',
       name: 'Name:', number: 'Number:', date: 'Date:', size: 'Size:', description: 'Description:', untitled: 'Untitled',
       more: 'More', less: 'Less', available: 'Available', sold: 'Sold', nfs: 'Not for sale', markSold: 'Mark sold',
@@ -1114,7 +1143,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       viewing: '瀏覽畫廊', admin: '管理', theme: '主題', layout: '版面', suffixes: '標籤', findMissing: '查找缺號',
       bulkUpload: '批量上載', importPdf: '從 PDF 匯入', importDesc: '從 PDF 匯入描述', exportXlsx: '匯出至 Excel',
       downloadPdf: '下載 PDF', addPainting: '新增畫作', signOut: '登出', addTab: '+ 分頁',
-      loading: '載入中…', noTabs: '暫無分頁', setupTitle: '畫廊正在準備中', setupSub: '請稍後再來。',
+      loading: '載入中…', searchPh: '按名稱、編號或尺寸搜尋…', searchResults: '搜尋結果', found: '找到 {n} 件', noMatch: '沒有符合「{q}」的作品', noMatchSub: '試試名稱中的完整字詞、編號（如 240）或尺寸（如 40x50）。', clearSearch: '清除搜尋', noTabs: '暫無分頁', setupTitle: '畫廊正在準備中', setupSub: '請稍後再來。',
       nothingIn: '{tab} 暫時未有作品', moreOnWay: '更多作品即將推出。', piece: '共 {n} 件', pieces: '共 {n} 件',
       name: '名稱：', number: '編號：', date: '日期：', size: '尺寸：', description: '描述：', untitled: '無題',
       more: '更多', less: '收起', available: '可供出售', sold: '已售', nfs: '非賣品', markSold: '標記已售',
@@ -1144,7 +1173,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       viewing: '浏览画廊', admin: '管理', theme: '主题', layout: '版面', suffixes: '标签', findMissing: '查找缺号',
       bulkUpload: '批量上传', importPdf: '从 PDF 导入', importDesc: '从 PDF 导入描述', exportXlsx: '导出至 Excel',
       downloadPdf: '下载 PDF', addPainting: '新增画作', signOut: '退出登录', addTab: '+ 分页',
-      loading: '加载中…', noTabs: '暂无分页', setupTitle: '画廊正在准备中', setupSub: '请稍后再来。',
+      loading: '加载中…', searchPh: '按名称、编号或尺寸搜索…', searchResults: '搜索结果', found: '找到 {n} 件', noMatch: '没有符合“{q}”的作品', noMatchSub: '试试名称中的完整词语、编号（如 240）或尺寸（如 40x50）。', clearSearch: '清除搜索', noTabs: '暂无分页', setupTitle: '画廊正在准备中', setupSub: '请稍后再来。',
       nothingIn: '{tab} 暂时没有作品', moreOnWay: '更多作品即将推出。', piece: '共 {n} 件', pieces: '共 {n} 件',
       name: '名称：', number: '编号：', date: '日期：', size: '尺寸：', description: '描述：', untitled: '无题',
       more: '更多', less: '收起', available: '可供出售', sold: '已售', nfs: '非卖品', markSold: '标记已售',
@@ -1174,7 +1203,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       viewing: 'A ver a galeria', admin: 'Admin', theme: 'Tema', layout: 'Disposição', suffixes: 'Etiquetas', findMissing: 'Números em falta',
       bulkUpload: 'Carregar em lote', importPdf: 'Importar de PDF', importDesc: 'Importar descrições de PDF', exportXlsx: 'Exportar para Excel',
       downloadPdf: 'Descarregar PDF', addPainting: 'Adicionar pintura', signOut: 'Terminar sessão', addTab: '+ Separador',
-      loading: 'A carregar…', noTabs: 'Ainda não há separadores', setupTitle: 'A galeria está a ser preparada', setupSub: 'Volte em breve.',
+      loading: 'A carregar…', searchPh: 'Pesquisar por nome, número ou tamanho…', searchResults: 'Resultados da pesquisa', found: '{n} encontradas', noMatch: 'Nenhuma obra corresponde a “{q}”', noMatchSub: 'Experimente uma palavra inteira do nome, um número como 240 ou um tamanho como 40x50.', clearSearch: 'Limpar pesquisa', noTabs: 'Ainda não há separadores', setupTitle: 'A galeria está a ser preparada', setupSub: 'Volte em breve.',
       nothingIn: 'Ainda não há nada em {tab}', moreOnWay: 'Mais obras a caminho.', piece: '{n} obra', pieces: '{n} obras',
       name: 'Nome:', number: 'Número:', date: 'Data:', size: 'Dimensões:', description: 'Descrição:', untitled: 'Sem título',
       more: 'Mais', less: 'Menos', available: 'Disponível', sold: 'Vendido', nfs: 'Não está à venda', markSold: 'Marcar vendido',
@@ -1722,7 +1751,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var list = state.tabs;
     var html = list.map(function (t) {
       var count = state.paintings.filter(function (p) { return p.tab_id === t.id; }).length;
-      var active = t.id === state.activeTabId;
+      var active = t.id === state.activeTabId && !state.search;
       return '<div class="tab' + (active ? ' active' : '') + '" data-tab="' + t.id + '">' +
         '<span>' + esc(t.name) + '</span>' +
         (t.prefix ? '<span class="prefix-chip">' + esc(t.prefix) + '</span>' : '') +
@@ -2052,7 +2081,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (L.rows === 'all' || testOverlay) return items;
     var per = cols * L.rows;
     var pages = Math.max(1, Math.ceil(items.length / per));
-    var key = state.activeTabId + '|' + lastGridSignature + '|' + L.rows + '|' + L.mode;
+    var key = (state.search ? 'q:' + state.search : state.activeTabId) + '|' + lastGridSignature + '|' + L.rows + '|' + L.mode;
     if (state.gridPageKey !== key) { state.gridPageKey = key; state.gridPage = 1; state.gridShown = 1; }
     if (state.gridPage > pages) state.gridPage = pages;
     if (pages <= 1) return items;
@@ -2189,7 +2218,78 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
 
   /* ---------------- render: grid ---------------- */
+  /* ---------- gallery search ----------
+     Searches every tab by name (whole words only: "aoi" finds "Aoi Fujimori", "ao" doesn't),
+     catalogue number (no prefix needed: "240" finds O-240; "O-240" works too) and size ("40x50",
+     "40 x 50", "40×50"). Every term must match, so extra words narrow the results.
+     Descriptions aren't searched. "Dont Exist" placeholders and Hidden pieces never show up. */
+  var SEARCH_CJK = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/;
+  function searchTerms(q) {
+    q = String(q || '').toLowerCase().trim();
+    var terms = [];
+    q = q.replace(/(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)/g, function (_, a, b) { terms.push({ kind: 'size', v: a + 'x' + b }); return ' '; });
+    q.split(/\s+/).filter(Boolean).forEach(function (w) {
+      terms.push(/^\d+$/.test(w) ? { kind: 'num', v: parseInt(w, 10) } : { kind: 'word', v: w });
+    });
+    return terms;
+  }
+  function searchMatches(p, terms) {
+    var words = String(p.name || '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+    var size = String(p.size || '').toLowerCase().replace(/[×*]/g, 'x').replace(/\s+/g, '');
+    return terms.every(function (t) {
+      if (t.kind === 'size') return size.indexOf(t.v) !== -1;
+      if (t.kind === 'num') return initialNumber(p.number) === t.v;
+      if (catalogNum(p).toLowerCase() === t.v || String(p.number || '').toLowerCase() === t.v) return true;
+      if (SEARCH_CJK.test(t.v)) return String(p.name || '').toLowerCase().indexOf(t.v) !== -1;
+      return words.indexOf(t.v) !== -1;
+    });
+  }
+  function searchResults(q) {
+    var terms = searchTerms(q);
+    if (!terms.length) return null;
+    return state.tabs.reduce(function (acc, t) {
+      var list = state.paintings.filter(function (p) {
+        if (p.tab_id !== t.id || isNoPiece(p)) return false;
+        var sfx = suffixById(p.suffix_id);
+        if (sfx && /^hidden$/i.test(sfx.label || '')) return false;
+        return searchMatches(p, terms);
+      });
+      return acc.concat(sortByNumber(list));
+    }, []);
+  }
+  function syncSearchBox() {
+    var box = document.getElementById('gallerySearch'), input = document.getElementById('searchInput');
+    if (!box || !input) return;
+    input.placeholder = tx('searchPh');
+    input.setAttribute('aria-label', tx('searchPh'));
+    document.getElementById('searchClear').setAttribute('aria-label', tx('clearSearch'));
+    if (input.value !== state.search) input.value = state.search;
+    box.classList.toggle('has-q', !!state.search);
+  }
+  function setSearch(q) {
+    state.search = q;
+    state.gridPage = 1; state.gridShown = 1;
+    syncSearchBox();
+    renderTabs(); bindTabEvents();
+    renderGrid(); bindGridEvents();
+  }
+  (function wireSearch() {
+    var input = document.getElementById('searchInput');
+    if (!input) return;
+    var timer = null;
+    input.addEventListener('input', function () {
+      var v = input.value;
+      document.getElementById('gallerySearch').classList.toggle('has-q', !!v);
+      clearTimeout(timer);
+      timer = setTimeout(function () { setSearch(v); }, 120);
+    });
+    input.addEventListener('keydown', function (e) { if (e.key === 'Escape' && input.value) { e.stopPropagation(); setSearch(''); } });
+    document.getElementById('searchClear').addEventListener('click', function () { setSearch(''); input.focus(); });
+  })();
+
   function renderGrid() {
+    var searching = !!state.search && !testOverlay && !!searchResults(state.search);
+    if (searching) return renderSearchGrid();
     var tab = tabById(state.activeTabId);
     document.getElementById('tabTitle').textContent = tab ? tab.name : (state.loaded ? tx('noTabs') : tx('loading'));
     var items = sortByNumber(state.paintings.concat(testOverlay ? testOverlay.extras : []).filter(function (p) { return p.tab_id === state.activeTabId; }));
@@ -2220,6 +2320,29 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return;
     }
 
+    renderGridCards(grid, items, pagerEl);
+  }
+
+  function renderSearchGrid() {
+    var items = searchResults(state.search) || [];
+    document.getElementById('tabTitle').textContent = tx('searchResults');
+    var perTab = state.tabs.map(function (t) {
+      var n = items.filter(function (p) { return p.tab_id === t.id; }).length;
+      return n ? t.name + ' ' + n : '';
+    }).filter(Boolean).join(' · ');
+    document.getElementById('tabSub').textContent = tx('found', { n: items.length }) + (perTab ? ' — ' + perTab : '');
+    var grid = document.getElementById('grid');
+    var pagerEl = document.getElementById('gridPager');
+    pagerEl.innerHTML = '';
+    applyGridColumns(grid);
+    if (!items.length) {
+      grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><h3>' + txe('noMatch', { q: state.search.trim() }) + '</h3><p>' + txe('noMatchSub') + '</p></div>';
+      return;
+    }
+    renderGridCards(grid, items, pagerEl);
+  }
+
+  function renderGridCards(grid, items, pagerEl) {
     items = paginateGridItems(grid, items, pagerEl);
     grid.innerHTML = items.map(function (p0) {
       var p = testView(p0);
@@ -2256,7 +2379,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       var setMates = setMembers(p);
       return '<div class="card' + (p.sold ? ' is-sold' : '') + (p.__testNew ? ' is-test-new' : '') + '" data-card="' + p.id + '">' +
         '<div class="card-image' + (isCensoredView ? ' is-censored' : '') + '"' + (canZoom ? ' data-lightbox="' + esc(fullSrc) + '" title="' + (isEmbedded ? txe('zoomTitleEmbed') : txe('zoomTitle')) + '"' : '') + '>' + imageInner +
-        (isInProgress ? '<span class="ip-corner c1"></span><span class="ip-corner c2"></span><span class="ip-corner c3"></span><span class="ip-corner c4"></span>' : '') +
+        (isInProgress ? '<span class="ip-pen top"></span><span class="ip-pen right"></span><span class="ip-pen bottom"></span><span class="ip-pen left"></span>' : '') +
         (isCensoredView
           ? '<div class="censored-badge"><div class="censored-chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>' + (isHidden ? txe('hiddenChip') : txe('clickToView')) + '</div></div>'
           : '') +
@@ -2830,11 +2953,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
 
   function showBrowse() {
+    document.getElementById('gallerySearch').hidden = false;
     document.getElementById('browseView').hidden = false;
     document.getElementById('printView').hidden = true;
     renderAll();
   }
   function showPrint() {
+    document.getElementById('gallerySearch').hidden = true;
     document.getElementById('browseView').hidden = true;
     document.getElementById('printView').hidden = false;
     renderAll();
@@ -2849,6 +2974,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   });
 
   function renderAll() {
+    syncSearchBox();
     renderTopActions();
     renderTabs();
     if (!document.getElementById('printView').hidden) renderPrint();
@@ -2865,6 +2991,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       el.addEventListener('click', function (e) {
         if (e.target.closest('[data-edit-tab]')) return;
         state.activeTabId = el.getAttribute('data-tab');
+        if (state.search) { state.search = ''; state.gridPage = 1; state.gridShown = 1; syncSearchBox(); }
         renderAll();
       });
     });
