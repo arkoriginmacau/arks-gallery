@@ -180,11 +180,9 @@
     { key: 'bed_marble', name: 'Marble & gold bedroom', img: '/mockups/m_bed_marble.jpg', mask: '/mockups/m_bed_marble_mask.png', light: '/mockups/m_bed_marble_light.jpg',
       w: 1600, h: 893, pxcm: 2.9, floorY: 770, zone: [260, 40, 1340, 770], anchor: { x: 800, topCm: 97 }, maxTopCm: 245, shadow: [0, 1] },
     { key: 'bed_emerald', name: 'Emerald Art Deco', img: '/mockups/m_bed_emerald.jpg', mask: '/mockups/m_bed_emerald_mask.png', light: '/mockups/m_bed_emerald_light.jpg',
-      w: 1600, h: 893, pxcm: 3.72, floorY: 935, zone: [465, 40, 1135, 935], anchor: { x: 800, topCm: 127 }, maxTopCm: 235, shadow: [0, 1] },
+      w: 1600, h: 893, pxcm: 3.35, floorY: 913, zone: [465, 40, 1135, 913], anchor: { x: 800, topCm: 135 }, maxTopCm: 255, shadow: [0, 1] },
     { key: 'stair_twin', name: 'Grand staircase', img: '/mockups/m_stair_twin.jpg', mask: '/mockups/m_stair_twin_mask.png', light: '/mockups/m_stair_twin_light.jpg',
-      w: 1600, h: 893, pxcm: 1.84, floorY: 745, zone: [475, 235, 1125, 745], anchor: { x: 800, topCm: 80 }, maxTopCm: 270, shadow: [0, 1] },
-    { key: 'stair_landing', name: 'Stair landing', img: '/mockups/m_stair_landing.jpg', mask: '/mockups/m_stair_landing_mask.png', light: '/mockups/m_stair_landing_light.jpg',
-      w: 1600, h: 893, pxcm: 1.79, floorY: 750, zone: [480, 180, 1120, 750], anchor: { x: 802, topCm: 80 }, maxTopCm: 285, shadow: [0, 1] }
+      w: 1600, h: 893, pxcm: 1.84, floorY: 745, zone: [475, 235, 1125, 745], anchor: { x: 800, topCm: 80 }, maxTopCm: 270, shadow: [0, 1] }
   ];
   var GAP_ABOVE_FURNITURE = 22;   // cm between furniture and the bottom of the painting
   var EYE_LEVEL = 150;
@@ -306,7 +304,11 @@
     /* Always leave clear wall above the painting (never touch the ceiling / picture edge).
        The gap above the furniture shrinks first; a very tall piece may then tuck behind the headboard. */
     var topLimit = r.maxTopCm - TOP_CLEARANCE;
-    if (cy + outerH / 2 > topLimit) cy = Math.max(20 + outerH / 2, topLimit - outerH / 2);
+    if (cy + outerH / 2 > topLimit) cy = topLimit - outerH / 2;
+    /* ...but never closer than 10 cm to the headboard / furniture: then the space above shrinks instead (to 8 cm). */
+    var minCy = r.anchor.topCm + 10 + outerH / 2;
+    if (cy < minCy) cy = Math.min(minCy, r.maxTopCm - 8 - outerH / 2);
+    cy = Math.max(cy, 20 + outerH / 2);
     return { x: r.anchor.x, yCm: cy };
   }
   function placementFits(r, art) {
