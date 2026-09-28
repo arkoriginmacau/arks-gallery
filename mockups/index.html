@@ -170,7 +170,7 @@
      shadow    = direction the painting's shadow falls (from the room's light) */
   var ROOMS = [
     { key: 'bed_silk', name: 'Silk bedroom', img: '/mockups/m_bed_silk.jpg', mask: '/mockups/m_bed_silk_mask.png', light: '/mockups/m_bed_silk_light.jpg',
-      w: 1600, h: 893, pxcm: 4.4, floorY: 1007, zone: [185, 0, 1415, 460], anchor: { x: 800, topCm: 124 }, maxTopCm: 225, shadow: [0, 1] },
+      w: 1600, h: 893, pxcm: 3.9, floorY: 980, zone: [185, 0, 1415, 460], anchor: { x: 800, topCm: 133 }, maxTopCm: 251, shadow: [0, 1] },
     { key: 'travertine', name: 'Travertine hall', img: '/mockups/m_travertine.jpg', mask: '/mockups/m_travertine_mask.png', light: '/mockups/m_travertine_light.jpg',
       w: 1600, h: 893, pxcm: 2.9, floorY: 752, zone: [520, 45, 1080, 752], anchor: { x: 800, topCm: 68 }, maxTopCm: 240, shadow: [0, 1] },
     { key: 'salon', name: 'Parisian salon', img: '/mockups/m_salon.jpg', mask: '/mockups/m_salon_mask.png', light: '/mockups/m_salon_light.jpg',
@@ -187,7 +187,8 @@
       w: 1600, h: 893, pxcm: 1.79, floorY: 750, zone: [480, 180, 1120, 750], anchor: { x: 802, topCm: 80 }, maxTopCm: 285, shadow: [0, 1] }
   ];
   var GAP_ABOVE_FURNITURE = 22;   // cm between furniture and the bottom of the painting
-  var EYE_LEVEL = 150;            // cm from floor to the centre of the painting (museum standard)
+  var EYE_LEVEL = 150;
+  var TOP_CLEARANCE = 18;          // cm of wall kept free above a painting            // cm from floor to the centre of the painting (museum standard)
   var FRAME_CM = { none: 0, black: 1.8, float: 3.2, oak: 3.5, gold: 5.5 };
   /* Moulded frames from photos. L/R/T/B = border width in the PNG (px); cm = default moulding width.
      They're drawn with "9-slice" scaling: corners keep their shape, the sides stretch to any size. */
@@ -302,7 +303,10 @@
   function autoPlace(r, art) {
     var f = frameCm(art), outerW = art.w + f * 2, outerH = art.h + f * 2;
     var cy = Math.max(EYE_LEVEL, r.anchor.topCm + GAP_ABOVE_FURNITURE + outerH / 2);
-    if (cy + outerH / 2 > r.maxTopCm) cy = Math.max(r.anchor.topCm + 5 + outerH / 2, r.maxTopCm - outerH / 2);
+    /* Always leave clear wall above the painting (never touch the ceiling / picture edge).
+       The gap above the furniture shrinks first; a very tall piece may then tuck behind the headboard. */
+    var topLimit = r.maxTopCm - TOP_CLEARANCE;
+    if (cy + outerH / 2 > topLimit) cy = Math.max(20 + outerH / 2, topLimit - outerH / 2);
     return { x: r.anchor.x, yCm: cy };
   }
   function placementFits(r, art) {
