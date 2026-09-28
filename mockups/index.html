@@ -169,12 +169,22 @@
      maxTopCm  = highest the top of a painting may go
      shadow    = direction the painting's shadow falls (from the room's light) */
   var ROOMS = [
-    { key: 'foyer', name: 'Marble foyer', img: '/mockups/foyer.jpg', mask: '/mockups/foyer_mask.png', light: '/mockups/foyer_light.jpg',
-      w: 1600, h: 900, pxcm: 2.15, floorY: 703, zone: [318, 72, 1295, 703], anchor: { x: 794, topCm: 72 }, maxTopCm: 280, shadow: [0, 1] },
-    { key: 'living', name: 'Living room', img: '/mockups/living.jpg', mask: '/mockups/living_mask.png', light: '/mockups/living_light.jpg',
-      w: 1600, h: 1001, pxcm: 2.75, floorY: 752, zone: [80, 0, 1555, 752], anchor: { x: 805, topCm: 84 }, maxTopCm: 262, shadow: [.8, .6] },
-    { key: 'penthouse', name: 'Penthouse', img: '/mockups/penthouse.jpg', mask: '/mockups/penthouse_mask.png', light: '/mockups/penthouse_light.jpg',
-      w: 1600, h: 900, pxcm: 2.25, floorY: 605, zone: [247, 0, 1290, 605], anchor: { x: 795, topCm: 75 }, maxTopCm: 258, shadow: [.35, .85] }
+    { key: 'bed_silk', name: 'Silk bedroom', img: '/mockups/m_bed_silk.jpg', mask: '/mockups/m_bed_silk_mask.png', light: '/mockups/m_bed_silk_light.jpg',
+      w: 1600, h: 893, pxcm: 4.4, floorY: 1007, zone: [185, 0, 1415, 460], anchor: { x: 800, topCm: 124 }, maxTopCm: 225, shadow: [0, 1] },
+    { key: 'travertine', name: 'Travertine hall', img: '/mockups/m_travertine.jpg', mask: '/mockups/m_travertine_mask.png', light: '/mockups/m_travertine_light.jpg',
+      w: 1600, h: 893, pxcm: 2.9, floorY: 752, zone: [520, 45, 1080, 752], anchor: { x: 800, topCm: 68 }, maxTopCm: 240, shadow: [0, 1] },
+    { key: 'salon', name: 'Parisian salon', img: '/mockups/m_salon.jpg', mask: '/mockups/m_salon_mask.png', light: '/mockups/m_salon_light.jpg',
+      w: 1600, h: 873, pxcm: 2.32, floorY: 770, zone: [530, 50, 1100, 770], anchor: { x: 814, topCm: 150 }, maxTopCm: 300, shadow: [0.4, 0.9] },
+    { key: 'bed_pink', name: 'Rose & gold bedroom', img: '/mockups/m_bed_pink.jpg', mask: '/mockups/m_bed_pink_mask.png', light: '/mockups/m_bed_pink_light.jpg',
+      w: 1600, h: 893, pxcm: 2.47, floorY: 800, zone: [550, 20, 1060, 800], anchor: { x: 800, topCm: 153 }, maxTopCm: 300, shadow: [0, 1] },
+    { key: 'bed_marble', name: 'Marble & gold bedroom', img: '/mockups/m_bed_marble.jpg', mask: '/mockups/m_bed_marble_mask.png', light: '/mockups/m_bed_marble_light.jpg',
+      w: 1600, h: 893, pxcm: 2.9, floorY: 770, zone: [260, 40, 1340, 770], anchor: { x: 800, topCm: 97 }, maxTopCm: 245, shadow: [0, 1] },
+    { key: 'bed_emerald', name: 'Emerald Art Deco', img: '/mockups/m_bed_emerald.jpg', mask: '/mockups/m_bed_emerald_mask.png', light: '/mockups/m_bed_emerald_light.jpg',
+      w: 1600, h: 893, pxcm: 3.72, floorY: 935, zone: [465, 40, 1135, 935], anchor: { x: 800, topCm: 127 }, maxTopCm: 235, shadow: [0, 1] },
+    { key: 'stair_twin', name: 'Grand staircase', img: '/mockups/m_stair_twin.jpg', mask: '/mockups/m_stair_twin_mask.png', light: '/mockups/m_stair_twin_light.jpg',
+      w: 1600, h: 893, pxcm: 1.84, floorY: 745, zone: [475, 235, 1125, 745], anchor: { x: 800, topCm: 80 }, maxTopCm: 270, shadow: [0, 1] },
+    { key: 'stair_landing', name: 'Stair landing', img: '/mockups/m_stair_landing.jpg', mask: '/mockups/m_stair_landing_mask.png', light: '/mockups/m_stair_landing_light.jpg',
+      w: 1600, h: 893, pxcm: 1.79, floorY: 750, zone: [480, 180, 1120, 750], anchor: { x: 802, topCm: 80 }, maxTopCm: 285, shadow: [0, 1] }
   ];
   var GAP_ABOVE_FURNITURE = 22;   // cm between furniture and the bottom of the painting
   var EYE_LEVEL = 150;            // cm from floor to the centre of the painting (museum standard)
