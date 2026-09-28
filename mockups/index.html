@@ -107,12 +107,21 @@
             <label class="field"><span>Frame</span>
               <select id="frame">
                 <option value="none">No frame</option>
-                <option value="black">Thin black</option>
-                <option value="float">White floater</option>
-                <option value="oak">Oak</option>
-                <option value="gold">Gold</option>
+                <optgroup label="Moulded frames">
+                  <option value="m_white">Classic white</option>
+                  <option value="m_black">Classic black</option>
+                  <option value="m_gold">Gold leaf</option>
+                  <option value="m_mahogany">Mahogany</option>
+                </optgroup>
+                <optgroup label="Simple frames">
+                  <option value="black">Thin black</option>
+                  <option value="float">White floater</option>
+                  <option value="oak">Oak</option>
+                  <option value="gold">Gold (flat)</option>
+                </optgroup>
               </select>
             </label>
+            <label class="field" id="frameCmField" hidden><span>Frame width cm</span><input id="frameCm" type="number" min="1" max="20" step="0.5"></label>
             <label class="check"><input id="thick" type="checkbox"> Thick canvas (4 cm)</label>
           </div>
           <p class="warn" id="sizeWarn" hidden></p>
@@ -170,6 +179,16 @@
   var GAP_ABOVE_FURNITURE = 22;   // cm between furniture and the bottom of the painting
   var EYE_LEVEL = 150;            // cm from floor to the centre of the painting (museum standard)
   var FRAME_CM = { none: 0, black: 1.8, float: 3.2, oak: 3.5, gold: 5.5 };
+  /* Moulded frames from photos. L/R/T/B = border width in the PNG (px); cm = default moulding width.
+     They're drawn with "9-slice" scaling: corners keep their shape, the sides stretch to any size. */
+  var FRAME_IMG = {
+    m_white: { src: '/mockups/frame_white.png', L: 66, R: 65, T: 66, B: 65, cm: 6.5 },
+    m_black: { src: '/mockups/frame_black.png', L: 75, R: 74, T: 76, B: 75, cm: 7 },
+    m_gold: { src: '/mockups/frame_gold.png', L: 72, R: 70, T: 72, B: 72, cm: 7.5 },
+    m_mahogany: { src: '/mockups/frame_mahogany.png', L: 71, R: 71, T: 72, B: 72, cm: 7.5 }
+  };
+  Object.keys(FRAME_IMG).forEach(function (k) { FRAME_CM[k] = FRAME_IMG[k].cm; loadImg(FRAME_IMG[k].src).then(function (i) { FRAME_IMG[k].img = i; if (typeof drawAll === 'function' && ui.current) drawAll(); }); });
+  function frameCm(art) { return art.frame in FRAME_IMG ? (art.frameCm || FRAME_IMG[art.frame].cm) : (FRAME_CM[art.frame] || 0); }
 
   /* ---------- helpers ---------- */
   function $(id) { return document.getElementById(id); }
@@ -271,13 +290,13 @@
 
   /* ---------- placement ---------- */
   function autoPlace(r, art) {
-    var f = FRAME_CM[art.frame] || 0, outerW = art.w + f * 2, outerH = art.h + f * 2;
+    var f = frameCm(art), outerW = art.w + f * 2, outerH = art.h + f * 2;
     var cy = Math.max(EYE_LEVEL, r.anchor.topCm + GAP_ABOVE_FURNITURE + outerH / 2);
     if (cy + outerH / 2 > r.maxTopCm) cy = Math.max(r.anchor.topCm + 5 + outerH / 2, r.maxTopCm - outerH / 2);
     return { x: r.anchor.x, yCm: cy };
   }
   function placementFits(r, art) {
-    var f = FRAME_CM[art.frame] || 0, outerW = (art.w + f * 2) * r.pxcm, outerH = art.h + f * 2;
+    var f = frameCm(art), outerW = (art.w + f * 2) * r.pxcm, outerH = art.h + f * 2;
     return outerW <= (r.zone[2] - r.zone[0]) && outerH + r.anchor.topCm + 5 <= r.maxTopCm;
   }
 
@@ -292,7 +311,7 @@
       var fw = r.w, fh = r.w / a; if (fh > r.h) { fh = r.h; fw = r.h * a; }
       return { x: (r.w - fw) / 2, y: (r.h - fh) / 2, w: fw, h: fh };
     }
-    var f = FILL[mode] || FILL.close, fcm = FRAME_CM[art.frame] || 0;
+    var f = FILL[mode] || FILL.close, fcm = frameCm(art);
     var ow = (art.w + fcm * 2) * r.pxcm, oh = (art.h + fcm * 2) * r.pxcm;
     var cx = pos.x, cy = r.floorY - pos.yCm * r.pxcm;
     var h = Math.max(oh / f.h, ow / f.w / a);
@@ -312,11 +331,11 @@
     ctx.setTransform(scale, 0, 0, scale, -crop.x * scale, -crop.y * scale);
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(r.base, 0, 0, r.w, r.h);
-    var s = r.pxcm, fcm = FRAME_CM[art.frame] || 0;
+    var s = r.pxcm, fcm = frameCm(art);
     var ow = (art.w + fcm * 2) * s, oh = (art.h + fcm * 2) * s;
     var cx = pos.x, cy = r.floorY - pos.yCm * s;
     var x = cx - ow / 2, y = cy - oh / 2, fw = fcm * s;
-    var depth = (art.thick ? 4 : 2) + (fcm ? 1.5 : 0);      // how far it stands off the wall, in cm
+    var depth = (art.thick ? 4 : 2) + (fcm ? (art.frame in FRAME_IMG ? 3 : 1.5) : 0);      // how far it stands off the wall, in cm
     // soft shadow on the wall, falling away from the room's light
     ctx.save();
     ctx.shadowColor = 'rgba(30,20,10,.42)';
@@ -346,11 +365,24 @@
       ctx.fillStyle = '#f6f4ef'; ctx.fillRect(x, y, ow, oh);
       var gap = fw * .32; ctx.fillStyle = '#2a2724'; ctx.fillRect(ix - gap, iy - gap, iw + gap * 2, ih + gap * 2);
     }
-    ctx.drawImage(art.img, ix, iy, iw, ih);
+    var fi = FRAME_IMG[art.frame];
+    if (fi && fi.img) {                                   // 9-slice: corners keep their shape, sides stretch
+      var k = fw / ((fi.L + fi.R + fi.T + fi.B) / 4);
+      var bl = fi.L * k, br = fi.R * k, bt = fi.T * k, bb = fi.B * k, sw = fi.img.width, sh = fi.img.height;
+      ix = x + bl; iy = y + bt; iw = ow - bl - br; ih = oh - bt - bb;
+      ctx.drawImage(art.img, ix, iy, iw, ih);           // painting first; the frame's lip overlaps its edge
+      var sx = [0, fi.L, sw - fi.R, sw], sy = [0, fi.T, sh - fi.B, sh];
+      var dx = [x, x + bl, x + ow - br, x + ow], dy = [y, y + bt, y + oh - bb, y + oh];
+      for (var yi = 0; yi < 3; yi++) for (var xi = 0; xi < 3; xi++) {
+        if (xi === 1 && yi === 1) continue;             // the open middle
+        var sW = sx[xi + 1] - sx[xi], sH = sy[yi + 1] - sy[yi], dW = dx[xi + 1] - dx[xi], dH = dy[yi + 1] - dy[yi];
+        if (sW > 0 && sH > 0 && dW > 0 && dH > 0) ctx.drawImage(fi.img, sx[xi], sy[yi], sW, sH, dx[xi], dy[yi], dW + .5, dH + .5);
+      }
+    } else ctx.drawImage(art.img, ix, iy, iw, ih);
     if (art.frame === 'none') {                      // canvas edge catching the light
       ctx.fillStyle = 'rgba(0,0,0,.16)'; ctx.fillRect(ix + iw - Math.max(1, s * .6), iy, Math.max(1, s * .6), ih);
       ctx.fillStyle = 'rgba(255,255,255,.10)'; ctx.fillRect(ix, iy, iw, Math.max(1, s * .35));
-    } else {
+    } else if (!fi) {
       ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fillRect(ix, iy, iw, Math.max(1, s * .7));   // frame lip shadow
     }
     // the room's own light (warm tint, window light, soft falloff) falls on the painting too
@@ -389,7 +421,7 @@
     var sc = VIEW_W / c.crop.w, W = Math.round(c.crop.w * sc), H = Math.round(c.crop.h * sc);
     if (c.cv.width !== W || c.cv.height !== H) { c.cv.width = W; c.cv.height = H; }
     c.box = drawMockup(c.ctx, c.r, ui.current, c.pos, sc, c.crop);
-    var bottom = c.pos.yCm - (ui.current.h / 2 + (FRAME_CM[ui.current.frame] || 0));
+    var bottom = c.pos.yCm - (ui.current.h / 2 + frameCm(ui.current));
     c.info.textContent = 'centre ' + Math.round(c.pos.yCm) + ' cm · bottom ' + Math.round(bottom) + ' cm';
   }
   function drawAll() { cards.forEach(draw); }
@@ -432,7 +464,7 @@
     return fetchArt(p).then(function (img) {
       if (token !== loadToken) return;
       var sz = sizeFor(p, img.width, img.height);
-      ui.current = { p: p, img: img, ratio: img.height / img.width, w: sz.w, h: sz.h, thick: sz.thick, frame: $('frame').value };
+      ui.current = { p: p, img: img, ratio: img.height / img.width, w: sz.w, h: sz.h, thick: sz.thick, frame: $('frame').value, frameCm: ($('frame').value in FRAME_IMG) ? (parseFloat($('frameCm').value) || null) : null };
       $('wCm').value = sz.w; $('hCm').value = sz.h; $('thick').checked = sz.thick;
       showSizeWarn(sz);
       cards.forEach(function (c) { c.pos = autoPlace(c.r, ui.current); c.crop = null; });
@@ -457,7 +489,12 @@
   }
   $('wCm').addEventListener('input', function () { onSizeInput('wCm'); });
   $('hCm').addEventListener('input', function () { onSizeInput('hCm'); });
-  $('frame').addEventListener('change', function () { if (!ui.current) return; ui.current.frame = this.value; replaceAll(); });
+  function syncFrameField() {
+    var v = $('frame').value, isImg = v in FRAME_IMG; $('frameCmField').hidden = !isImg;
+    if (isImg) $('frameCm').value = ui.current && ui.current.frameCm ? ui.current.frameCm : FRAME_IMG[v].cm;
+  }
+  $('frame').addEventListener('change', function () { syncFrameField(); if (!ui.current) return; ui.current.frame = this.value; ui.current.frameCm = null; replaceAll(); });
+  $('frameCm').addEventListener('input', function () { var v = parseFloat(this.value); if (!ui.current || !(v > 0)) return; ui.current.frameCm = v; replaceAll(); });
   $('thick').addEventListener('change', function () { if (!ui.current) return; ui.current.thick = this.checked; drawAll(); });
 
   /* ---------- export ---------- */
@@ -501,7 +538,7 @@
       btn.textContent = 'Making ' + (i + 1) + ' of ' + ids.length + '…';
       return fetchArt(p).then(function (img) {
         var sz = sizeFor(p, img.width, img.height);
-        var art = { p: p, img: img, w: sz.w, h: sz.h, thick: sz.thick, frame: frame };
+        var art = { p: p, img: img, w: sz.w, h: sz.h, thick: sz.thick, frame: frame, frameCm: (frame in FRAME_IMG) ? (parseFloat($('frameCm').value) || null) : null };
         var folder = zip.folder(catNum(p).replace(/[^\w-]+/g, '-') + '_' + slug(p.name) + (sz.guessed ? '_SIZE-GUESSED' : ''));
         return Promise.all(cards.map(function (c) { return exportOne(c, art, autoPlace(c.r, art)).then(function (b) { folder.file(fileName(p, c.r), b); }); }));
       }).catch(function () {}).then(function () { done++; return next(i + 1); });
