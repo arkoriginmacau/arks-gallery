@@ -2234,7 +2234,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     return terms;
   }
   function searchMatches(p, terms) {
-    var words = String(p.name || '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+    /* A piece with no name shows as "Untitled" on its card, so it's findable by that word too. */
+    var words = String(p.name || (tx('untitled') + ' untitled')).toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
     var size = String(p.size || '').toLowerCase().replace(/[×*]/g, 'x').replace(/\s+/g, '');
     return terms.every(function (t) {
       if (t.kind === 'size') return size.indexOf(t.v) !== -1;
