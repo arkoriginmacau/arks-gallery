@@ -154,11 +154,11 @@
      maxTopCm  = highest the top of a painting may go
      shadow    = direction the painting's shadow falls (from the room's light) */
   var ROOMS = [
-    { key: 'foyer', name: 'Marble foyer', img: 'foyer.jpg', mask: 'foyer_mask.png', light: 'foyer_light.jpg',
+    { key: 'foyer', name: 'Marble foyer', img: '/mockups/foyer.jpg', mask: '/mockups/foyer_mask.png', light: '/mockups/foyer_light.jpg',
       w: 1600, h: 900, pxcm: 2.15, floorY: 703, zone: [318, 72, 1295, 703], anchor: { x: 794, topCm: 72 }, maxTopCm: 280, shadow: [0, 1] },
-    { key: 'living', name: 'Living room', img: 'living.jpg', mask: 'living_mask.png', light: 'living_light.jpg',
+    { key: 'living', name: 'Living room', img: '/mockups/living.jpg', mask: '/mockups/living_mask.png', light: '/mockups/living_light.jpg',
       w: 1600, h: 1001, pxcm: 2.75, floorY: 752, zone: [80, 0, 1555, 752], anchor: { x: 805, topCm: 84 }, maxTopCm: 262, shadow: [.8, .6] },
-    { key: 'penthouse', name: 'Penthouse', img: 'penthouse.jpg', mask: 'penthouse_mask.png', light: 'penthouse_light.jpg',
+    { key: 'penthouse', name: 'Penthouse', img: '/mockups/penthouse.jpg', mask: '/mockups/penthouse_mask.png', light: '/mockups/penthouse_light.jpg',
       w: 1600, h: 900, pxcm: 2.25, floorY: 605, zone: [247, 0, 1290, 605], anchor: { x: 795, topCm: 75 }, maxTopCm: 258, shadow: [.35, .85] }
   ];
   var GAP_ABOVE_FURNITURE = 22;   // cm between furniture and the bottom of the painting
@@ -494,7 +494,10 @@
 
   /* ---------- start ---------- */
   buildCards();
-  Promise.all(ROOMS.map(prepareRoom)).then(function () {
+  Promise.all(ROOMS.map(prepareRoom)).catch(function () {
+    $('rooms').insertAdjacentHTML('afterbegin', '<p class="warn" style="grid-column:1/-1">The room pictures did not load. Reload the page to try again.</p>');
+  }).then(function () {
+    if (!ROOMS.every(function (r) { return r.base; })) return;
     if (ui.current) drawAll();
     else cards.forEach(function (c) { c.ctx.drawImage(c.r.base, 0, 0, c.r.w, c.r.h); });   // empty rooms until a painting is picked
   });
