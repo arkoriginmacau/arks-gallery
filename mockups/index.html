@@ -125,6 +125,12 @@
           <label class="field"><span>Image size</span>
             <select id="outSize"><option value="2400" selected>Large · 2400 px wide</option><option value="1600">Standard · 1600 px wide</option></select>
           </label>
+          <label class="field"><span>View</span>
+            <select id="framing"><option value="close" selected>Close-up</option><option value="medium">Medium</option><option value="full">Whole room</option></select>
+          </label>
+          <label class="field"><span>Shape</span>
+            <select id="shape"><option value="1.3333" selected>Landscape 4:3</option><option value="0.8">Portrait 4:5</option><option value="1">Square 1:1</option><option value="room">Same as room</option></select>
+          </label>
         </div>
         <div class="left">
           <span class="progress" id="batchInfo"></span>
@@ -275,10 +281,35 @@
     return outerW <= (r.zone[2] - r.zone[0]) && outerH + r.anchor.topCm + 5 <= r.maxTopCm;
   }
 
+  /* ---------- framing (crop around the painting) ----------
+     Close-up: the painting fills about 42% of the picture's height; Medium about 28%.
+     The painting sits a little above centre so some of the furniture below stays in view. */
+  var FILL = { close: { h: .42, w: .52 }, medium: { h: .28, w: .38 } };
+  function cropFor(r, art, pos) {
+    var mode = $('framing').value, shapeV = $('shape').value;
+    var a = shapeV === 'room' ? r.w / r.h : parseFloat(shapeV) || 4 / 3;
+    if (mode === 'full') {
+      var fw = r.w, fh = r.w / a; if (fh > r.h) { fh = r.h; fw = r.h * a; }
+      return { x: (r.w - fw) / 2, y: (r.h - fh) / 2, w: fw, h: fh };
+    }
+    var f = FILL[mode] || FILL.close, fcm = FRAME_CM[art.frame] || 0;
+    var ow = (art.w + fcm * 2) * r.pxcm, oh = (art.h + fcm * 2) * r.pxcm;
+    var cx = pos.x, cy = r.floorY - pos.yCm * r.pxcm;
+    var h = Math.max(oh / f.h, ow / f.w / a);
+    var furnTop = r.floorY - r.anchor.topCm * r.pxcm;            // keep a slice of the sofa / console in view
+    var need = (furnTop - cy) / (1 - .42 - .14);
+    if (need > h) h = need;
+    h = Math.min(h, r.h, r.w / a);
+    var w = h * a;
+    var x = clamp(cx - w / 2, 0, r.w - w), y = clamp(cy - h * .42, 0, r.h - h);
+    return { x: x, y: y, w: w, h: h };
+  }
+
   /* ---------- drawing ---------- */
-  function drawMockup(ctx, r, art, pos, scale) {
+  function drawMockup(ctx, r, art, pos, scale, crop) {
+    crop = crop || { x: 0, y: 0 };
     ctx.save();
-    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.setTransform(scale, 0, 0, scale, -crop.x * scale, -crop.y * scale);
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(r.base, 0, 0, r.w, r.h);
     var s = r.pxcm, fcm = FRAME_CM[art.frame] || 0;
@@ -344,23 +375,30 @@
         '<div class="bar"><strong>' + esc(r.name) + '</strong><span class="info"></span><span><button class="btn" type="button" data-reset>Reset</button> <button class="btn" type="button" data-dl>Download</button></span></div>';
       wrap.appendChild(card);
       var cv = card.querySelector('canvas');
-      var c = { r: r, cv: cv, ctx: cv.getContext('2d'), info: card.querySelector('.info'), pos: null, box: null };
-      card.querySelector('[data-reset]').addEventListener('click', function () { if (ui.current) { c.pos = autoPlace(r, ui.current); draw(c); } });
+      var c = { r: r, cv: cv, ctx: cv.getContext('2d'), info: card.querySelector('.info'), pos: null, box: null, crop: null };
+      card.querySelector('[data-reset]').addEventListener('click', function () { if (ui.current) { c.pos = autoPlace(r, ui.current); c.crop = null; draw(c); } });
       card.querySelector('[data-dl]').addEventListener('click', function () { if (ui.current) exportOne(c).then(function (b) { saveBlob(b, fileName(ui.current.p, r)); }); });
       wireDrag(c);
       return c;
     });
   }
+  var VIEW_W = 1000;   // on-screen canvas resolution
   function draw(c) {
     if (!ui.current || !c.r.base) return;
-    c.box = drawMockup(c.ctx, c.r, ui.current, c.pos, 1);
+    if (!c.crop) c.crop = cropFor(c.r, ui.current, c.pos);      // the view stays put while you drag
+    var sc = VIEW_W / c.crop.w, W = Math.round(c.crop.w * sc), H = Math.round(c.crop.h * sc);
+    if (c.cv.width !== W || c.cv.height !== H) { c.cv.width = W; c.cv.height = H; }
+    c.box = drawMockup(c.ctx, c.r, ui.current, c.pos, sc, c.crop);
     var bottom = c.pos.yCm - (ui.current.h / 2 + (FRAME_CM[ui.current.frame] || 0));
     c.info.textContent = 'centre ' + Math.round(c.pos.yCm) + ' cm · bottom ' + Math.round(bottom) + ' cm';
   }
   function drawAll() { cards.forEach(draw); }
+  function replaceAll() { cards.forEach(function (c) { c.pos = autoPlace(c.r, ui.current); c.crop = null; }); drawAll(); }
+  $('framing').addEventListener('change', function () { cards.forEach(function (c) { c.crop = null; }); drawAll(); });
+  $('shape').addEventListener('change', function () { cards.forEach(function (c) { c.crop = null; }); drawAll(); });
   function wireDrag(c) {
     var drag = null;
-    function pt(e) { var rc = c.cv.getBoundingClientRect(); return { x: (e.clientX - rc.left) * c.r.w / rc.width, y: (e.clientY - rc.top) * c.r.h / rc.height }; }
+    function pt(e) { var rc = c.cv.getBoundingClientRect(), k = c.crop || { x: 0, y: 0, w: c.r.w, h: c.r.h }; return { x: k.x + (e.clientX - rc.left) * k.w / rc.width, y: k.y + (e.clientY - rc.top) * k.h / rc.height }; }
     c.cv.addEventListener('pointerdown', function (e) {
       if (!c.box) return; var p = pt(e), b = c.box;
       if (p.x < b.x || p.x > b.x + b.w || p.y < b.y || p.y > b.y + b.h) return;
@@ -397,7 +435,7 @@
       ui.current = { p: p, img: img, ratio: img.height / img.width, w: sz.w, h: sz.h, thick: sz.thick, frame: $('frame').value };
       $('wCm').value = sz.w; $('hCm').value = sz.h; $('thick').checked = sz.thick;
       showSizeWarn(sz);
-      cards.forEach(function (c) { c.pos = autoPlace(c.r, ui.current); });
+      cards.forEach(function (c) { c.pos = autoPlace(c.r, ui.current); c.crop = null; });
       drawAll(); renderList();
     }).catch(function () { $('selMeta').textContent += ' · could not load the photo'; });
   }
@@ -415,20 +453,21 @@
     var a = ui.current; if (!a) return;
     var v = parseFloat($(which).value); if (!(v > 0)) return;
     if (which === 'wCm') a.w = v; else a.h = v;
-    cards.forEach(function (c) { c.pos = autoPlace(c.r, a); }); drawAll(); showSizeWarn({ guessed: false });
+    replaceAll(); showSizeWarn({ guessed: false });
   }
   $('wCm').addEventListener('input', function () { onSizeInput('wCm'); });
   $('hCm').addEventListener('input', function () { onSizeInput('hCm'); });
-  $('frame').addEventListener('change', function () { if (!ui.current) return; ui.current.frame = this.value; cards.forEach(function (c) { c.pos = autoPlace(c.r, ui.current); }); drawAll(); });
+  $('frame').addEventListener('change', function () { if (!ui.current) return; ui.current.frame = this.value; replaceAll(); });
   $('thick').addEventListener('change', function () { if (!ui.current) return; ui.current.thick = this.checked; drawAll(); });
 
   /* ---------- export ---------- */
   function fileName(p, r) { return catNum(p).replace(/[^\w-]+/g, '-') + '_' + slug(p.name) + '_' + r.key + '.jpg'; }
   function exportOne(c, art, pos) {
-    art = art || ui.current; pos = pos || c.pos;
-    var outW = +$('outSize').value || 2400, scale = outW / c.r.w;
-    var cv = document.createElement('canvas'); cv.width = Math.round(c.r.w * scale); cv.height = Math.round(c.r.h * scale);
-    drawMockup(cv.getContext('2d'), c.r, art, pos, scale);
+    var own = !art; art = art || ui.current; pos = pos || c.pos;
+    var crop = own && c.crop ? c.crop : cropFor(c.r, art, pos);
+    var outW = +$('outSize').value || 2400, scale = outW / crop.w;
+    var cv = document.createElement('canvas'); cv.width = Math.round(crop.w * scale); cv.height = Math.round(crop.h * scale);
+    drawMockup(cv.getContext('2d'), c.r, art, pos, scale, crop);
     return new Promise(function (res) { cv.toBlob(res, 'image/jpeg', .92); });
   }
   function saveBlob(blob, name) {
