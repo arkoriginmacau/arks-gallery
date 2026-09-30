@@ -3448,7 +3448,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (!c.__req) need.push([ad, c]);
       var th = d / S * 2 * Math.PI, cos = Math.cos(th);
       var w = ch * (c.__ratio || 0.8);
-      var x = Math.sin(th) * Rx, z = cos * Rz - Rz, y = (1 - cos) * -ch * 0.3;
+      /* Mirrored: newer paintings sit to the right, older ones to the left. */
+      var x = -Math.sin(th) * Rx, z = cos * Rz - Rz, y = (1 - cos) * -ch * 0.3;
       var s = ad < 1 ? 1 + 0.14 * (1 - ad) : 1;
       if (c.__ch !== ch || c.__cw !== w) { c.style.height = ch + 'px'; c.style.width = w + 'px'; c.__ch = ch; c.__cw = w; }
       c.style.transform = 'translate3d(' + (x - w / 2) + 'px,' + (y - ch / 2) + 'px,' + z + 'px) scale(' + s + ')';
@@ -3542,8 +3543,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   function wireOrbit() {
     var stage = document.getElementById('orbStage');
     var prev = document.getElementById('orbPrev'), next = document.getElementById('orbNext');
-    if (prev) prev.addEventListener('click', function (e) { e.stopPropagation(); orbGo(-1); });
-    if (next) next.addEventListener('click', function (e) { e.stopPropagation(); orbGo(1); });
+    if (prev) prev.addEventListener('click', function (e) { e.stopPropagation(); orbGo(1); });
+    if (next) next.addEventListener('click', function (e) { e.stopPropagation(); orbGo(-1); });
     var fb = document.getElementById('orbFull');
     if (fb) {
       fb.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
@@ -3597,7 +3598,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
       if (!horiz) return;
       moved = true;
-      ORB.pos = sp - dx / slotPx();
+      ORB.pos = sp + dx / slotPx();
       orbKick();
     });
     function end(e) {
@@ -3629,7 +3630,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (!dx) return;
       e.preventDefault();
       var now = Date.now(); if (now - lastWheel < 180) return; lastWheel = now;
-      orbGo(dx > 0 ? 1 : -1);
+      orbGo(dx > 0 ? -1 : 1);
     }, { passive: false });
   }
 
@@ -3652,7 +3653,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (document.getElementById('modalRoot').innerHTML.trim()) return;
     var t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
     e.preventDefault();
-    orbGo(e.key === 'ArrowRight' ? 1 : -1);
+    orbGo(e.key === 'ArrowRight' ? -1 : 1);
   });
   window.addEventListener('resize', function () { ORB.W = ORB.H = 0; if (document.getElementById('orbStage')) orbLayout(); });
 
