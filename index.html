@@ -242,6 +242,9 @@
   .orb-hint { margin-top: 10px; font-size: 12px; color: var(--ink-faint); }
   .orb-info.swap > * { animation: orbRise .4s ease both; }
   @keyframes orbRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .orb-gofs { left: 54px !important; }
+  .orb-full, .orb-sound { touch-action: manipulation; }
+  .orb-gofs[hidden] { display: none; }
   .orb-full { position: absolute; top: 10px; left: 10px; z-index: 3; width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255,255,255,.3); background: rgba(0,0,0,.45); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
   /* Full-screen Orbit: only the ring + details, nothing to scroll. */
   body.orbit-immersive { overflow: hidden; }
@@ -3185,23 +3188,36 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     document.body.classList.toggle('orbit-immersive', on);
     var fb = document.getElementById('orbFull');
     if (fb) { fb.innerHTML = orbFullIcon(); fb.title = on ? 'Exit full screen' : 'Full screen'; }
+    orbSyncFsBtn();
     ORB.W = ORB.H = 0;
     requestAnimationFrame(function () { ORB.W = ORB.H = 0; orbLayout(); });
+  }
+  function orbFsOk() {
+    var el = document.documentElement;
+    return !!(el.requestFullscreen || el.webkitRequestFullscreen) && !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+  }
+  function orbIsRealFs() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  /* Real browser full screen needs a tap from the visitor, so it's asked for on a tap. */
+  function orbRequestFs() {
+    if (orbIsRealFs() || !orbFsOk()) return false;
+    var el = document.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen;
+    try {
+      var pr = req.call(el);
+      ORB.fsUsed = true;
+      if (pr && pr.catch) pr.catch(function () { ORB.fsUsed = false; orbSyncFsBtn(); });
+    } catch (e) { ORB.fsUsed = false; return false; }
+    return true;
+  }
+  function orbSyncFsBtn() {
+    var b = document.getElementById('orbGoFs');
+    if (b) b.hidden = !(ORB.immersive && !orbIsRealFs() && (orbFsOk() || isEmbedded));
   }
   function orbEnterImmersive(tryFs) {
     var o = document.getElementById('orbitView');
     if (!o || o.hidden || ORB.immersive) return;
     if (tryFs) {
-      var el = document.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen;
-      var fsOk = !!req && !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
-      if (!fsOk && isEmbedded) { window.open(orbFullUrl(), '_blank', 'noopener'); return; }
-      if (fsOk) {
-        try {
-          var pr = req.call(el);
-          ORB.fsUsed = true;
-          if (pr && pr.catch) pr.catch(function () { ORB.fsUsed = false; });
-        } catch (e) { ORB.fsUsed = false; }
-      }
+      if (!orbFsOk() && isEmbedded) { window.open(orbFullUrl(), '_blank', 'noopener'); return; }
+      orbRequestFs();
     }
     orbApplyImmersive(true);
   }
@@ -3215,6 +3231,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   function orbFsChange() {
     var fsEl = document.fullscreenElement || document.webkitFullscreenElement;
     if (!fsEl && ORB.immersive && ORB.fsUsed) { ORB.fsUsed = false; orbApplyImmersive(false); }
+    orbSyncFsBtn(); ORB.W = ORB.H = 0; orbLayout();
   }
   document.addEventListener('fullscreenchange', orbFsChange);
   document.addEventListener('webkitfullscreenchange', orbFsChange);
@@ -3308,6 +3325,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }).join('') + '</div>' +
       (items.length > 1 ? '<button class="orb-nav prev" type="button" id="orbPrev" aria-label="Previous">‹</button><button class="orb-nav next" type="button" id="orbNext" aria-label="Next">›</button>' : '') +
       '<button class="orb-full" type="button" id="orbFull" aria-label="Full screen" title="Full screen">' + orbFullIcon() + '</button>' +
+      '<button class="orb-full orb-gofs" type="button" id="orbGoFs" hidden aria-label="Fill the whole screen" title="Fill the whole screen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>' +
       '<button class="orb-sound' + (SFX.on ? '' : ' off') + '" type="button" id="orbSound" aria-label="Sound on/off" title="Sound on/off">' + sfxIcon() + '</button>' +
       '<div class="orb-count" id="orbCount"></div>' +
       '</div>' +
@@ -3508,6 +3526,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       fb.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
       fb.addEventListener('click', function (e) { e.stopPropagation(); sfx('switch'); if (ORB.immersive) orbExitImmersive(); else orbEnterImmersive(true); });
     }
+    var gofs = document.getElementById('orbGoFs');
+    if (gofs) {
+      gofs.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+      gofs.addEventListener('click', function (e) {
+        e.stopPropagation(); sfx('switch');
+        if (!orbRequestFs() && isEmbedded) window.open(orbFullUrl(), '_blank', 'noopener');
+      });
+    }
+    orbSyncFsBtn();
     var snd = document.getElementById('orbSound');
     if (snd) {
       snd.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
@@ -3539,6 +3566,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     });
     function end(e) {
       if (!down) return;
+      /* Opened straight into full-screen Orbit: the visitor's first touch also
+         takes it to real full screen (browsers only allow that when a finger lifts). */
+      if (e.type === 'pointerup' && ORB.immersive && !ORB.autoFsTried && !orbIsRealFs() && orbFsOk()) { ORB.autoFsTried = true; orbRequestFs(); }
       down = false;
       if (ORB.dragging) {
         ORB.dragging = false; stage.classList.remove('dragging');
