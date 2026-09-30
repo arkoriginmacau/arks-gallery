@@ -3467,8 +3467,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       /* Mirrored: newer paintings sit to the right, older ones to the left. */
       var x = -Math.sin(th) * Rx, z = cos * Rz - Rz, y = (1 - cos) * -ch * 0.3;
       var s = ad < 1 ? 1 + 0.14 * (1 - ad) : 1;
-      if (c.__ch !== ch || c.__cw !== w) { c.style.height = ch + 'px'; c.style.width = w + 'px'; c.__ch = ch; c.__cw = w; }
-      c.style.transform = 'translate3d(' + (x - w / 2) + 'px,' + (y - ch / 2) + 'px,' + z + 'px) scale(' + s + ')';
+      /* Once the ring has settled, the front painting is drawn at its real size with no scale(),
+         so the browser paints it pixel-sharp instead of stretching a smaller copy (that was the "fog"). */
+      var settled = ad < 0.02, hh = settled ? Math.round(ch * s) : ch, ww = settled ? Math.round(w * s) : w;
+      if (c.__ch !== hh || c.__cw !== ww) { c.style.height = hh + 'px'; c.style.width = ww + 'px'; c.__ch = hh; c.__cw = ww; }
+      c.style.transform = 'translate3d(' + (x - ww / 2) + 'px,' + (y - hh / 2) + 'px,' + z + 'px)' + (settled ? '' : ' scale(' + s + ')');
       c.style.zIndex = Math.round(cos * 100) + 100;
       var edge = n > S ? Math.max(0, Math.min(1, (S / 2 - 0.2 - ad) / 1.2)) : 1;
       c.style.opacity = edge.toFixed(2);
@@ -3501,7 +3504,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
      (900px), so once the ring settles on it, swap in the sharper full-size
      photo. Phones keep the thumbnail — it's already sharp at that size. */
   function orbSharpen(i) {
-    if (orbIsPhone()) return;
+    /* Same on PC and phones: the front painting always gets the full photo. */
     var p = ORB.items[i], c = ORB.cards[i]; if (!p || !c || c.__full) return;
     var suffix = suffixById(p.suffix_id);
     if (p.censored || (suffix && /^hidden$/i.test(suffix.label || ''))) return;
