@@ -240,8 +240,30 @@
   .orb-hint { margin-top: 10px; font-size: 12px; color: var(--ink-faint); }
   .orb-info.swap > * { animation: orbRise .4s ease both; }
   @keyframes orbRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .orb-full { position: absolute; top: 10px; left: 10px; z-index: 3; width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255,255,255,.3); background: rgba(0,0,0,.45); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  /* Full-screen Orbit: only the ring + details, nothing to scroll. */
+  body.orbit-immersive { overflow: hidden; }
+  .orbit.immersive { position: fixed; inset: 0; z-index: 80; background: #0a0908; display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+  .orbit.immersive .orb-stage { flex: 1 1 auto; height: auto; min-height: 0; width: auto; margin: 0; border-radius: 0; }
+  .orbit.immersive .orb-info { flex: 0 0 36%; width: auto; max-width: none; margin: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 12px 18px calc(14px + env(safe-area-inset-bottom)); }
+  .orbit.immersive .orb-info > * { max-width: 720px; margin-left: auto; margin-right: auto; }
+  .orbit.immersive .orb-info, .orbit.immersive .orb-info h3 { color: #f4f1ea; }
+  .orbit.immersive .orb-meta { color: rgba(244,241,234,.6); }
+  .orbit.immersive .orb-meta .mono { color: #f4f1ea; }
+  .orbit.immersive .orb-desc { color: rgba(244,241,234,.85); }
+  .orbit.immersive .orb-hint { color: rgba(244,241,234,.45); }
   @media (max-width: 640px) {
     .orbit { --orb-h: min(52vh, 100vw, 420px); }
+    /* Phones: details sit right under the ring on the same dark background. */
+    .orb-info { background: #0a0908; color: #f4f1ea; width: 100vw; max-width: none; margin: 0 0 0 calc(50% - 50vw); padding: 8px 16px 16px; }
+    .orb-info h3 { color: #f4f1ea; font-size: 22px; margin-bottom: 6px; }
+    .orb-meta { color: rgba(244,241,234,.6); font-size: 12px; gap: 4px 14px; }
+    .orb-meta .mono { color: #f4f1ea; }
+    .orb-desc { color: rgba(244,241,234,.85); font-size: 13.5px; margin-top: 8px; }
+    .orb-status { margin-top: 8px; }
+    .orb-hint { color: rgba(244,241,234,.45); margin-top: 6px; }
+    .orb-nav { display: none; }
+    .orbit.immersive .orb-info { flex-basis: 31%; padding-top: 6px; }
     /* Edge-to-edge ring on phones (no white strips either side). */
     .orb-stage { width: 100vw; margin-left: calc(50% - 50vw); border-radius: 0; }
     body.orbit-on { overflow-x: clip; }
@@ -1697,8 +1719,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
   async function loadAll() {
     await Promise.all([fetchTabs(), fetchPaintings(), fetchSuffixes(), fetchThumbPos(), fetchGridLayout(), fetchPrintDefaults()]);
+    if (state.tabs.length && !state.tabs.some(function (t) { return t.id === state.activeTabId; })) state.activeTabId = state.tabs[0].id;
     state.loaded = true;
     renderAll();
+    if (ORB.pendingImmersive) { ORB.pendingImmersive = false; orbEnterImmersive(false); }
   }
 
   /* ---------------- auth ---------------- */
@@ -3134,6 +3158,75 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
   }
 
+  /* ---- Full-screen Orbit ----
+     The ⛶ button (and, on phones, choosing Orbit) fills the whole screen with
+     just the ring and the painting's details — no page scrolling. Uses the
+     browser's real full screen where allowed; when the gallery is embedded in
+     another site (Wix) that doesn't allow it, it opens the gallery in its own
+     tab straight into this mode (?orbit=1&tab=…). */
+  function orbIsPhone() { return window.matchMedia('(max-width: 640px)').matches; }
+  function orbFullIcon() {
+    return ORB.immersive
+      ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6 6 18M6 6l12 12"/></svg>'
+      : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>';
+  }
+  function orbFullUrl() {
+    return location.origin + location.pathname + '?orbit=1' + (state.activeTabId ? '&tab=' + encodeURIComponent(state.activeTabId) : '');
+  }
+  function orbApplyImmersive(on) {
+    ORB.immersive = on;
+    var o = document.getElementById('orbitView');
+    if (o) o.classList.toggle('immersive', on);
+    document.body.classList.toggle('orbit-immersive', on);
+    var fb = document.getElementById('orbFull');
+    if (fb) { fb.innerHTML = orbFullIcon(); fb.title = on ? 'Exit full screen' : 'Full screen'; }
+    ORB.W = ORB.H = 0;
+    requestAnimationFrame(function () { ORB.W = ORB.H = 0; orbLayout(); });
+  }
+  function orbEnterImmersive(tryFs) {
+    var o = document.getElementById('orbitView');
+    if (!o || o.hidden || ORB.immersive) return;
+    if (tryFs) {
+      var el = document.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen;
+      var fsOk = !!req && !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+      if (!fsOk && isEmbedded) { window.open(orbFullUrl(), '_blank', 'noopener'); return; }
+      if (fsOk) {
+        try {
+          var pr = req.call(el);
+          ORB.fsUsed = true;
+          if (pr && pr.catch) pr.catch(function () { ORB.fsUsed = false; });
+        } catch (e) { ORB.fsUsed = false; }
+      }
+    }
+    orbApplyImmersive(true);
+  }
+  function orbExitImmersive() {
+    if (!ORB.immersive) return;
+    var fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+    if (fsEl) { try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch (e) {} }
+    ORB.fsUsed = false;
+    orbApplyImmersive(false);
+  }
+  function orbFsChange() {
+    var fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+    if (!fsEl && ORB.immersive && ORB.fsUsed) { ORB.fsUsed = false; orbApplyImmersive(false); }
+  }
+  document.addEventListener('fullscreenchange', orbFsChange);
+  document.addEventListener('webkitfullscreenchange', orbFsChange);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && ORB.immersive && !document.getElementById('lbBackdrop')) orbExitImmersive();
+  });
+  /* Arriving with ?orbit=1 (opened from the embedded site): start in full-screen Orbit. */
+  (function () {
+    try {
+      var q = new URLSearchParams(location.search);
+      if (q.get('orbit') === '1') {
+        state.view = 'orbit'; ORB.pendingImmersive = true;
+        if (q.get('tab')) state.activeTabId = q.get('tab');
+      }
+    } catch (e) {}
+  })();
+
   function renderViewSwitch() {
     var el = document.getElementById('viewSwitch');
     if (!el) return;
@@ -3147,7 +3240,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (state.view !== b.getAttribute('data-view')) sfx('switch');
         state.view = b.getAttribute('data-view');
         try { localStorage.setItem('arksView', state.view); } catch (e) {}
+        if (state.view !== 'orbit') orbExitImmersive();
         renderAll();
+        if (state.view === 'orbit' && orbIsPhone()) orbEnterImmersive(true);
       });
     });
   }
@@ -3199,6 +3294,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           '<div class="orb-shade"></div></div>';
       }).join('') + '</div>' +
       (items.length > 1 ? '<button class="orb-nav prev" type="button" id="orbPrev" aria-label="Previous">‹</button><button class="orb-nav next" type="button" id="orbNext" aria-label="Next">›</button>' : '') +
+      '<button class="orb-full" type="button" id="orbFull" aria-label="Full screen" title="Full screen">' + orbFullIcon() + '</button>' +
       '<button class="orb-sound' + (SFX.on ? '' : ' off') + '" type="button" id="orbSound" aria-label="Sound on/off" title="Sound on/off">' + sfxIcon() + '</button>' +
       '<div class="orb-count" id="orbCount"></div>' +
       '</div>' +
@@ -3346,6 +3442,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var prev = document.getElementById('orbPrev'), next = document.getElementById('orbNext');
     if (prev) prev.addEventListener('click', function (e) { e.stopPropagation(); orbGo(-1); });
     if (next) next.addEventListener('click', function (e) { e.stopPropagation(); orbGo(1); });
+    var fb = document.getElementById('orbFull');
+    if (fb) {
+      fb.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+      fb.addEventListener('click', function (e) { e.stopPropagation(); sfx('switch'); if (ORB.immersive) orbExitImmersive(); else orbEnterImmersive(true); });
+    }
     var snd = document.getElementById('orbSound');
     if (snd) {
       snd.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
@@ -3360,7 +3461,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var sx = 0, sy = 0, sp = 0, moved = false, down = false, horiz = null;
     function slotPx() { return Math.max(50, stage.clientWidth * (stage.clientWidth < 640 ? 0.22 : 0.14)); }
     stage.addEventListener('pointerdown', function (e) {
-      if (e.target.closest('.orb-nav, .orb-sound') || ORB.items.length < 2) { down = false; return; }
+      if (e.target.closest('.orb-nav, .orb-sound, .orb-full') || ORB.items.length < 2) { down = false; return; }
       down = true; moved = false; horiz = null; sx = e.clientX; sy = e.clientY; sp = ORB.pos;
     });
     stage.addEventListener('pointermove', function (e) {
