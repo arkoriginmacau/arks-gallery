@@ -3507,8 +3507,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (p.censored || (suffix && /^hidden$/i.test(suffix.label || ''))) return;
     var img = c.querySelector('img'); var full = publicImgUrl(p.image_path);
     if (!img || !full || !img.naturalHeight || img.src === full) return;
-    var need = (c.__ch || 300) * 1.14 * (window.devicePixelRatio || 1);
-    if (img.naturalHeight >= need * 0.95) return;
+    /* Always use the full photo for the front painting on PC: thumbnails are compressed and look foggy when shown this large. */
     c.__full = true;
     var hi = new Image();
     hi.onload = function () {
