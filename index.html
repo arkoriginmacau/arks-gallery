@@ -3310,6 +3310,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   function orbIsNoPiece(p) { try { return isNoPiece(p); } catch (e) { return false; } }
 
   function renderOrbit(items) {
+    /* Orbit only shows pieces that have a photo (no blank or Dont Exist tiles). The grid is unchanged. */
+    items = items.filter(function (p) { return p.thumb_path || p.image_path; });
     var o = document.getElementById('orbitView');
     document.getElementById('grid').style.display = 'none';
     o.hidden = false;
