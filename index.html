@@ -219,6 +219,8 @@
   .orb-card img, .orb-card .swatch { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: 6px; background: #1b1814; box-shadow: 0 18px 40px rgba(0,0,0,.55); pointer-events: none; }
   .orb-card img[data-pixelate="1"] { image-rendering: pixelated; }
   .orb-card .swatch { display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.8); font-size: 32px; font-weight: 700; }
+  .orb-card img { opacity: 0; transition: opacity .35s; }
+  .orb-card.ready img { opacity: 1; }
   .orb-card .orb-shade { position: absolute; inset: 0; border-radius: 6px; background: #000; pointer-events: none; }
   .orb-card.front img, .orb-card.front .swatch { outline: 2px solid rgba(255,255,255,.9); outline-offset: 4px; }
   .orb-card .orb-chip { position: absolute; top: 8px; left: 8px; font-size: 10px; font-weight: 700; letter-spacing: .08em; padding: 3px 7px; border-radius: 3px; background: var(--sold); color: #fff; text-transform: uppercase; }
@@ -3300,7 +3302,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       '</div>' +
       '<div class="orb-info" id="orbInfo"></div>';
     ORB.cards = Array.prototype.slice.call(o.querySelectorAll('.orb-card'));
-    ORB.W = ORB.H = 0;
+    ORB.W = ORB.H = 0; ORB.active = 0;
     wireOrbit();
     orbLayout(); orbInfo();
   }
@@ -3324,18 +3326,61 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     } catch (e) {}
   }
 
+  /* Paintings load one or two at a time, front one first then outward, and
+     each is fully decoded before it appears (fades in). Loading ~12 large
+     thumbnails at once is what made phones stutter when Orbit opened. */
+  var ORB_MAX_LOADING = 2;
   function orbLoad(card) {
     var img = card.querySelector('img[data-src]');
     if (!img || img.__loading) return;
     img.__loading = true;
+    ORB.active = (ORB.active || 0) + 1;
+    var t0 = performance.now();
+    function done(ok) {
+      ORB.active = Math.max(0, (ORB.active || 1) - 1);
+      card.classList.add('ready');
+      if (ORB_DBG) ORB_DBG.imgs.push({ ms: Math.round(performance.now() - t0), w: img.naturalWidth, h: img.naturalHeight, ok: ok });
+      orbLayout();
+    }
     img.addEventListener('load', function () {
       if (img.__pixDone) return;
       orbSizeCard(card, img);
-      if (img.getAttribute('data-pixelate') === '1') orbPixelate(img);
-      orbLayout();
+      if (img.getAttribute('data-pixelate') === '1') { orbPixelate(img); done(true); return; }
+      if (img.decode) img.decode().then(function () { done(true); }, function () { done(true); });
+      else done(true);
     });
+    img.addEventListener('error', function () { done(false); });
     img.src = img.getAttribute('data-src');
   }
+
+  /* ---- Debug panel: add ?debug=1 to the address to see what's slow ---- */
+  var ORB_DBG = (function () {
+    try { if (new URLSearchParams(location.search).get('debug') !== '1') return null; } catch (e) { return null; }
+    var d = { imgs: [], frames: 0, slow: 0, worst: 0, last: performance.now(), t0: performance.now(), fpsFrames: 0, fpsT: performance.now(), fps: 0, log: [] };
+    var box = document.createElement('div');
+    box.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:500;background:rgba(0,0,0,.82);color:#7CFC9A;font:11px/1.35 ui-monospace,monospace;padding:6px 8px;border-radius:6px;pointer-events:none;white-space:pre;max-width:94vw';
+    document.addEventListener('DOMContentLoaded', function () { document.body.appendChild(box); });
+    if (document.body) document.body.appendChild(box);
+    function loop(now) {
+      var dt = now - d.last; d.last = now; d.frames++; d.fpsFrames++;
+      if (dt > 50) { d.slow++; if (d.log.length < 6) d.log.push(Math.round((now - d.t0) / 100) / 10 + 's:' + Math.round(dt) + 'ms'); }
+      if (dt > d.worst && d.frames > 2) d.worst = dt;
+      if (now - d.fpsT > 500) { d.fps = Math.round(d.fpsFrames * 1000 / (now - d.fpsT)); d.fpsFrames = 0; d.fpsT = now; paint(); }
+      requestAnimationFrame(loop);
+    }
+    function paint() {
+      var n = d.imgs.length, avg = n ? Math.round(d.imgs.reduce(function (a, b) { return a + b.ms; }, 0) / n) : 0;
+      var sz = n ? d.imgs[n - 1].w + 'x' + d.imgs[n - 1].h : '-';
+      var vis = (ORB.cards || []).filter(function (c) { return c.style.display !== 'none'; }).length;
+      box.textContent =
+        'fps ' + d.fps + '   slow frames ' + d.slow + '   worst ' + Math.round(d.worst) + 'ms\n' +
+        'images ' + n + ' done, ' + (ORB.active || 0) + ' loading, avg ' + avg + 'ms, last ' + sz + '\n' +
+        'cards on ring ' + vis + ' / ' + (ORB.items || []).length + '   screen ' + innerWidth + 'x' + innerHeight + ' @' + (window.devicePixelRatio || 1) + 'x\n' +
+        'slow at: ' + (d.log.join('  ') || '-');
+    }
+    requestAnimationFrame(loop);
+    return d;
+  })();
 
   function orbLayout() {
     var stage = document.getElementById('orbStage');
@@ -3345,12 +3390,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var n = ORB.items.length, S = Math.min(n, W < 640 ? 12 : ORB_SLOTS);
     var ch = Math.round(Math.min(H * (W < 640 ? 0.52 : 0.56), W * 0.55));
     var Rx = Math.min(W * (W < 640 ? 0.4 : 0.4), ch * 3.2), Rz = ch * (W < 640 ? 1.5 : 2.1);
+    var need = [];
     ORB.cards.forEach(function (c, i) {
       var d = orbWrap(i - ORB.pos), ad = Math.abs(d);
       var visible = n <= S || ad < S / 2 - 0.2;
       if (!visible) { if (c.style.display !== 'none') c.style.display = 'none'; return; }
       c.style.display = '';
-      orbLoad(c);
+      if (!c.__req) need.push([ad, c]);
       var th = d / S * 2 * Math.PI, cos = Math.cos(th);
       var w = ch * (c.__ratio || 0.8);
       var x = Math.sin(th) * Rx, z = cos * Rz - Rz, y = (1 - cos) * -ch * 0.3;
@@ -3365,6 +3411,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       var fr = ad < 0.5;
       if (c.__fr !== fr) { c.classList.toggle('front', fr); c.__fr = fr; }
     });
+    if (need.length && (ORB.active || 0) < ORB_MAX_LOADING) {
+      need.sort(function (a, b) { return a[0] - b[0]; });
+      for (var q = 0; q < need.length && (ORB.active || 0) < ORB_MAX_LOADING; q++) { need[q][1].__req = true; orbLoad(need[q][1]); }
+    }
     var cnt = document.getElementById('orbCount');
     if (cnt) cnt.textContent = (orbIndex() + 1) + ' / ' + n;
   }
