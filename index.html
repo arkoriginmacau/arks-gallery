@@ -205,6 +205,47 @@
     padding: 24px; min-height: 200px;
   }
 
+  /* ---------- Orbit view (extra browse mode; the grid is untouched) ---------- */
+  .view-switch { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper-2); }
+  .view-switch button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--ink-soft); font: inherit; font-size: 12.5px; font-weight: 600; padding: 7px 12px; border-radius: 999px; cursor: pointer; }
+  .view-switch button.on { background: var(--ink); color: var(--paper-2); }
+  .orbit { --orb-h: min(58vh, 540px); }
+  .orb-stage { position: relative; height: var(--orb-h); border-radius: 10px; overflow: hidden; background: #0a0908; perspective: 1300px; perspective-origin: 50% 22%; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab; }
+  .orb-stage.dragging { cursor: grabbing; }
+  .orb-bg { position: absolute; inset: -40px; background-size: cover; background-position: center; filter: blur(40px) saturate(1.25) brightness(.38); transition: opacity .7s; pointer-events: none; }
+  .orb-stage::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 45%, transparent 35%, rgba(0,0,0,.75) 100%); pointer-events: none; }
+  .orb-world { position: absolute; left: 50%; top: 52%; transform-style: preserve-3d; z-index: 1; }
+  .orb-card { position: absolute; top: 0; left: 0; height: var(--orb-card-h, 300px); width: calc(var(--orb-card-h, 300px) * .8); border-radius: 6px; will-change: transform; -webkit-box-reflect: below 6px linear-gradient(transparent 75%, rgba(255,255,255,.16)); }
+  .orb-card img, .orb-card .swatch { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: 6px; background: #1b1814; box-shadow: 0 18px 40px rgba(0,0,0,.55); pointer-events: none; }
+  .orb-card img[data-pixelate="1"] { image-rendering: pixelated; }
+  .orb-card .swatch { display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.8); font-size: 32px; font-weight: 700; }
+  .orb-card .orb-shade { position: absolute; inset: 0; border-radius: 6px; background: #000; pointer-events: none; }
+  .orb-card.front img, .orb-card.front .swatch { outline: 2px solid rgba(255,255,255,.9); outline-offset: 4px; }
+  .orb-card .orb-chip { position: absolute; top: 8px; left: 8px; font-size: 10px; font-weight: 700; letter-spacing: .08em; padding: 3px 7px; border-radius: 3px; background: var(--sold); color: #fff; text-transform: uppercase; }
+  .orb-card .orb-chip.nfs { background: var(--not-for-sale); }
+  .orb-nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 3; width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(255,255,255,.3); background: rgba(0,0,0,.35); color: #fff; font-size: 22px; line-height: 1; cursor: pointer; backdrop-filter: blur(6px); }
+  .orb-nav.prev { left: 12px; } .orb-nav.next { right: 12px; }
+  .orb-count { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; z-index: 3; color: rgba(255,255,255,.7); font-size: 12px; letter-spacing: .1em; font-variant-numeric: tabular-nums; pointer-events: none; }
+  .orb-info { max-width: 640px; margin: 18px auto 0; text-align: center; padding: 0 8px; }
+  .orb-info .suffix-tag { display: inline-block; margin-bottom: 6px; }
+  .orb-info h3 { font-size: clamp(22px, 4vw, 32px); margin: 0 0 8px; line-height: 1.15; }
+  .orb-meta { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--ink-soft); }
+  .orb-meta .mono { color: var(--ink); }
+  .orb-desc { margin-top: 12px; font-size: 14px; line-height: 1.55; color: var(--ink-2); }
+  .orb-desc.clamped { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .orb-status { margin-top: 12px; font-weight: 700; font-size: 13px; }
+  .orb-hint { margin-top: 10px; font-size: 12px; color: var(--ink-faint); }
+  .orb-info.swap > * { animation: orbRise .4s ease both; }
+  @keyframes orbRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @media (max-width: 640px) {
+    .orbit { --orb-h: min(50vh, 92vw, 400px); }
+    .orb-nav { width: 38px; height: 38px; font-size: 19px; }
+    .orb-nav.prev { left: 6px; } .orb-nav.next { right: 6px; }
+    .view-switch button span { display: none; }
+    .view-switch button { padding: 8px 11px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .orb-info.swap > * { animation: none; } }
+
   /* ---------- grid ---------- */
   .grid-toolbar {
     display: flex; justify-content: space-between; align-items: center; gap: 12px;
@@ -961,8 +1002,10 @@
         <p class="tab-title" id="tabTitle">&nbsp;</p>
         <p class="tab-sub" id="tabSub"></p>
       </div>
+      <div class="view-switch" id="viewSwitch"></div>
     </div>
     <div class="grid" id="grid"></div>
+    <div class="orbit" id="orbitView" hidden></div>
     <div class="grid-pager" id="gridPager"></div>
   </main>
 
@@ -1119,6 +1162,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       more: 'More', less: 'Less', available: 'Available', sold: 'Sold', nfs: 'Not for sale', markSold: 'Mark sold',
       hiddenChip: 'Hidden', clickToView: 'Click to view', zoomTitle: 'Click to view full size', zoomTitleEmbed: 'Click to view full size (opens in a new tab)',
       viewSet: 'View the full set', setN: 'Set ×{n}', loadMore: 'Load more', showingOf: 'Showing {a} of {b}', showingAll: 'Showing all {n}',
+      viewGrid: 'Grid', viewOrbit: 'Orbit', orbitHint: 'Swipe or use ‹ › to browse · tap the front painting to view full size', orbitHintNoZoom: 'Swipe or use ‹ › to browse',
       pageOfPieces: 'Page {a} of {b} · {n} pieces', prevPage: 'Previous page', nextPage: 'Next page',
       lbClose: 'Close full-size view', lbHint: 'Click image to zoom', lbHintZoomed: 'Move to explore · click to reset', close: 'Close',
       mode: 'Mode', standard: 'Standard', advanced: 'Advanced', pageSize: 'Page size', rowsPerPage: 'Rows per page',
@@ -1149,6 +1193,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       more: '更多', less: '收起', available: '可供出售', sold: '已售', nfs: '非賣品', markSold: '標記已售',
       hiddenChip: '已隱藏', clickToView: '點擊查看', zoomTitle: '點擊查看大圖', zoomTitleEmbed: '點擊查看大圖（在新分頁開啟）',
       viewSet: '查看整套作品', setN: '一套 ×{n}', loadMore: '載入更多', showingOf: '顯示 {a} / {b}', showingAll: '已顯示全部 {n} 件',
+      viewGrid: '網格', viewOrbit: '環形', orbitHint: '左右滑動或按 ‹ › 瀏覽 · 點擊前方作品查看大圖', orbitHintNoZoom: '左右滑動或按 ‹ › 瀏覽',
       pageOfPieces: '第 {a} 頁，共 {b} 頁 · {n} 件', prevPage: '上一頁', nextPage: '下一頁',
       lbClose: '關閉大圖', lbHint: '點擊圖片放大', lbHintZoomed: '移動查看 · 點擊還原', close: '關閉',
       mode: '模式', standard: '標準', advanced: '進階', pageSize: '紙張尺寸', rowsPerPage: '每頁行數',
@@ -1179,6 +1224,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       more: '更多', less: '收起', available: '可供出售', sold: '已售', nfs: '非卖品', markSold: '标记已售',
       hiddenChip: '已隐藏', clickToView: '点击查看', zoomTitle: '点击查看大图', zoomTitleEmbed: '点击查看大图（在新标签页打开）',
       viewSet: '查看整套作品', setN: '一套 ×{n}', loadMore: '加载更多', showingOf: '显示 {a} / {b}', showingAll: '已显示全部 {n} 件',
+      viewGrid: '网格', viewOrbit: '环形', orbitHint: '左右滑动或按 ‹ › 浏览 · 点击前方作品查看大图', orbitHintNoZoom: '左右滑动或按 ‹ › 浏览',
       pageOfPieces: '第 {a} 页，共 {b} 页 · {n} 件', prevPage: '上一页', nextPage: '下一页',
       lbClose: '关闭大图', lbHint: '点击图片放大', lbHintZoomed: '移动查看 · 点击还原', close: '关闭',
       mode: '模式', standard: '标准', advanced: '高级', pageSize: '纸张尺寸', rowsPerPage: '每页行数',
@@ -1209,6 +1255,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       more: 'Mais', less: 'Menos', available: 'Disponível', sold: 'Vendido', nfs: 'Não está à venda', markSold: 'Marcar vendido',
       hiddenChip: 'Oculto', clickToView: 'Clique para ver', zoomTitle: 'Clique para ver em tamanho real', zoomTitleEmbed: 'Clique para ver em tamanho real (abre num novo separador)',
       viewSet: 'Ver o conjunto completo', setN: 'Conjunto ×{n}', loadMore: 'Carregar mais', showingOf: 'A mostrar {a} de {b}', showingAll: 'A mostrar todas as {n}',
+      viewGrid: 'Grelha', viewOrbit: 'Órbita', orbitHint: 'Deslize ou use ‹ › para navegar · toque na pintura da frente para ver em tamanho real', orbitHintNoZoom: 'Deslize ou use ‹ › para navegar',
       pageOfPieces: 'Página {a} de {b} · {n} obras', prevPage: 'Página anterior', nextPage: 'Página seguinte',
       lbClose: 'Fechar vista ampliada', lbHint: 'Clique na imagem para ampliar', lbHintZoomed: 'Mova para explorar · clique para repor', close: 'Fechar',
       mode: 'Modo', standard: 'Padrão', advanced: 'Avançado', pageSize: 'Tamanho da página', rowsPerPage: 'Linhas por página',
@@ -2349,6 +2396,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
 
   function renderGridCards(grid, items, pagerEl) {
+    if (state.view === 'orbit' && !testOverlay) { grid.innerHTML = ''; pagerEl.innerHTML = ''; renderOrbit(items); return; }
     items = paginateGridItems(grid, items, pagerEl);
     grid.innerHTML = items.map(function (p0) {
       var p = testView(p0);
@@ -2979,8 +3027,283 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     showBrowse();
   });
 
+  /* ---------------- Orbit view ----------------
+     An extra, view-only way to browse the same pieces the grid shows (current
+     tab or search results): paintings stand on a tilted ring and spin left /
+     right, like a game-console library. Each painting is shown whole (its own
+     proportions, nothing cropped); the front one's details — the same ones a
+     grid card shows — appear underneath. Censored / "Hidden" pieces stay
+     pixelated and "Hidden" ones can't be opened full size, same as the grid.
+     Choice of view is remembered per browser. The grid code is untouched. */
+  state.view = (function () { try { return localStorage.getItem('arksView') === 'orbit' ? 'orbit' : 'grid'; } catch (e) { return 'grid'; } })();
+  var ORB = { items: [], cards: [], pos: 0, target: 0, key: null, raf: 0, dragging: false, shown: -1, bgFlip: false, descOpen: false };
+  var ORB_SLOTS = 16;
+
+  function renderViewSwitch() {
+    var el = document.getElementById('viewSwitch');
+    if (!el) return;
+    el.innerHTML =
+      '<button type="button" data-view="grid"' + (state.view === 'grid' ? ' class="on"' : '') + ' title="' + txe('viewGrid') + '">' +
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>' + txe('viewGrid') + '</span></button>' +
+      '<button type="button" data-view="orbit"' + (state.view === 'orbit' ? ' class="on"' : '') + ' title="' + txe('viewOrbit') + '">' +
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="13" rx="10" ry="4.5"/><rect x="9" y="5" width="6" height="9" rx="1" fill="currentColor"/></svg><span>' + txe('viewOrbit') + '</span></button>';
+    el.querySelectorAll('[data-view]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        state.view = b.getAttribute('data-view');
+        try { localStorage.setItem('arksView', state.view); } catch (e) {}
+        renderAll();
+      });
+    });
+  }
+
+  /* Called at the top of every grid render; renderGridCards flips it back on. */
+  function hideOrbit() {
+    var o = document.getElementById('orbitView');
+    if (o) o.hidden = true;
+    document.getElementById('grid').style.display = '';
+  }
+
+  function orbIsNoPiece(p) { try { return isNoPiece(p); } catch (e) { return false; } }
+
+  function renderOrbit(items) {
+    var o = document.getElementById('orbitView');
+    document.getElementById('grid').style.display = 'none';
+    o.hidden = false;
+    var key = (state.search || '') + '|' + state.activeTabId + '|' + items.map(function (p) { return p.id; }).join(',');
+    var keepPos = ORB.key === key;
+    if (!keepPos && ORB.key && ORB.key.split('|').slice(0, 2).join('|') === key.split('|').slice(0, 2).join('|')) {
+      /* Same tab, data just refreshed — stay on the same painting if it's still there. */
+      var cur = ORB.items[orbIndex()];
+      var ni = cur ? items.findIndex(function (p) { return p.id === cur.id; }) : -1;
+      ORB.pos = ORB.target = ni < 0 ? 0 : ni; keepPos = true;
+    }
+    ORB.key = key;
+    if (!keepPos) { ORB.pos = ORB.target = 0; }
+    ORB.items = items;
+    ORB.shown = -1; ORB.descOpen = false;
+    o.innerHTML =
+      '<div class="orb-stage" id="orbStage">' +
+      '<div class="orb-bg" id="orbBg1"></div><div class="orb-bg" id="orbBg2" style="opacity:0"></div>' +
+      '<div class="orb-world" id="orbWorld">' + items.map(function (p, i) {
+        var suffix = suffixById(p.suffix_id);
+        var isHidden = !!(suffix && /^hidden$/i.test(suffix.label || ''));
+        var censored = p.censored || isHidden;
+        var thumb = publicImgUrl(p.thumb_path) || publicImgUrl(p.image_path);
+        var inner = thumb
+          ? '<img alt="' + esc(p.name) + '" draggable="false" decoding="async"' + (censored ? ' crossorigin="anonymous" data-pixelate="1"' : '') + ' data-src="' + esc(thumb) + '">'
+          : (orbIsNoPiece(p) ? '<div class="swatch" style="background:#000"></div>'
+            : '<div class="swatch" style="background:' + swatchGradient(p.hue || 30) + '">' + esc((p.name || '?').charAt(0).toUpperCase()) + '</div>');
+        return '<div class="orb-card" data-orb-i="' + i + '" data-card="' + esc(String(p.id)) + '">' + inner +
+          '<span class="card-name" hidden>' + esc(p.name || tx('untitled')) + '</span>' +
+          (p.sold ? '<span class="orb-chip">' + txe('sold') + '</span>' : (p.not_for_sale ? '<span class="orb-chip nfs">' + txe('nfs') + '</span>' : '')) +
+          '<div class="orb-shade"></div></div>';
+      }).join('') + '</div>' +
+      (items.length > 1 ? '<button class="orb-nav prev" type="button" id="orbPrev" aria-label="Previous">‹</button><button class="orb-nav next" type="button" id="orbNext" aria-label="Next">›</button>' : '') +
+      '<div class="orb-count" id="orbCount"></div>' +
+      '</div>' +
+      '<div class="orb-info" id="orbInfo"></div>';
+    ORB.cards = Array.prototype.slice.call(o.querySelectorAll('.orb-card'));
+    wireOrbit();
+    orbLayout(); orbInfo();
+  }
+
+  function orbIndex() { var n = ORB.items.length || 1; return ((Math.round(ORB.pos) % n) + n) % n; }
+  function orbWrap(d) { var n = ORB.items.length; return ((d % n) + n + n / 2) % n - n / 2; }
+
+  function orbSizeCard(card, img) {
+    var r = img.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : 0.8;
+    card.__ratio = Math.max(0.45, Math.min(1.8, r));
+  }
+
+  function orbPixelate(img) {
+    try {
+      var sw = img.naturalWidth, sh = img.naturalHeight; if (!sw || !sh) return;
+      var B = 12, bw = sw >= sh ? B : Math.max(1, Math.round(B * sw / sh)), bh = sh >= sw ? B : Math.max(1, Math.round(B * sh / sw));
+      var c = document.createElement('canvas'); c.width = bw; c.height = bh;
+      c.getContext('2d').drawImage(img, 0, 0, bw, bh);
+      img.__pixDone = true;
+      img.src = c.toDataURL('image/png');
+    } catch (e) {}
+  }
+
+  function orbLoad(card) {
+    var img = card.querySelector('img[data-src]');
+    if (!img || img.__loading) return;
+    img.__loading = true;
+    img.addEventListener('load', function () {
+      if (img.__pixDone) return;
+      orbSizeCard(card, img);
+      if (img.getAttribute('data-pixelate') === '1') orbPixelate(img);
+      orbLayout();
+    });
+    img.src = img.getAttribute('data-src');
+  }
+
+  function orbLayout() {
+    var stage = document.getElementById('orbStage');
+    if (!stage || !ORB.items.length) return;
+    var n = ORB.items.length, S = Math.min(n, ORB_SLOTS);
+    var W = stage.clientWidth, H = stage.clientHeight;
+    var ch = Math.round(Math.min(H * (W < 640 ? 0.52 : 0.56), W * 0.55));
+    var Rx = Math.min(W * (W < 640 ? 0.4 : 0.4), ch * 3.2), Rz = ch * (W < 640 ? 1.5 : 2.1);
+    ORB.cards.forEach(function (c, i) {
+      var d = orbWrap(i - ORB.pos), ad = Math.abs(d);
+      var visible = n <= S || ad < S / 2 - 0.2;
+      if (!visible) { if (c.style.display !== 'none') c.style.display = 'none'; return; }
+      c.style.display = '';
+      orbLoad(c);
+      var th = d / S * 2 * Math.PI, cos = Math.cos(th);
+      var w = ch * (c.__ratio || 0.8);
+      var x = Math.sin(th) * Rx, z = cos * Rz - Rz, y = (1 - cos) * -ch * 0.3;
+      var s = ad < 1 ? 1 + 0.14 * (1 - ad) : 1;
+      c.style.height = ch + 'px'; c.style.width = w + 'px';
+      c.style.transform = 'translate3d(' + (x - w / 2) + 'px,' + (y - ch / 2) + 'px,' + z + 'px) scale(' + s + ')';
+      c.style.zIndex = Math.round(cos * 100) + 100;
+      var edge = n > S ? Math.max(0, Math.min(1, (S / 2 - 0.2 - ad) / 1.2)) : 1;
+      c.style.opacity = edge;
+      c.lastChild.style.opacity = (0.72 * (1 - (cos + 1) / 2)).toFixed(3);
+      c.classList.toggle('front', ad < 0.5);
+    });
+    var cnt = document.getElementById('orbCount');
+    if (cnt) cnt.textContent = (orbIndex() + 1) + ' / ' + n;
+  }
+
+  function orbInfo() {
+    var i = orbIndex();
+    if (i === ORB.shown) return;
+    ORB.shown = i; ORB.descOpen = false;
+    var p = ORB.items[i]; if (!p) return;
+    var suffix = suffixById(p.suffix_id);
+    var isHidden = !!(suffix && /^hidden$/i.test(suffix.label || ''));
+    var isInProgress = !!(suffix && /^in progress$/i.test(suffix.label || ''));
+    var isPendingRemake = !!(suffix && /^pending( for)? remake$/i.test(suffix.label || ''));
+    var anim = isInProgress ? ' rainbow' : (isPendingRemake ? ' redshift' : '');
+    var el = document.getElementById('orbInfo');
+    el.innerHTML =
+      (suffix ? '<div class="suffix-tag' + anim + '"' + (anim ? '' : ' style="color:' + esc(suffix.color) + '"') + '>' + esc(suffixText(suffix)) + '</div>' : '') +
+      '<h3>' + esc(p.name || tx('untitled')) + '</h3>' +
+      '<div class="orb-meta">' +
+      '<span>' + txe('number') + ' <span class="mono">' + esc(catalogNum(p)) + '</span></span>' +
+      '<span>' + txe('date') + ' <span class="mono">' + esc(fmtPieceDate(p)) + '</span></span>' +
+      (p.size ? '<span>' + txe('size') + ' <span class="mono">' + esc(p.size) + '</span></span>' : '') +
+      (p.price ? '<span><span class="mono">' + esc(fmtPrice(p.price)) + '</span></span>' : '') +
+      '</div>' +
+      (p.description ? '<div class="orb-desc clamped" id="orbDesc">' + esc(p.description) + '</div><button class="desc-more" type="button" id="orbMore" hidden>' + txe('more') + '</button>' : '') +
+      '<div class="orb-status sold-static' + (p.sold ? ' is-sold' : (p.not_for_sale ? ' is-nfs' : '')) + '">' + (p.sold ? txe('sold') : (p.not_for_sale ? txe('nfs') : txe('available'))) + '</div>' +
+      '<div class="orb-hint">' + txe(isHidden ? 'orbitHintNoZoom' : 'orbitHint') + '</div>';
+    el.classList.remove('swap'); void el.offsetWidth; el.classList.add('swap');
+    var desc = document.getElementById('orbDesc'), more = document.getElementById('orbMore');
+    if (desc && more) {
+      if (desc.scrollHeight > desc.clientHeight + 2) more.hidden = false;
+      more.addEventListener('click', function () {
+        ORB.descOpen = !ORB.descOpen;
+        desc.classList.toggle('clamped', !ORB.descOpen);
+        more.textContent = tx(ORB.descOpen ? 'less' : 'more');
+      });
+    }
+    /* Soft blurred backdrop from the front painting (skipped for censored ones). */
+    var b1 = document.getElementById('orbBg1'), b2 = document.getElementById('orbBg2');
+    if (b1 && b2) {
+      var on = ORB.bgFlip ? b1 : b2, off = ORB.bgFlip ? b2 : b1; ORB.bgFlip = !ORB.bgFlip;
+      var src = (p.censored || isHidden) ? '' : (publicImgUrl(p.thumb_path) || publicImgUrl(p.image_path) || '');
+      on.style.backgroundImage = src ? 'url("' + src.replace(/"/g, '%22') + '")' : 'none';
+      on.style.opacity = 1; off.style.opacity = 0;
+    }
+  }
+
+  function orbKick() {
+    if (ORB.raf) return;
+    ORB.raf = requestAnimationFrame(function step() {
+      ORB.raf = 0;
+      if (!document.getElementById('orbStage')) return;
+      if (!ORB.dragging) {
+        ORB.pos += (ORB.target - ORB.pos) * 0.14;
+        if (Math.abs(ORB.target - ORB.pos) < 0.002) ORB.pos = ORB.target;
+      }
+      orbLayout(); orbInfo();
+      if (ORB.dragging || ORB.pos !== ORB.target) ORB.raf = requestAnimationFrame(step);
+    });
+  }
+  function orbGo(delta) { ORB.target = Math.round(ORB.target) + delta; orbKick(); }
+
+  function wireOrbit() {
+    var stage = document.getElementById('orbStage');
+    var prev = document.getElementById('orbPrev'), next = document.getElementById('orbNext');
+    if (prev) prev.addEventListener('click', function (e) { e.stopPropagation(); orbGo(-1); });
+    if (next) next.addEventListener('click', function (e) { e.stopPropagation(); orbGo(1); });
+    var sx = 0, sy = 0, sp = 0, moved = false, down = false, horiz = null;
+    function slotPx() { return Math.max(50, stage.clientWidth * (stage.clientWidth < 640 ? 0.22 : 0.14)); }
+    stage.addEventListener('pointerdown', function (e) {
+      if (e.target.closest('.orb-nav') || ORB.items.length < 2) { down = false; return; }
+      down = true; moved = false; horiz = null; sx = e.clientX; sy = e.clientY; sp = ORB.pos;
+    });
+    stage.addEventListener('pointermove', function (e) {
+      if (!down) return;
+      var dx = e.clientX - sx, dy = e.clientY - sy;
+      if (horiz === null && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+        horiz = Math.abs(dx) > Math.abs(dy);
+        if (horiz) { ORB.dragging = true; stage.classList.add('dragging'); try { stage.setPointerCapture(e.pointerId); } catch (er) {} }
+      }
+      if (!horiz) return;
+      moved = true;
+      ORB.pos = sp - dx / slotPx();
+      orbKick();
+    });
+    function end(e) {
+      if (!down) return;
+      down = false;
+      if (ORB.dragging) {
+        ORB.dragging = false; stage.classList.remove('dragging');
+        ORB.target = Math.round(ORB.pos); orbKick();
+      }
+      if (!moved && e.type === 'pointerup') {
+        var card = e.target.closest('.orb-card');
+        if (!card) return;
+        var i = +card.getAttribute('data-orb-i');
+        var d = orbWrap(i - ORB.target);
+        if (Math.abs(d) < 0.5) orbOpen(card, i);
+        else { ORB.target = Math.round(ORB.target + d); orbKick(); }
+      }
+    }
+    stage.addEventListener('pointerup', end);
+    stage.addEventListener('pointercancel', end);
+    /* Trackpad sideways swipe / shift+wheel only — a plain vertical wheel keeps scrolling the page. */
+    var lastWheel = 0;
+    stage.addEventListener('wheel', function (e) {
+      var dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : (e.shiftKey ? e.deltaY : 0);
+      if (!dx) return;
+      e.preventDefault();
+      var now = Date.now(); if (now - lastWheel < 180) return; lastWheel = now;
+      orbGo(dx > 0 ? 1 : -1);
+    }, { passive: false });
+  }
+
+  function orbOpen(card, i) {
+    var p = ORB.items[i]; if (!p) return;
+    var suffix = suffixById(p.suffix_id);
+    if (suffix && /^hidden$/i.test(suffix.label || '')) return;
+    var full = publicImgUrl(p.image_path) || publicImgUrl(p.thumb_path);
+    if (!full) return;
+    if (isEmbedded) { window.open(full, '_blank', 'noopener'); return; }
+    openLightbox(full, card);
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    var o = document.getElementById('orbitView');
+    if (!o || o.hidden || document.getElementById('browseView').hidden) return;
+    if (document.getElementById('lbBackdrop')) return;
+    if (document.getElementById('modalRoot').innerHTML.trim()) return;
+    var t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+    e.preventDefault();
+    orbGo(e.key === 'ArrowRight' ? 1 : -1);
+  });
+  window.addEventListener('resize', function () { if (document.getElementById('orbStage')) orbLayout(); });
+
   function renderAll() {
     syncSearchBox();
+    renderViewSwitch();
+    hideOrbit();
     renderTopActions();
     renderTabs();
     if (!document.getElementById('printView').hidden) renderPrint();
