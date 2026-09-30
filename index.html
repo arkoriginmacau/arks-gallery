@@ -3339,7 +3339,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           (isInProgress ? '<span class="ip-pen top"></span><span class="ip-pen right"></span><span class="ip-pen bottom"></span><span class="ip-pen left"></span>' : '') +
           '<span class="card-name" hidden>' + esc(p.name || tx('untitled')) + '</span>' +
           (p.sold ? '<span class="orb-chip">' + txe('sold') + '</span>' : (p.not_for_sale ? '<span class="orb-chip nfs">' + txe('nfs') + '</span>' : '')) +
-          (setMembers(p).length > 1 ? '<span class="set-badge orb-set"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2 9 4.9-9 4.9-9-4.9L12 2Z"/><path d="m3 12 9 4.9 9-4.9M3 17l9 4.9 9-4.9"/></svg>' + txe('setN', { n: setMembers(p).length }) + '</span>' : '') +
+          (setMembers(p).length > 1 ? '<span class="set-badge orb-set"><span class="set-badge-ring"></span><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2 9 4.9-9 4.9-9-4.9L12 2Z"/><path d="m3 12 9 4.9 9-4.9M3 17l9 4.9 9-4.9"/></svg>' + txe('setN', { n: setMembers(p).length }) + '</span>' : '') +
           (censored ? '<span class="orb-censor">' + txe(isHidden ? 'hiddenChip' : 'clickToView') + '</span>' : '') +
           '<div class="orb-shade"></div></div>';
       }).join('') + '</div>' +
