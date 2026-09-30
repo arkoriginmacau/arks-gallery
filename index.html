@@ -3218,6 +3218,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && ORB.immersive && !document.getElementById('lbBackdrop')) orbExitImmersive();
   });
+  /* Phones open straight into full-screen Orbit — unless this visitor picked
+     Grid themselves before (then their choice wins). ✕ leaves it for this visit. */
+  (function () {
+    try {
+      var saved = localStorage.getItem('arksView');
+      if (saved !== 'grid' && orbIsPhone()) { state.view = 'orbit'; ORB.pendingImmersive = true; }
+    } catch (e) {}
+  })();
   /* Arriving with ?orbit=1 (opened from the embedded site): start in full-screen Orbit. */
   (function () {
     try {
