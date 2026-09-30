@@ -225,6 +225,9 @@
   .orb-card .orb-chip.nfs { background: var(--not-for-sale); }
   .orb-nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 3; width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(255,255,255,.3); background: rgba(0,0,0,.35); color: #fff; font-size: 22px; line-height: 1; cursor: pointer; backdrop-filter: blur(6px); }
   .orb-nav.prev { left: 12px; } .orb-nav.next { right: 12px; }
+  .orb-sound { position: absolute; top: 10px; right: 10px; z-index: 3; width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255,255,255,.3); background: rgba(0,0,0,.35); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(6px); }
+  .orb-sound.off { opacity: .55; }
+  .orb-card .ip-pen { z-index: 2; }
   .orb-count { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; z-index: 3; color: rgba(255,255,255,.7); font-size: 12px; letter-spacing: .1em; font-variant-numeric: tabular-nums; pointer-events: none; }
   .orb-info { max-width: 640px; margin: 18px auto 0; text-align: center; padding: 0 8px; }
   .orb-info .suffix-tag { display: inline-block; margin-bottom: 6px; }
@@ -3039,6 +3042,89 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   var ORB = { items: [], cards: [], pos: 0, target: 0, key: null, raf: 0, dragging: false, shown: -1, bgFlip: false, descOpen: false };
   var ORB_SLOTS = 16;
 
+  /* Sound effects (Web Audio, generated on the fly — no sound files to load).
+     Styled after old PlayStation 1 / 2 menus (not copies of them).
+     Each one has a name so any of them can be switched off later:
+       tick   — soft click each time a painting passes the front
+       whoosh — airy swoosh when the ring starts spinning
+       land   — gentle thud when it settles on a painting
+       open   — rising chime when a painting opens full size
+       switch — two-note blip when changing Grid / Orbit or turning sound on
+     Visitors can mute with the speaker button (remembered per browser). */
+  var SFX_OFF = {}; /* e.g. { tick: true } to remove a sound */
+  var SFX = { ctx: null, noise: null, bus: null, last: {}, on: (function () { try { return localStorage.getItem('arksOrbitSound') !== 'off'; } catch (e) { return true; } })() };
+  function sfxIcon() {
+    return SFX.on
+      ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>'
+      : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="m22 9-6 6M16 9l6 6"/></svg>';
+  }
+  function sfxCtx() {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    if (!SFX.ctx) {
+      SFX.ctx = new AC();
+      var len = Math.floor(SFX.ctx.sampleRate * 0.6), buf = SFX.ctx.createBuffer(1, len, SFX.ctx.sampleRate), d = buf.getChannelData(0);
+      for (var k = 0; k < len; k++) d[k] = Math.random() * 2 - 1;
+      SFX.noise = buf;
+    }
+    if (SFX.ctx.state === 'suspended') SFX.ctx.resume();
+    return SFX.ctx;
+  }
+  /* Echo bus — the spacey tail that gives it the old PlayStation-menu feel. */
+  function sfxBus(c) {
+    if (SFX.bus) return SFX.bus;
+    var dry = c.createGain(), wet = c.createGain(), dl = c.createDelay(1), fb = c.createGain(), lp = c.createBiquadFilter();
+    dl.delayTime.value = 0.19; fb.gain.value = 0.38; wet.gain.value = 0.32; lp.type = 'lowpass'; lp.frequency.value = 2600;
+    dry.connect(c.destination);
+    dry.connect(dl); dl.connect(lp); lp.connect(fb); fb.connect(dl); lp.connect(wet); wet.connect(c.destination);
+    SFX.bus = dry; return dry;
+  }
+  function sfxTone(c, t, type, f0, f1, dur, vol, attack) {
+    var o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t);
+    if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + (attack || 0.006)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(sfxBus(c)); o.start(t); o.stop(t + dur + 0.02);
+  }
+  /* Glassy bell: a pure tone plus a quieter octave-and-a-fifth partial. */
+  function sfxBell(c, t, f, dur, vol) {
+    sfxTone(c, t, 'sine', f, f, dur, vol);
+    sfxTone(c, t, 'sine', f * 3, f * 3, dur * 0.45, vol * 0.28);
+  }
+  function sfx(name) {
+    if (!SFX.on || SFX_OFF[name]) return;
+    var now = Date.now(), gap = { tick: 45, whoosh: 260, land: 150, open: 300, 'switch': 150 }[name] || 100;
+    if (SFX.last[name] && now - SFX.last[name] < gap) return;
+    SFX.last[name] = now;
+    var c; try { c = sfxCtx(); } catch (e) { return; }
+    if (!c) return;
+    var t = c.currentTime + 0.005;
+    if (name === 'tick') {
+      /* PS1-style cursor blip: short crystal ping */
+      sfxBell(c, t, 1760, 0.09, 0.05);
+    } else if (name === 'whoosh') {
+      /* PS2-style airy swell: low pad + breathy filtered noise */
+      var src = c.createBufferSource(), bp = c.createBiquadFilter(), g = c.createGain();
+      src.buffer = SFX.noise; bp.type = 'bandpass'; bp.Q.value = 1.4;
+      bp.frequency.setValueAtTime(260, t); bp.frequency.exponentialRampToValueAtTime(1800, t + 0.35);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.07, t + 0.12); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+      src.connect(bp); bp.connect(g); g.connect(sfxBus(c)); src.start(t); src.stop(t + 0.5);
+      sfxTone(c, t, 'sine', 110, 165, 0.42, 0.06, 0.12);
+    } else if (name === 'land') {
+      /* soft "confirm": two glass notes a fifth apart */
+      sfxBell(c, t, 988, 0.35, 0.045);
+      sfxBell(c, t + 0.06, 1480, 0.4, 0.035);
+    } else if (name === 'open') {
+      /* shimmering rising arpeggio with echo */
+      [659, 988, 1319, 1976].forEach(function (f, k) { sfxBell(c, t + k * 0.055, f, 0.5, 0.045); });
+      sfxTone(c, t, 'sine', 82, 82, 0.9, 0.07, 0.2);
+    } else if (name === 'switch') {
+      /* PS1-style menu select: square-wave chirp */
+      sfxTone(c, t, 'square', 660, 660, 0.06, 0.03);
+      sfxTone(c, t + 0.06, 'square', 990, 990, 0.09, 0.03);
+    }
+  }
+
   function renderViewSwitch() {
     var el = document.getElementById('viewSwitch');
     if (!el) return;
@@ -3049,6 +3135,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="13" rx="10" ry="4.5"/><rect x="9" y="5" width="6" height="9" rx="1" fill="currentColor"/></svg><span>' + txe('viewOrbit') + '</span></button>';
     el.querySelectorAll('[data-view]').forEach(function (b) {
       b.addEventListener('click', function () {
+        if (state.view !== b.getAttribute('data-view')) sfx('switch');
         state.view = b.getAttribute('data-view');
         try { localStorage.setItem('arksView', state.view); } catch (e) {}
         renderAll();
@@ -3093,12 +3180,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           ? '<img alt="' + esc(p.name) + '" draggable="false" decoding="async"' + (censored ? ' crossorigin="anonymous" data-pixelate="1"' : '') + ' data-src="' + esc(thumb) + '">'
           : (orbIsNoPiece(p) ? '<div class="swatch" style="background:#000"></div>'
             : '<div class="swatch" style="background:' + swatchGradient(p.hue || 30) + '">' + esc((p.name || '?').charAt(0).toUpperCase()) + '</div>');
+        var isInProgress = !!(suffix && /^in progress$/i.test(suffix.label || ''));
         return '<div class="orb-card" data-orb-i="' + i + '" data-card="' + esc(String(p.id)) + '">' + inner +
+          (isInProgress ? '<span class="ip-pen top"></span><span class="ip-pen right"></span><span class="ip-pen bottom"></span><span class="ip-pen left"></span>' : '') +
           '<span class="card-name" hidden>' + esc(p.name || tx('untitled')) + '</span>' +
           (p.sold ? '<span class="orb-chip">' + txe('sold') + '</span>' : (p.not_for_sale ? '<span class="orb-chip nfs">' + txe('nfs') + '</span>' : '')) +
           '<div class="orb-shade"></div></div>';
       }).join('') + '</div>' +
       (items.length > 1 ? '<button class="orb-nav prev" type="button" id="orbPrev" aria-label="Previous">‹</button><button class="orb-nav next" type="button" id="orbNext" aria-label="Next">›</button>' : '') +
+      '<button class="orb-sound' + (SFX.on ? '' : ' off') + '" type="button" id="orbSound" aria-label="Sound on/off" title="Sound on/off">' + sfxIcon() + '</button>' +
       '<div class="orb-count" id="orbCount"></div>' +
       '</div>' +
       '<div class="orb-info" id="orbInfo"></div>';
@@ -3171,6 +3261,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   function orbInfo() {
     var i = orbIndex();
     if (i === ORB.shown) return;
+    if (ORB.shown !== -1) sfx('tick');
     ORB.shown = i; ORB.descOpen = false;
     var p = ORB.items[i]; if (!p) return;
     var suffix = suffixById(p.suffix_id);
@@ -3218,23 +3309,34 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (!document.getElementById('orbStage')) return;
       if (!ORB.dragging) {
         ORB.pos += (ORB.target - ORB.pos) * 0.14;
-        if (Math.abs(ORB.target - ORB.pos) < 0.002) ORB.pos = ORB.target;
+        if (Math.abs(ORB.target - ORB.pos) < 0.002) { ORB.pos = ORB.target; if (ORB.moving) { ORB.moving = false; sfx('land'); } }
       }
       orbLayout(); orbInfo();
       if (ORB.dragging || ORB.pos !== ORB.target) ORB.raf = requestAnimationFrame(step);
     });
   }
-  function orbGo(delta) { ORB.target = Math.round(ORB.target) + delta; orbKick(); }
+  function orbGo(delta) { ORB.target = Math.round(ORB.target) + delta; ORB.moving = true; sfx('whoosh'); orbKick(); }
 
   function wireOrbit() {
     var stage = document.getElementById('orbStage');
     var prev = document.getElementById('orbPrev'), next = document.getElementById('orbNext');
     if (prev) prev.addEventListener('click', function (e) { e.stopPropagation(); orbGo(-1); });
     if (next) next.addEventListener('click', function (e) { e.stopPropagation(); orbGo(1); });
+    var snd = document.getElementById('orbSound');
+    if (snd) {
+      snd.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+      snd.addEventListener('click', function (e) {
+        e.stopPropagation();
+        SFX.on = !SFX.on;
+        try { localStorage.setItem('arksOrbitSound', SFX.on ? 'on' : 'off'); } catch (er) {}
+        snd.classList.toggle('off', !SFX.on); snd.innerHTML = sfxIcon();
+        sfx('switch');
+      });
+    }
     var sx = 0, sy = 0, sp = 0, moved = false, down = false, horiz = null;
     function slotPx() { return Math.max(50, stage.clientWidth * (stage.clientWidth < 640 ? 0.22 : 0.14)); }
     stage.addEventListener('pointerdown', function (e) {
-      if (e.target.closest('.orb-nav') || ORB.items.length < 2) { down = false; return; }
+      if (e.target.closest('.orb-nav, .orb-sound') || ORB.items.length < 2) { down = false; return; }
       down = true; moved = false; horiz = null; sx = e.clientX; sy = e.clientY; sp = ORB.pos;
     });
     stage.addEventListener('pointermove', function (e) {
@@ -3254,7 +3356,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       down = false;
       if (ORB.dragging) {
         ORB.dragging = false; stage.classList.remove('dragging');
-        ORB.target = Math.round(ORB.pos); orbKick();
+        ORB.target = Math.round(ORB.pos); ORB.moving = true; sfx('whoosh'); orbKick();
       }
       if (!moved && e.type === 'pointerup') {
         var card = e.target.closest('.orb-card');
@@ -3262,7 +3364,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         var i = +card.getAttribute('data-orb-i');
         var d = orbWrap(i - ORB.target);
         if (Math.abs(d) < 0.5) orbOpen(card, i);
-        else { ORB.target = Math.round(ORB.target + d); orbKick(); }
+        else { ORB.target = Math.round(ORB.target + d); ORB.moving = true; sfx('whoosh'); orbKick(); }
       }
     }
     stage.addEventListener('pointerup', end);
@@ -3284,6 +3386,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (suffix && /^hidden$/i.test(suffix.label || '')) return;
     var full = publicImgUrl(p.image_path) || publicImgUrl(p.thumb_path);
     if (!full) return;
+    sfx('open');
     if (isEmbedded) { window.open(full, '_blank', 'noopener'); return; }
     openLightbox(full, card);
   }
