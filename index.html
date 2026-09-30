@@ -248,6 +248,15 @@
   .orb-info.swap > * { animation: orbRise .4s ease both; }
   @keyframes orbRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
   .orb-gofs { left: 54px !important; }
+  /* Exit ✕ in full-screen Orbit: no circle, just a glowing X blinking red/white
+     (same look as the Set badge's running dot). */
+  .orb-full.is-x { border: 0; background: none; backdrop-filter: none; }
+  .orb-full.is-x svg { width: 22px; height: 22px; stroke-width: 2.6; animation: orbXBlink 1.6s ease-in-out infinite; }
+  @keyframes orbXBlink {
+    0%, 100% { color: #ff2d2d; filter: drop-shadow(0 0 4px rgba(255,45,45,.95)) drop-shadow(0 0 9px rgba(255,45,45,.6)); }
+    50%      { color: #ffffff; filter: drop-shadow(0 0 4px rgba(255,255,255,.9)) drop-shadow(0 0 8px rgba(255,255,255,.4)); }
+  }
+  @media (prefers-reduced-motion: reduce) { .orb-full.is-x svg { animation: none; color: #ff2d2d; } }
   .orb-card .orb-set { top: 8px; right: 8px; pointer-events: auto; }
   .orb-card .orb-censor { position: absolute; left: 8px; bottom: 8px; font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 3px; background: rgba(0,0,0,.65); color: #fff; }
   .orb-setbtn { margin-top: 10px; border: 1px solid currentColor; background: transparent; color: inherit; border-radius: 999px; padding: 7px 14px; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
@@ -3215,7 +3224,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (o) o.classList.toggle('immersive', on);
     document.body.classList.toggle('orbit-immersive', on);
     var fb = document.getElementById('orbFull');
-    if (fb) { fb.innerHTML = orbFullIcon(); fb.title = on ? 'Exit full screen' : 'Full screen'; }
+    if (fb) { fb.innerHTML = orbFullIcon(); fb.title = on ? 'Exit full screen' : 'Full screen'; fb.classList.toggle('is-x', on); }
     orbSyncFsBtn();
     ORB.W = ORB.H = 0;
     requestAnimationFrame(function () { ORB.W = ORB.H = 0; orbLayout(); });
@@ -3238,7 +3247,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
   function orbSyncFsBtn() {
     var b = document.getElementById('orbGoFs');
-    if (b) b.hidden = !(ORB.immersive && !orbIsRealFs() && (orbFsOk() || isEmbedded));
+    if (b) b.hidden = !(isEmbedded && ORB.immersive && !orbIsRealFs());
   }
   function orbEnterImmersive(tryFs) {
     var o = document.getElementById('orbitView');
@@ -3360,7 +3369,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           '<div class="orb-shade"></div></div>';
       }).join('') + '</div>' +
       (items.length > 1 ? '<button class="orb-nav prev" type="button" id="orbPrev" aria-label="Previous">‹</button><button class="orb-nav next" type="button" id="orbNext" aria-label="Next">›</button>' : '') +
-      '<button class="orb-full" type="button" id="orbFull" aria-label="Full screen" title="Full screen">' + orbFullIcon() + '</button>' +
+      '<button class="orb-full' + (ORB.immersive ? ' is-x' : '') + '" type="button" id="orbFull" aria-label="Full screen" title="Full screen">' + orbFullIcon() + '</button>' +
       '<button class="orb-full orb-gofs" type="button" id="orbGoFs" hidden aria-label="Fill the whole screen" title="Fill the whole screen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>' +
       '<button class="orb-sound' + (SFX.on ? '' : ' off') + '" type="button" id="orbSound" aria-label="Sound on/off" title="Sound on/off">' + sfxIcon() + '</button>' +
       '<div class="orb-count" id="orbCount"></div>' +
@@ -3646,7 +3655,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (!down) return;
       /* Opened straight into full-screen Orbit: the visitor's first touch also
          takes it to real full screen (browsers only allow that when a finger lifts). */
-      if (e.type === 'pointerup' && ORB.immersive && !ORB.autoFsTried && !orbIsRealFs() && orbFsOk()) { ORB.autoFsTried = true; orbRequestFs(); }
+      if (e.type === 'pointerup' && isEmbedded && ORB.immersive && !ORB.autoFsTried && !orbIsRealFs() && orbFsOk()) { ORB.autoFsTried = true; orbRequestFs(); }
       down = false;
       if (ORB.dragging) {
         ORB.dragging = false; stage.classList.remove('dragging');
