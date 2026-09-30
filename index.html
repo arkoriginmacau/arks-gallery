@@ -1800,6 +1800,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         '<button class="btn btn-ghost btn-sm" id="btnDescPdfTest" type="button" title="Read a catalogue PDF (one numbered piece per page) and pull its description text in, preview in red, fix anything wrong, then apply">' + txe('importDesc') + '</button>' +
         '<input type="file" id="descPdfTestInput" accept="application/pdf" style="display:none">' +
         '<button class="btn btn-ghost btn-sm" id="btnXlsxExport" type="button" title="Download the inventory (date, number, name, size) as an Excel file — edit it, print it to PDF, then re-import with Import from PDF">' + txe('exportXlsx') + '</button>' +
+        '<button class="btn btn-ghost btn-sm" id="btnSharpenThumbs" type="button" title="Find thumbnails smaller than 900px (older uploads look soft/foggy) and rebuild them sharp from the full photo">Sharpen thumbnails</button>' +
         '<button class="btn btn-ghost btn-sm" id="btnPdfExport" type="button" title="Download the current inventory as a PDF, in the exact layout Import from PDF reads — a ready-made master copy to correct offline and bring back in">' + txe('downloadPdf') + '</button>' +
         '<button class="btn btn-primary" id="btnAddPainting" type="button">' +
         '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>' + txe('addPainting') + '</button>' +
@@ -1828,6 +1829,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
       document.getElementById('btnXlsxExport').addEventListener('click', exportInventoryXlsx);
       document.getElementById('btnPdfExport').addEventListener('click', exportInventoryPdf);
+      document.getElementById('btnSharpenThumbs').addEventListener('click', openSharpenThumbsModal);
       document.getElementById('btnPdfTest').addEventListener('click', function () {
         document.getElementById('pdfTestInput').click();
       });
@@ -4265,6 +4267,84 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     });
   }
   function closeModal() { document.getElementById('modalRoot').innerHTML = ''; }
+
+  /* ---------------- Sharpen thumbnails (admin) ----------------
+     Older uploads got 480px thumbnails, which look soft/foggy on PC and in
+     Orbit. This rebuilds any thumbnail under 850px from the full photo at
+     900px (same quality as new uploads), saves it under a NEW file name
+     (so no browser shows the old cached one) and points the painting at
+     it. The full photo and every other detail are untouched; the old
+     thumbnail file is left in storage as a backup. */
+  var THUMB_TARGET = 900, THUMB_MIN_OK = 850;
+  function loadImg(src) {
+    return new Promise(function (resolve, reject) {
+      var im = new Image(); im.crossOrigin = 'anonymous';
+      im.onload = function () { resolve(im); }; im.onerror = function () { reject(new Error('load failed')); };
+      im.src = src;
+    });
+  }
+  function openSharpenThumbsModal() {
+    var root = document.getElementById('modalRoot');
+    var cancelled = false, running = false;
+    root.innerHTML = '<div class="modal-backdrop" id="shBackdrop"><div class="modal">' +
+      '<h2>Sharpen thumbnails</h2>' +
+      '<p class="field-hint" id="shText">Checking every thumbnail…</p>' +
+      '<div class="bulk-progress" style="height:6px;background:var(--line-soft);border-radius:3px;overflow:hidden;margin:12px 0"><div id="shFill" style="height:100%;width:0;background:var(--ochre);transition:width .2s"></div></div>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" id="shCancel" type="button">Close</button>' +
+      '<button class="btn btn-primary" id="shGo" type="button" disabled>Rebuild</button></div>' +
+      '</div></div>';
+    var text = document.getElementById('shText'), fill = document.getElementById('shFill'), goBtn = document.getElementById('shGo');
+    document.getElementById('shCancel').addEventListener('click', function () { cancelled = true; if (!running) closeModal(); });
+    var list = state.paintings.filter(function (p) { return p.image_path && p.thumb_path && p.thumb_path !== p.image_path; });
+    var soft = [];
+    (async function scan() {
+      var q = list.slice(), done = 0;
+      await Promise.all([0, 1, 2, 3, 4, 5].map(async function () {
+        while (q.length && !cancelled) {
+          var p = q.shift();
+          try { var im = await loadImg(publicImgUrl(p.thumb_path)); if (Math.max(im.naturalWidth, im.naturalHeight) < THUMB_MIN_OK) soft.push(p); } catch (e) {}
+          done++; fill.style.width = Math.round(done / list.length * 100) + '%';
+        }
+      }));
+      if (cancelled) return;
+      fill.style.width = '0';
+      if (!soft.length) { text.textContent = 'All ' + list.length + ' thumbnails are already sharp. Nothing to do.'; return; }
+      text.textContent = soft.length + ' of ' + list.length + ' thumbnails are low-resolution (older uploads). Rebuild them sharp from the full photos? This takes a few minutes; keep this tab open.';
+      goBtn.disabled = false;
+    })();
+    goBtn.addEventListener('click', async function () {
+      goBtn.disabled = true; running = true;
+      document.getElementById('shCancel').textContent = 'Stop';
+      var ok = 0, failed = 0;
+      for (var i = 0; i < soft.length && !cancelled; i++) {
+        var p = soft[i];
+        text.textContent = 'Rebuilding ' + (i + 1) + ' of ' + soft.length + ' — ' + (p.name || catalogNum(p));
+        fill.style.width = Math.round(i / soft.length * 100) + '%';
+        try {
+          var im = await loadImg(publicImgUrl(p.image_path));
+          var w = im.naturalWidth, h = im.naturalHeight;
+          var sc = Math.min(1, THUMB_TARGET / Math.max(w, h));
+          var tw = Math.max(1, Math.round(w * sc)), th = Math.max(1, Math.round(h * sc));
+          var cv = drawHQDownscale(im, w, h, tw, th);
+          var blob = await new Promise(function (r) { cv.toBlob(r, 'image/jpeg', 0.78); });
+          if (!blob) throw new Error('encode failed');
+          var uid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
+          var path = 'thumb/' + uid + '.jpg';
+          var up = await r2Upload(path, blob, 'image/jpeg');
+          if (up.error) throw up.error;
+          var res = await sb.from('paintings').update({ thumb_path: path }).eq('id', p.id);
+          if (res.error) throw res.error;
+          p.thumb_path = path; ok++;
+        } catch (e) { failed++; }
+      }
+      running = false;
+      fill.style.width = '100%';
+      text.textContent = (cancelled ? 'Stopped. ' : 'Done. ') + ok + ' thumbnail' + (ok === 1 ? '' : 's') + ' rebuilt sharp' + (failed ? ', ' + failed + ' failed (try again later)' : '') + '.';
+      document.getElementById('shCancel').textContent = 'Close';
+      cancelled = false;
+      document.getElementById('shCancel').onclick = function () { closeModal(); renderAll(); };
+    });
+  }
 
   function openTabModal(tabId) {
     var t = tabId ? tabById(tabId) : null;
