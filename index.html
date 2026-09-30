@@ -215,7 +215,7 @@
   .orb-bg { position: absolute; inset: -40px; background-size: cover; background-position: center; filter: blur(40px) saturate(1.25) brightness(.38); transition: opacity .7s; pointer-events: none; }
   .orb-stage::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 45%, transparent 35%, rgba(0,0,0,.75) 100%); pointer-events: none; }
   .orb-world { position: absolute; left: 50%; top: 52%; transform-style: preserve-3d; z-index: 1; }
-  .orb-card { position: absolute; top: 0; left: 0; height: var(--orb-card-h, 300px); width: calc(var(--orb-card-h, 300px) * .8); border-radius: 6px; will-change: transform; -webkit-box-reflect: below 6px linear-gradient(transparent 75%, rgba(255,255,255,.16)); }
+  .orb-card { position: absolute; top: 0; left: 0; height: var(--orb-card-h, 300px); width: calc(var(--orb-card-h, 300px) * .8); border-radius: 6px; -webkit-box-reflect: below 6px linear-gradient(transparent 75%, rgba(255,255,255,.16)); }
   .orb-card img, .orb-card .swatch { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: 6px; background: #1b1814; box-shadow: 0 18px 40px rgba(0,0,0,.55); pointer-events: none; }
   .orb-card img[data-pixelate="1"] { image-rendering: pixelated; }
   .orb-card .swatch { display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.8); font-size: 32px; font-weight: 700; }
@@ -272,6 +272,10 @@
   .orbit.immersive .orb-meta .mono { color: #f4f1ea; }
   .orbit.immersive .orb-desc { color: rgba(244,241,234,.85); }
   .orbit.immersive .orb-hint { color: rgba(244,241,234,.45); }
+  /* Phones: pre-promote cards for smooth spinning. (Not on PC — Chrome then
+     keeps the low-res raster from when a card was small at the back of the
+     ring, which made the front painting look soft on big screens.) */
+  @media (max-width: 640px) { .orb-card { will-change: transform; } }
   @media (max-width: 640px) {
     .orbit { --orb-h: min(52vh, 100vw, 420px); }
     /* Phones: details sit right under the ring on the same dark background. */
@@ -3265,7 +3269,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   (function () {
     try {
       var saved = localStorage.getItem('arksView');
-      if (saved !== 'grid' && orbIsPhone()) { state.view = 'orbit'; ORB.pendingImmersive = true; }
+      if (saved !== 'grid') { state.view = 'orbit'; ORB.pendingImmersive = true; }
     } catch (e) {}
   })();
   /* Arriving with ?orbit=1 (opened from the embedded site): start in full-screen Orbit. */
@@ -3398,6 +3402,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function done(ok) {
       ORB.active = Math.max(0, (ORB.active || 1) - 1);
       card.classList.add('ready');
+      var ci = ORB.cards.indexOf(card);
+      if (ci === orbIndex()) setTimeout(function () { if (!ORB.dragging && ORB.pos === ORB.target && orbIndex() === ci) orbSharpen(ci); }, 300);
       if (ORB_DBG) ORB_DBG.imgs.push({ ms: Math.round(performance.now() - t0), w: img.naturalWidth, h: img.naturalHeight, ok: ok });
       orbLayout();
     }
@@ -3491,8 +3497,29 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (ORB.dragging || Math.abs(ORB.target - ORB.pos) > 0.6) { ORB.infoTimer = setTimeout(function () { var k = ORB.shown; ORB.shown = -2; orbInfoFill(k); }, 140); return; }
     orbInfoFill(i);
   }
+  /* On PC the front painting can be shown bigger than its grid thumbnail
+     (900px), so once the ring settles on it, swap in the sharper full-size
+     photo. Phones keep the thumbnail — it's already sharp at that size. */
+  function orbSharpen(i) {
+    if (orbIsPhone()) return;
+    var p = ORB.items[i], c = ORB.cards[i]; if (!p || !c || c.__full) return;
+    var suffix = suffixById(p.suffix_id);
+    if (p.censored || (suffix && /^hidden$/i.test(suffix.label || ''))) return;
+    var img = c.querySelector('img'); var full = publicImgUrl(p.image_path);
+    if (!img || !full || !img.naturalHeight || img.src === full) return;
+    var need = (c.__ch || 300) * 1.14 * (window.devicePixelRatio || 1);
+    if (img.naturalHeight >= need * 0.95) return;
+    c.__full = true;
+    var hi = new Image();
+    hi.onload = function () {
+      var go = function () { img.__pixDone = true; img.src = full; };
+      if (hi.decode) hi.decode().then(go, go); else go();
+    };
+    hi.src = full;
+  }
   function orbInfoFill(i) {
     ORB.shown = i;
+    setTimeout(function () { if (ORB.shown === i && !ORB.dragging && ORB.pos === ORB.target) orbSharpen(i); }, 350);
     var p = ORB.items[i]; if (!p) return;
     var suffix = suffixById(p.suffix_id);
     var isHidden = !!(suffix && /^hidden$/i.test(suffix.label || ''));
