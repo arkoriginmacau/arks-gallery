@@ -236,6 +236,11 @@
   .orb-info h3 { font-size: clamp(22px, 4vw, 32px); margin: 0 0 8px; line-height: 1.15; }
   .orb-meta { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--ink-soft); }
   .orb-meta .mono { color: var(--ink); }
+  /* Painting number: bigger than the meta line so visitors can tell where they are in the collection. */
+  .orb-num { margin: 0 0 12px; font-size: 20px; font-weight: 600; line-height: 1.2; }
+  .orb-num .mono { font-size: 22px; letter-spacing: .03em; }
+  .orb-num-l { font-size: 13px; font-weight: 500; color: var(--ink-soft); margin-right: 4px; }
+  .orbit.immersive .orb-num-l { color: rgba(244,241,234,.6); }
   .orb-desc { margin-top: 12px; font-size: 14px; line-height: 1.55; color: var(--ink-2); }
   .orb-desc.clamped { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .orb-status { margin-top: 12px; font-weight: 700; font-size: 13px; }
@@ -272,6 +277,9 @@
     /* Phones: details sit right under the ring on the same dark background. */
     .orb-info { background: #0a0908; color: #f4f1ea; width: 100vw; max-width: none; margin: 0 0 0 calc(50% - 50vw); padding: 8px 16px 16px; }
     .orb-info h3 { color: #f4f1ea; font-size: 22px; margin-bottom: 6px; }
+    .orb-num { font-size: 18px; margin-bottom: 8px; color: #f4f1ea; }
+    .orb-num .mono { font-size: 19px; }
+    .orb-num-l { color: rgba(244,241,234,.6); font-size: 12px; }
     .orb-meta { color: rgba(244,241,234,.6); font-size: 12px; gap: 4px 14px; }
     .orb-meta .mono { color: #f4f1ea; }
     .orb-desc { color: rgba(244,241,234,.85); font-size: 13.5px; margin-top: 8px; }
@@ -3493,8 +3501,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     el.innerHTML =
       (suffix ? '<div class="suffix-tag' + anim + '"' + (anim ? '' : ' style="color:' + esc(suffix.color) + '"') + '>' + esc(suffixText(suffix)) + '</div>' : '') +
       '<h3>' + esc(p.name || tx('untitled')) + '</h3>' +
+      '<div class="orb-num"><span class="orb-num-l">' + txe('number') + '</span> <span class="mono">' + esc(catalogNum(p)) + '</span></div>' +
       '<div class="orb-meta">' +
-      '<span>' + txe('number') + ' <span class="mono">' + esc(catalogNum(p)) + '</span></span>' +
       '<span>' + txe('date') + ' <span class="mono">' + esc(fmtPieceDate(p)) + '</span></span>' +
       (p.size ? '<span>' + txe('size') + ' <span class="mono">' + esc(p.size) + '</span></span>' : '') +
       (p.price ? '<span><span class="mono">' + esc(fmtPrice(p.price)) + '</span></span>' : '') +
