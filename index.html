@@ -248,6 +248,10 @@
   .orb-info.swap > * { animation: orbRise .4s ease both; }
   @keyframes orbRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
   .orb-gofs { left: 54px !important; }
+  .site-home { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+  .orb-home { display: none; position: absolute; top: 10px; left: 52px; z-index: 3; width: 36px; height: 36px; align-items: center; justify-content: center; color: #f4f1ea; opacity: .85; }
+  .orb-home svg { width: 20px; height: 20px; }
+  .orbit.immersive .orb-home { display: flex; }
   /* Exit ✕ in full-screen Orbit: no circle, just a glowing X blinking red/white
      (same look as the Set badge's running dot). */
   .orb-full.is-x { border: 0; background: none; backdrop-filter: none; }
@@ -1202,6 +1206,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   /* When this page is loaded inside someone else's site (e.g. embedded on the
      Wix website) it must always stay pure viewing mode — no "Admin" sign-in
      affordance, and no edit controls even if a stray admin session exists. */
+  /* The Admin sign-in button only appears on  …/?admin  (or #admin). */
+  /* Main website — "back" button in the header and in full-screen Orbit. */
+  var SITE_HOME = 'https://www.arkorigin.xyz/';
+  var SITE_HOME_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M3 11 12 3l9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>';
+  var ADMIN_ENTRY = (function () {
+    try { return /(^|[?&])admin(=|&|$)/.test(location.search.slice(1)) || location.hash === '#admin'; } catch (e) { return false; }
+  })();
   var isEmbedded = (function () {
     try { return window.self !== window.top; } catch (e) { return true; }
   })();
@@ -1858,8 +1869,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         runDescPdfSync(f);
       });
       document.getElementById('btnSignOut').addEventListener('click', signOut);
-    } else if (isEmbedded) {
-      /* Embedded on the Wix website: pure viewing mode, no admin affordance at all. */
+    } else if (isEmbedded || !ADMIN_ENTRY) {
+      /* Visitors: pure viewing mode, no admin button at all. The studio's
+         own way in is the private address  arks-gallery.vercel.app/?admin
+         (sign-in is still the emailed magic link, so knowing the address
+         alone gets nobody in). */
       el.innerHTML = printBtn;
     } else {
       el.innerHTML = printBtn +
@@ -1870,7 +1884,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     document.getElementById('btnPrintView').addEventListener('click', function () {
       if (document.getElementById('printView').hidden) showPrint(); else showBrowse();
     });
-    el.insertAdjacentHTML('beforeend', langPickerHtml());
+    /* Visitors: language picker first (left); admin keeps it at the end. */
+    el.insertAdjacentHTML(isAdmin ? 'beforeend' : 'afterbegin', langPickerHtml());
+    if (!isEmbedded && !isAdmin) el.insertAdjacentHTML('afterbegin', '<a class="btn btn-ghost btn-sm site-home" href="' + SITE_HOME + '">' + SITE_HOME_ICON + ' arkorigin.xyz</a>');
     document.getElementById('langSelect').addEventListener('change', function (e) { setLanguage(e.target.value); });
   }
 
@@ -3280,7 +3296,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   (function () {
     try {
       var saved = localStorage.getItem('arksView');
-      if (saved !== 'grid') { state.view = 'orbit'; ORB.pendingImmersive = true; }
+      /* Not for the studio itself: ?admin or a signed-in admin opens the normal page. */
+      var studio = ADMIN_ENTRY || !!localStorage.getItem(SESSION_KEY);
+      if (saved !== 'grid' && !studio) { state.view = 'orbit'; ORB.pendingImmersive = true; }
     } catch (e) {}
   })();
   /* Arriving with ?orbit=1 (opened from the embedded site): start in full-screen Orbit. */
@@ -3370,6 +3388,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }).join('') + '</div>' +
       (items.length > 1 ? '<button class="orb-nav prev" type="button" id="orbPrev" aria-label="Previous">‹</button><button class="orb-nav next" type="button" id="orbNext" aria-label="Next">›</button>' : '') +
       '<button class="orb-full' + (ORB.immersive ? ' is-x' : '') + '" type="button" id="orbFull" aria-label="Full screen" title="Full screen">' + orbFullIcon() + '</button>' +
+      (isEmbedded ? '' : '<a class="orb-home" id="orbHome" href="' + SITE_HOME + '" aria-label="Back to arkorigin.xyz" title="Back to arkorigin.xyz">' + SITE_HOME_ICON + '</a>') +
       '<button class="orb-full orb-gofs" type="button" id="orbGoFs" hidden aria-label="Fill the whole screen" title="Fill the whole screen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>' +
       '<button class="orb-sound' + (SFX.on ? '' : ' off') + '" type="button" id="orbSound" aria-label="Sound on/off" title="Sound on/off">' + sfxIcon() + '</button>' +
       '<div class="orb-count" id="orbCount"></div>' +
@@ -3636,7 +3655,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var sx = 0, sy = 0, sp = 0, moved = false, down = false, horiz = null;
     function slotPx() { return Math.max(50, stage.clientWidth * (stage.clientWidth < 640 ? 0.22 : 0.14)); }
     stage.addEventListener('pointerdown', function (e) {
-      if (e.target.closest('.orb-nav, .orb-sound, .orb-full') || ORB.items.length < 2) { down = false; return; }
+      if (e.target.closest('.orb-nav, .orb-sound, .orb-full, .orb-home') || ORB.items.length < 2) { down = false; return; }
       down = true; moved = false; horiz = null; sx = e.clientX; sy = e.clientY; sp = ORB.pos;
     });
     stage.addEventListener('pointermove', function (e) {
