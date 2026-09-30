@@ -243,6 +243,16 @@
   .orb-info.swap > * { animation: orbRise .4s ease both; }
   @keyframes orbRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
   .orb-gofs { left: 54px !important; }
+  .orb-card .orb-set { top: 8px; right: 8px; pointer-events: auto; }
+  .orb-card .orb-censor { position: absolute; left: 8px; bottom: 8px; font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 3px; background: rgba(0,0,0,.65); color: #fff; }
+  .orb-setbtn { margin-top: 10px; border: 1px solid currentColor; background: transparent; color: inherit; border-radius: 999px; padding: 7px 14px; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+  .orb-tabs { display: none; }
+  .orbit.immersive .orb-tabs { display: flex; flex: 0 0 auto; gap: 6px; overflow-x: auto; padding: 10px 12px 6px; justify-content: safe center; scrollbar-width: none; }
+  .orbit.immersive .orb-tabs::-webkit-scrollbar { display: none; }
+  .orb-tab { flex: 0 0 auto; border: 1px solid rgba(255,255,255,.25); background: transparent; color: rgba(244,241,234,.8); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+  .orb-tab span { opacity: .6; font-weight: 400; }
+  .orb-tab.on { background: #f4f1ea; color: #0a0908; border-color: #f4f1ea; }
+  body.orbit-immersive .set-modal-backdrop { z-index: 95; }
   .orb-full, .orb-sound { touch-action: manipulation; }
   .orb-gofs[hidden] { display: none; }
   .orb-full { position: absolute; top: 10px; left: 10px; z-index: 3; width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255,255,255,.3); background: rgba(0,0,0,.45); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -2474,6 +2484,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         : (isNoPiece(p)
           ? '<div class="swatch" style="background:#000"></div>'
           : '<div class="swatch" style="background:' + swatchGradient(p.hue || 30) + '"><span>' + esc((p.name || '?').charAt(0).toUpperCase()) + '</span></div>');
+      /* NOTE: the Orbit view (renderOrbit / orbInfoFill) shows the same visitor
+         info as this card — name, number, date, size, price, description,
+         suffix, sold / not-for-sale, set, censored/hidden, in-progress lines.
+         When adding a new field here, add it there too. */
       var setMates = setMembers(p);
       return '<div class="card' + (p.sold ? ' is-sold' : '') + (p.__testNew ? ' is-test-new' : '') + '" data-card="' + p.id + '">' +
         '<div class="card-image' + (isCensoredView ? ' is-censored' : '') + '"' + (canZoom ? ' data-lightbox="' + esc(fullSrc) + '" title="' + (isEmbedded ? txe('zoomTitleEmbed') : txe('zoomTitle')) + '"' : '') + '>' + imageInner +
@@ -3305,6 +3319,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     ORB.items = items;
     ORB.shown = -1; ORB.descOpen = false;
     o.innerHTML =
+      (state.tabs.length > 1 ? '<div class="orb-tabs" id="orbTabs">' + state.tabs.map(function (t) {
+        var n = state.paintings.filter(function (x) { return x.tab_id === t.id; }).length;
+        return '<button type="button" class="orb-tab' + (t.id === state.activeTabId && !state.search ? ' on' : '') + '" data-orb-tab="' + esc(String(t.id)) + '">' + esc(t.name) + ' <span>' + n + '</span></button>';
+      }).join('') + '</div>' : '') +
       '<div class="orb-stage" id="orbStage">' +
       '<div class="orb-bg" id="orbBg1"></div><div class="orb-bg" id="orbBg2" style="opacity:0"></div>' +
       '<div class="orb-world" id="orbWorld">' + items.map(function (p, i) {
@@ -3321,6 +3339,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           (isInProgress ? '<span class="ip-pen top"></span><span class="ip-pen right"></span><span class="ip-pen bottom"></span><span class="ip-pen left"></span>' : '') +
           '<span class="card-name" hidden>' + esc(p.name || tx('untitled')) + '</span>' +
           (p.sold ? '<span class="orb-chip">' + txe('sold') + '</span>' : (p.not_for_sale ? '<span class="orb-chip nfs">' + txe('nfs') + '</span>' : '')) +
+          (setMembers(p).length > 1 ? '<span class="set-badge orb-set"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2 9 4.9-9 4.9-9-4.9L12 2Z"/><path d="m3 12 9 4.9 9-4.9M3 17l9 4.9 9-4.9"/></svg>' + txe('setN', { n: setMembers(p).length }) + '</span>' : '') +
+          (censored ? '<span class="orb-censor">' + txe(isHidden ? 'hiddenChip' : 'clickToView') + '</span>' : '') +
           '<div class="orb-shade"></div></div>';
       }).join('') + '</div>' +
       (items.length > 1 ? '<button class="orb-nav prev" type="button" id="orbPrev" aria-label="Previous">‹</button><button class="orb-nav next" type="button" id="orbNext" aria-label="Next">›</button>' : '') +
@@ -3480,7 +3500,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       '</div>' +
       (p.description ? '<div class="orb-desc clamped" id="orbDesc">' + esc(p.description) + '</div><button class="desc-more" type="button" id="orbMore" hidden>' + txe('more') + '</button>' : '') +
       '<div class="orb-status sold-static' + (p.sold ? ' is-sold' : (p.not_for_sale ? ' is-nfs' : '')) + '">' + (p.sold ? txe('sold') : (p.not_for_sale ? txe('nfs') : txe('available'))) + '</div>' +
+      (setMembers(p).length > 1 ? '<button type="button" class="orb-setbtn" id="orbSetBtn">' + txe('viewSet') + ' · ' + txe('setN', { n: setMembers(p).length }) + '</button>' : '') +
       '<div class="orb-hint">' + txe(isHidden ? 'orbitHintNoZoom' : 'orbitHint') + '</div>';
+    var setBtn = document.getElementById('orbSetBtn');
+    if (setBtn) setBtn.addEventListener('click', function () { sfx('open'); openSetModal(p.id); });
     el.classList.remove('swap'); void el.offsetWidth; el.classList.add('swap');
     var desc = document.getElementById('orbDesc'), more = document.getElementById('orbMore');
     if (desc && more) {
@@ -3525,6 +3548,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (fb) {
       fb.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
       fb.addEventListener('click', function (e) { e.stopPropagation(); sfx('switch'); if (ORB.immersive) orbExitImmersive(); else orbEnterImmersive(true); });
+    }
+    var tabsRow = document.getElementById('orbTabs');
+    if (tabsRow) {
+      tabsRow.querySelectorAll('[data-orb-tab]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          sfx('switch');
+          state.activeTabId = b.getAttribute('data-orb-tab');
+          if (state.search) { state.search = ''; state.gridPage = 1; state.gridShown = 1; syncSearchBox(); }
+          renderAll();
+        });
+      });
+      var onTab = tabsRow.querySelector('.orb-tab.on');
+      if (onTab && onTab.scrollIntoView) onTab.scrollIntoView({ inline: 'center', block: 'nearest' });
     }
     var gofs = document.getElementById('orbGoFs');
     if (gofs) {
@@ -3579,6 +3615,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (!card) return;
         var i = +card.getAttribute('data-orb-i');
         var d = orbWrap(i - ORB.target);
+        if (Math.abs(d) < 0.5 && e.target.closest('.orb-set')) { sfx('open'); openSetModal(ORB.items[i].id); return; }
         if (Math.abs(d) < 0.5) orbOpen(card, i);
         else { ORB.target = Math.round(ORB.target + d); ORB.moving = true; sfx('whoosh'); orbKick(); }
       }
