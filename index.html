@@ -241,7 +241,16 @@
   .orb-info.swap > * { animation: orbRise .4s ease both; }
   @keyframes orbRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
   @media (max-width: 640px) {
-    .orbit { --orb-h: min(50vh, 92vw, 400px); }
+    .orbit { --orb-h: min(52vh, 100vw, 420px); }
+    /* Edge-to-edge ring on phones (no white strips either side). */
+    .orb-stage { width: 100vw; margin-left: calc(50% - 50vw); border-radius: 0; }
+    body.orbit-on { overflow-x: clip; }
+    /* Lighter effects on phones so the spin stays smooth. */
+    .orb-card { -webkit-box-reflect: unset; }
+    .orb-card img, .orb-card .swatch { box-shadow: 0 8px 18px rgba(0,0,0,.5); }
+    .orb-bg { display: none; }
+    .orb-stage { background: radial-gradient(ellipse at 50% 40%, #2a2420 0%, #0a0908 70%); }
+    .orb-nav, .orb-sound { backdrop-filter: none; background: rgba(0,0,0,.5); }
     .orb-nav { width: 38px; height: 38px; font-size: 19px; }
     .orb-nav.prev { left: 6px; } .orb-nav.next { right: 6px; }
     .view-switch button span { display: none; }
@@ -3147,6 +3156,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   function hideOrbit() {
     var o = document.getElementById('orbitView');
     if (o) o.hidden = true;
+    document.body.classList.remove('orbit-on');
     document.getElementById('grid').style.display = '';
   }
 
@@ -3156,6 +3166,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var o = document.getElementById('orbitView');
     document.getElementById('grid').style.display = 'none';
     o.hidden = false;
+    document.body.classList.add('orbit-on');
     var key = (state.search || '') + '|' + state.activeTabId + '|' + items.map(function (p) { return p.id; }).join(',');
     var keepPos = ORB.key === key;
     if (!keepPos && ORB.key && ORB.key.split('|').slice(0, 2).join('|') === key.split('|').slice(0, 2).join('|')) {
@@ -3193,6 +3204,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       '</div>' +
       '<div class="orb-info" id="orbInfo"></div>';
     ORB.cards = Array.prototype.slice.call(o.querySelectorAll('.orb-card'));
+    ORB.W = ORB.H = 0;
     wireOrbit();
     orbLayout(); orbInfo();
   }
@@ -3232,8 +3244,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   function orbLayout() {
     var stage = document.getElementById('orbStage');
     if (!stage || !ORB.items.length) return;
-    var n = ORB.items.length, S = Math.min(n, ORB_SLOTS);
-    var W = stage.clientWidth, H = stage.clientHeight;
+    var W = ORB.W || stage.clientWidth, H = ORB.H || stage.clientHeight;
+    ORB.W = W; ORB.H = H;
+    var n = ORB.items.length, S = Math.min(n, W < 640 ? 12 : ORB_SLOTS);
     var ch = Math.round(Math.min(H * (W < 640 ? 0.52 : 0.56), W * 0.55));
     var Rx = Math.min(W * (W < 640 ? 0.4 : 0.4), ch * 3.2), Rz = ch * (W < 640 ? 1.5 : 2.1);
     ORB.cards.forEach(function (c, i) {
@@ -3246,13 +3259,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       var w = ch * (c.__ratio || 0.8);
       var x = Math.sin(th) * Rx, z = cos * Rz - Rz, y = (1 - cos) * -ch * 0.3;
       var s = ad < 1 ? 1 + 0.14 * (1 - ad) : 1;
-      c.style.height = ch + 'px'; c.style.width = w + 'px';
+      if (c.__ch !== ch || c.__cw !== w) { c.style.height = ch + 'px'; c.style.width = w + 'px'; c.__ch = ch; c.__cw = w; }
       c.style.transform = 'translate3d(' + (x - w / 2) + 'px,' + (y - ch / 2) + 'px,' + z + 'px) scale(' + s + ')';
       c.style.zIndex = Math.round(cos * 100) + 100;
       var edge = n > S ? Math.max(0, Math.min(1, (S / 2 - 0.2 - ad) / 1.2)) : 1;
-      c.style.opacity = edge;
-      c.lastChild.style.opacity = (0.72 * (1 - (cos + 1) / 2)).toFixed(3);
-      c.classList.toggle('front', ad < 0.5);
+      c.style.opacity = edge.toFixed(2);
+      var sh = (0.72 * (1 - (cos + 1) / 2)).toFixed(2);
+      if (c.__sh !== sh) { c.lastChild.style.opacity = sh; c.__sh = sh; }
+      var fr = ad < 0.5;
+      if (c.__fr !== fr) { c.classList.toggle('front', fr); c.__fr = fr; }
     });
     var cnt = document.getElementById('orbCount');
     if (cnt) cnt.textContent = (orbIndex() + 1) + ' / ' + n;
@@ -3263,6 +3278,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (i === ORB.shown) return;
     if (ORB.shown !== -1) sfx('tick');
     ORB.shown = i; ORB.descOpen = false;
+    /* While the ring is still spinning, don't rebuild the text below on every
+       painting that flies past (that's what made phones stutter) — just once
+       it has slowed down onto one. */
+    clearTimeout(ORB.infoTimer);
+    if (ORB.dragging || Math.abs(ORB.target - ORB.pos) > 0.6) { ORB.infoTimer = setTimeout(function () { var k = ORB.shown; ORB.shown = -2; orbInfoFill(k); }, 140); return; }
+    orbInfoFill(i);
+  }
+  function orbInfoFill(i) {
+    ORB.shown = i;
     var p = ORB.items[i]; if (!p) return;
     var suffix = suffixById(p.suffix_id);
     var isHidden = !!(suffix && /^hidden$/i.test(suffix.label || ''));
@@ -3401,7 +3425,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     e.preventDefault();
     orbGo(e.key === 'ArrowRight' ? 1 : -1);
   });
-  window.addEventListener('resize', function () { if (document.getElementById('orbStage')) orbLayout(); });
+  window.addEventListener('resize', function () { ORB.W = ORB.H = 0; if (document.getElementById('orbStage')) orbLayout(); });
 
   function renderAll() {
     syncSearchBox();
