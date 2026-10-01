@@ -3183,7 +3183,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
      grid card shows — appear underneath. Censored / "Hidden" pieces stay
      pixelated and "Hidden" ones can't be opened full size, same as the grid.
      Choice of view is remembered per browser. The grid code is untouched. */
-  state.view = (function () { try { return localStorage.getItem('arksView') === 'orbit' ? 'orbit' : 'grid'; } catch (e) { return 'grid'; } })();
+  state.view = (function () { try { return !SIGNUP_ENTRY && localStorage.getItem('arksView') === 'orbit' ? 'orbit' : 'grid'; } catch (e) { return 'grid'; } })();
   var ORB = { items: [], cards: [], pos: 0, target: 0, key: null, raf: 0, dragging: false, shown: -1, bgFlip: false, descOpen: false };
   var ORB_SLOTS = 16;
 
