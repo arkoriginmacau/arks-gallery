@@ -268,6 +268,15 @@
   .site-home { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
   .orb-home { display: none; position: absolute; top: 10px; left: 52px; z-index: 3; width: 36px; height: 36px; align-items: center; justify-content: center; color: #f4f1ea; opacity: .85; }
   .orb-home svg { width: 20px; height: 20px; }
+  .site-home, .orb-home { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+  /* Secret admin sign-in: hold the home button 3s, then the screen corners blink red for 2s. */
+  .corner-blink { position: fixed; inset: 0; pointer-events: none; z-index: 2147483000; }
+  .corner-blink i { position: absolute; width: 56px; height: 56px; border: 0 solid #ff2a2a; animation: cornerBlink .4s steps(1) infinite; }
+  .corner-blink i:nth-child(1) { top: 10px; left: 10px; border-top-width: 5px; border-left-width: 5px; }
+  .corner-blink i:nth-child(2) { top: 10px; right: 10px; border-top-width: 5px; border-right-width: 5px; }
+  .corner-blink i:nth-child(3) { bottom: 10px; left: 10px; border-bottom-width: 5px; border-left-width: 5px; }
+  .corner-blink i:nth-child(4) { bottom: 10px; right: 10px; border-bottom-width: 5px; border-right-width: 5px; }
+  @keyframes cornerBlink { 0% { opacity: 1; } 50% { opacity: 0; } }
   .orbit.immersive .orb-home { display: flex; }
   /* Exit ✕ in full-screen Orbit: no circle, just a glowing X blinking red/white
      (same look as the Set badge's running dot). */
@@ -6028,6 +6037,52 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
     });
   }
+
+  /* ---------------- secret admin sign-in (hold the home button) ----------------
+     Hold the arkorigin.xyz button: 3s nothing, then the 4 screen corners blink
+     red for 2s, then the one-time sign-in link is emailed to the studio address
+     (the Worker only ever sends it to ADMIN_EMAIL). Letting go early cancels;
+     a normal quick tap still opens arkorigin.xyz. Studio gallery only. */
+  (function () {
+    var HOLD_QUIET = 3000, HOLD_BLINK = 2000;
+    var t1 = null, t2 = null, blinkEl = null, held = 0, suppressClick = false, active = null;
+    function stopBlink() { if (blinkEl) { blinkEl.remove(); blinkEl = null; } }
+    function cancel() { clearTimeout(t1); clearTimeout(t2); t1 = t2 = null; stopBlink(); active = null; }
+    function target(e) { return (!GALLERY && !isEmbedded && e.target.closest) ? e.target.closest('.site-home, #orbHome') : null; }
+    document.addEventListener('pointerdown', function (e) {
+      var el = target(e);
+      if (!el || (e.button && e.button !== 0)) return;
+      cancel();
+      active = el; held = Date.now(); suppressClick = false;
+      t1 = setTimeout(function () {
+        blinkEl = document.createElement('div');
+        blinkEl.className = 'corner-blink';
+        blinkEl.innerHTML = '<i></i><i></i><i></i><i></i>';
+        document.body.appendChild(blinkEl);
+        t2 = setTimeout(async function () {
+          cancel();
+          suppressClick = true;
+          var res = await sb.auth.requestLink();
+          toast(res.error ? 'Could not send sign-in link: ' + res.error.message : 'Sign-in link sent — check your inbox.');
+        }, HOLD_BLINK);
+      }, HOLD_QUIET);
+    }, true);
+    ['pointerup', 'pointercancel'].forEach(function (ev) {
+      document.addEventListener(ev, function () {
+        if (!active) return;
+        if (Date.now() - held > 800) suppressClick = true; /* a long press that was let go: don't navigate */
+        cancel();
+      }, true);
+    });
+    document.addEventListener('pointermove', function (e) {
+      if (active && !active.contains(document.elementFromPoint(e.clientX, e.clientY))) { suppressClick = true; cancel(); }
+    }, true);
+    document.addEventListener('click', function (e) {
+      if (target(e) && suppressClick) { e.preventDefault(); e.stopPropagation(); suppressClick = false; }
+    }, true);
+    document.addEventListener('contextmenu', function (e) { if (target(e)) e.preventDefault(); }, true);
+    document.addEventListener('dragstart', function (e) { if (target(e)) e.preventDefault(); }, true);
+  })();
 
   /* ---------------- init ---------------- */
   sb.auth.onAuthStateChange(function (_event, session) { refreshAuthFromSession(session); });
