@@ -110,6 +110,23 @@
     font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
     color: var(--ochre-readable); font-weight: 600; margin: 0 0 6px;
   }
+  .brand-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .daily-no {
+    font: inherit; letter-spacing: 0.14em; font-variant-numeric: tabular-nums; color: inherit;
+    background: none; border: 1px dashed currentColor; border-radius: 3px; padding: 1px 6px; margin-right: 8px; cursor: pointer;
+  }
+  .daily-no:hover { background: var(--paper-2); }
+  .acct-btn { padding: 6px 12px; font-size: 12.5px; }
+  .acct-modal .field input { width: 100%; }
+  .acct-modal .acct-switch { margin-top: 14px; font-size: 13px; color: var(--ink-soft); }
+  .acct-modal .linkish { background: none; border: 0; padding: 0; color: var(--ochre-readable); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; }
+  .acct-modal .acct-error { color: #c0392b; font-size: 13px; min-height: 18px; margin: 6px 0 0; }
+  .acct-code-input { font-size: 26px !important; letter-spacing: 0.4em; text-align: center; font-variant-numeric: tabular-nums; }
+  .invite-code-big { font-size: 34px; letter-spacing: 0.3em; font-weight: 700; text-align: center; margin: 6px 0 14px; font-variant-numeric: tabular-nums; }
+  .acct-modal textarea { width: 100%; min-height: 130px; font: inherit; font-size: 13px; padding: 8px; border: 1px solid var(--line); border-radius: 3px; background: var(--paper-2); color: var(--ink-2); }
+  .users-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .users-table td, .users-table th { padding: 8px 6px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+  .users-table .btn { padding: 5px 9px; font-size: 12px; }
   header.top h1 { font-size: clamp(28px, 4vw, 38px); font-weight: 600; margin: 0; line-height: 1.05; }
   .top-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
@@ -1060,8 +1077,8 @@
 <div class="wrap" id="app">
   <header class="top">
     <div>
-      <p class="brand-eyebrow">Arkorigin Studio</p>
-      <h1>Ark's Gallery</h1>
+      <p class="brand-eyebrow"><span id="dailyNoSlot"></span><span id="brandStudio">Arkorigin Studio</span></p>
+      <div class="brand-row"><span id="signupSlot"></span><h1 id="brandTitle">Ark's Gallery</h1></div>
     </div>
     <div class="top-actions" id="topActions"></div>
   </header>
@@ -1109,6 +1126,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   var ADMIN_EMAIL = 'arkoriginmacau@gmail.com';
   var IMAGE_BASE = 'https://arks-gallery-images.arkoriginmacau.workers.dev';
   var SESSION_KEY = 'arks_admin_session';
+  /* Invited users' galleries live at  …/?g=<name>  (separate database + photo bucket). */
+  var GALLERY = (function () {
+    try { var g = new URLSearchParams(location.search).get('g'); return g && /^[a-z0-9-]{1,40}$/i.test(g) ? g.toLowerCase() : null; } catch (e) { return null; }
+  })();
+  var SIGNUP_ENTRY = (function () { try { return /(^|[?&])(signup|reset)(=|&|$)/.test(location.search.slice(1)); } catch (e) { return false; } })();
 
   /* Small client that keeps the same call shape the rest of this file
      already uses (sb.from(...).select/insert/update/delete, sb.auth...). */
@@ -1120,7 +1142,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (!raw) return null;
         var s = JSON.parse(raw);
         if (!s || !s.token || !s.expires_at || s.expires_at < Date.now() / 1000) return null;
-        return { access_token: s.token, expires_at: s.expires_at, user: { email: ADMIN_EMAIL } };
+        return { access_token: s.token, expires_at: s.expires_at,
+          user: { email: s.email || ADMIN_EMAIL, role: s.role || 'admin', id: s.id || null, slug: s.slug || null } };
       } catch (e) { return null; }
     }
     function notify() { var s = readSession(); listeners.forEach(function (cb) { try { cb('CHANGED', s); } catch (e) {} }); }
@@ -1146,7 +1169,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         var res = await fetch(IMAGE_BASE + '/api/db', {
           method: 'POST', headers: headers,
           body: JSON.stringify({ table: this.table, op: this.op, values: this.values, filters: this.filters,
-            order: this.orderBy, returning: this.returning })
+            order: this.orderBy, returning: this.returning, gallery: GALLERY || undefined })
         });
         var body = await res.json().catch(function () { return {}; });
         if (!res.ok) return { data: null, error: { message: body.error || ('Request failed (' + res.status + ')') } };
@@ -1192,7 +1215,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             return { error: null };
           } catch (e) { return { error: { message: e.message || String(e) } }; }
         },
-        signOut: async function () { try { localStorage.removeItem(SESSION_KEY); } catch (e) {} notify(); }
+        signOut: async function () { try { localStorage.removeItem(SESSION_KEY); } catch (e) {} notify(); },
+        /* Store a session returned by sign-up / log-in / password reset (invited users). */
+        setSession: function (b) {
+          try { localStorage.setItem(SESSION_KEY, JSON.stringify({ token: b.token, expires_at: b.expires_at, role: b.role, email: b.email, id: b.id, slug: b.slug })); } catch (e) {}
+          notify();
+        }
       }
     };
   })();
@@ -1202,6 +1230,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
   var state = { thumbPos: {}, tabs: [], paintings: [], suffixes: [], activeTabId: null, printMode: 'A4', printRows: 8, printScope: 'current', printCustom: null, printCustomBreak: false, printStyle: 'standard', printAdv: null, loaded: false, descOpen: {}, gridLayout: null, gridPage: 1, gridShown: 1, gridPageKey: null, search: '' };
   var isAdmin = false;
+  var isStudio = false;      /* the studio admin, on the studio's own gallery */
+  var currentUser = null;
   var currentUserEmail = null;
   /* When this page is loaded inside someone else's site (e.g. embedded on the
      Wix website) it must always stay pure viewing mode — no "Admin" sign-in
@@ -1510,6 +1540,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (!path) return null;
     return IMAGE_BASE + '/' + encodePath(path);
   }
+  /* Invited users' photos go under u/<their id>/ — the Worker sends those to the users' bucket. */
+  function storePath(p) {
+    if (!GALLERY) return p;
+    var sess = null;
+    try { sess = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch (e) {}
+    return (sess && sess.id ? 'u/' + sess.id + '/' : 'u/unknown/') + p;
+  }
   async function r2AuthHeader() {
     var sess = await sb.auth.getSession();
     var token = sess && sess.data && sess.data.session && sess.data.session.access_token;
@@ -1768,7 +1805,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (c && (c.style === 'advanced' || c.style === 'standard')) state.printStyle = c.style;
   }
   async function loadAll() {
+    if (GALLERY) {
+      var pr = await sb.from('site_theme').select('colors').eq('id', 5).maybeSingle();
+      if (pr.error && /not found/i.test(pr.error.message)) { state.galleryMissing = true; state.loaded = true; renderAll(); toast('This gallery does not exist.'); return; }
+      state.profile = (pr.data && pr.data.colors && typeof pr.data.colors === 'object') ? pr.data.colors : {};
+    }
     await Promise.all([fetchTabs(), fetchPaintings(), fetchSuffixes(), fetchThumbPos(), fetchGridLayout(), fetchPrintDefaults()]);
+    if (GALLERY && state.printAdv && state.printAdv.title === "Ark's Gallery") state.printAdv.title = galleryTitle();
     if (state.tabs.length && !state.tabs.some(function (t) { return t.id === state.activeTabId; })) state.activeTabId = state.tabs[0].id;
     state.loaded = true;
     renderAll();
@@ -1793,12 +1836,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   function refreshAuthFromSession(session) {
     var user = session && session.user;
     currentUserEmail = user ? user.email : null;
-    isAdmin = !isEmbedded && !!user && user.email === ADMIN_EMAIL;
+    currentUser = user || null;
+    isStudio = !isEmbedded && !!user && user.role !== 'user' && user.email === ADMIN_EMAIL;
+    var isOwnerUser = !isEmbedded && !!user && user.role === 'user' && !!GALLERY && user.slug === GALLERY;
+    isAdmin = GALLERY ? isOwnerUser : isStudio;
     renderAll();
   }
 
   /* ---------------- render: header ---------------- */
   function renderTopActions() {
+    renderBrand();
     var el = document.getElementById('topActions');
     var inPrint = !document.getElementById('printView').hidden;
     var printBtn = inPrint
@@ -1824,6 +1871,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         '<button class="btn btn-ghost btn-sm" id="btnPdfExport" type="button" title="Download the current inventory as a PDF, in the exact layout Import from PDF reads — a ready-made master copy to correct offline and bring back in">' + txe('downloadPdf') + '</button>' +
         '<button class="btn btn-primary" id="btnAddPainting" type="button">' +
         '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>' + txe('addPainting') + '</button>' +
+        (GALLERY ? '<button class="btn btn-ghost btn-sm" id="btnProfile" type="button" title="Your gallery name, studio name and website link">Gallery name</button>'
+          : '<button class="btn btn-ghost btn-sm" id="btnUsers" type="button" title="People you invited and their galleries">Users</button>') +
         '<span class="admin-pill"><span class="dot"></span>' + esc(currentUserEmail) + '</span>' +
         '<button class="btn btn-ghost btn-sm" id="btnSignOut" type="button">' + txe('signOut') + '</button>';
       document.getElementById('btnTheme').addEventListener('click', openThemeModal);
@@ -1869,6 +1918,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         runDescPdfSync(f);
       });
       document.getElementById('btnSignOut').addEventListener('click', signOut);
+      if (document.getElementById('btnProfile')) document.getElementById('btnProfile').addEventListener('click', openProfileModal);
+      if (document.getElementById('btnUsers')) document.getElementById('btnUsers').addEventListener('click', openUsersModal);
     } else if (isEmbedded || !ADMIN_ENTRY) {
       /* Visitors: pure viewing mode, no admin button at all. The studio's
          own way in is the private address  arks-gallery.vercel.app/?admin
@@ -1886,7 +1937,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     });
     /* Visitors: language picker first (left); admin keeps it at the end. */
     el.insertAdjacentHTML(isAdmin ? 'beforeend' : 'afterbegin', langPickerHtml());
-    if (!isEmbedded && !isAdmin) el.insertAdjacentHTML('afterbegin', '<a class="btn btn-ghost btn-sm site-home" href="' + SITE_HOME + '">' + SITE_HOME_ICON + ' arkorigin.xyz</a>');
+    if (!isEmbedded && !isAdmin && homeLink()) el.insertAdjacentHTML('afterbegin', '<a class="btn btn-ghost btn-sm site-home" href="' + esc(homeLink()) + '">' + SITE_HOME_ICON + ' ' + esc(homeLabel()) + '</a>');
     document.getElementById('langSelect').addEventListener('change', function (e) { setLanguage(e.target.value); });
   }
 
@@ -2714,7 +2765,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var rows = state.printRows;
     function headerFor(entries) {
       var label = printScopeLabel(state.printScope === 'custom' && entries.length ? pageTabNames(entries) : null);
-      return '<div class="p-header"><h3>Ark\'s Gallery — ' + esc(label) + '</h3><span class="p-meta">' + dims.w + '×' + dims.h + 'mm</span></div>';
+      return '<div class="p-header"><h3>' + esc(galleryTitle()) + ' — ' + esc(label) + '</h3><span class="p-meta">' + dims.w + '×' + dims.h + 'mm</span></div>';
     }
     var headerHtml = headerFor([]);
     var breakPerTab = state.printScope === 'custom' && state.printCustomBreak;
@@ -3098,7 +3149,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     /* The page title becomes the saved PDF's file name. */
     var oldTitle = document.title;
     var tabName = printScopeLabel();
-    document.title = "Ark's Gallery" + (tabName ? ' - ' + tabName : '');
+    document.title = galleryTitle() + (tabName ? ' - ' + tabName : '');
     window.print();
     setTimeout(function () { document.title = oldTitle; }, 1000);
   }
@@ -3297,7 +3348,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     try {
       var saved = localStorage.getItem('arksView');
       /* Not for the studio itself: ?admin or a signed-in admin opens the normal page. */
-      var studio = ADMIN_ENTRY || !!localStorage.getItem(SESSION_KEY);
+      var studio = ADMIN_ENTRY || SIGNUP_ENTRY || !!localStorage.getItem(SESSION_KEY);
       if (saved !== 'grid' && !studio) { state.view = 'orbit'; ORB.pendingImmersive = true; }
     } catch (e) {}
   })();
@@ -3388,7 +3439,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }).join('') + '</div>' +
       (items.length > 1 ? '<button class="orb-nav prev" type="button" id="orbPrev" aria-label="Previous">‹</button><button class="orb-nav next" type="button" id="orbNext" aria-label="Next">›</button>' : '') +
       '<button class="orb-full' + (ORB.immersive ? ' is-x' : '') + '" type="button" id="orbFull" aria-label="Full screen" title="Full screen">' + orbFullIcon() + '</button>' +
-      (isEmbedded ? '' : '<a class="orb-home" id="orbHome" href="' + SITE_HOME + '" aria-label="Back to arkorigin.xyz" title="Back to arkorigin.xyz">' + SITE_HOME_ICON + '</a>') +
+      (isEmbedded || !homeLink() ? '' : '<a class="orb-home" id="orbHome" href="' + esc(homeLink()) + '" aria-label="Back to ' + esc(homeLabel()) + '" title="Back to ' + esc(homeLabel()) + '">' + SITE_HOME_ICON + '</a>') +
       '<button class="orb-full orb-gofs" type="button" id="orbGoFs" hidden aria-label="Fill the whole screen" title="Fill the whole screen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>' +
       '<button class="orb-sound' + (SFX.on ? '' : ' off') + '" type="button" id="orbSound" aria-label="Sound on/off" title="Sound on/off">' + sfxIcon() + '</button>' +
       '<div class="orb-count" id="orbCount"></div>' +
@@ -4357,7 +4408,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           var blob = await new Promise(function (r) { cv.toBlob(r, 'image/jpeg', 0.78); });
           if (!blob) throw new Error('encode failed');
           var uid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
-          var path = 'thumb/' + uid + '.jpg';
+          var path = storePath('thumb/') + uid + '.jpg';
           var up = await r2Upload(path, blob, 'image/jpeg');
           if (up.error) throw up.error;
           var res = await sb.from('paintings').update({ thumb_path: path }).eq('id', p.id);
@@ -4556,8 +4607,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           var uid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
           var processed = await processPhoto(pendingFile, 900, 0.78);
           var fullBase = (pendingFile.name || 'photo').replace(/\.[^.]+$/, '');
-          var fullPath = 'full/' + uid + '-' + fullBase + extForType(processed.fullBlob.type, pendingFile.name);
-          var thumbPath = 'thumb/' + uid + '.jpg';
+          var fullPath = storePath('full/') + uid + '-' + fullBase + extForType(processed.fullBlob.type, pendingFile.name);
+          var thumbPath = storePath('thumb/') + uid + '.jpg';
           var uploads = [r2Upload(fullPath, processed.fullBlob, processed.fullBlob.type || pendingFile.type || 'image/jpeg')];
           if (processed.thumbBlob) uploads.push(r2Upload(thumbPath, processed.thumbBlob, 'image/jpeg'));
           var results = await Promise.all(uploads);
@@ -4638,8 +4689,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         var uid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
         var processed = await processPhoto(f, 900, 0.78);
         var fullBase = (f.name || 'photo').replace(/\.[^.]+$/, '');
-        var fullPath = 'full/' + uid + '-' + fullBase + extForType(processed.fullBlob.type, f.name);
-        var thumbPath = 'thumb/' + uid + '.jpg';
+        var fullPath = storePath('full/') + uid + '-' + fullBase + extForType(processed.fullBlob.type, f.name);
+        var thumbPath = storePath('thumb/') + uid + '.jpg';
         var uploads = [r2Upload(fullPath, processed.fullBlob, processed.fullBlob.type || f.type || 'image/jpeg')];
         if (processed.thumbBlob) uploads.push(r2Upload(thumbPath, processed.thumbBlob, 'image/jpeg'));
         var results = await Promise.all(uploads);
@@ -5677,6 +5728,307 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
   }
 
+  /* ---------------- accounts: invites, sign-up, invited users' galleries ---------------- */
+  function galleryTitle() {
+    if (!GALLERY) return "Ark's Gallery";
+    return (state.profile && state.profile.title) || 'My Gallery';
+  }
+  function homeLink() {
+    if (!GALLERY) return SITE_HOME;
+    var l = state.profile && state.profile.link;
+    if (!l) return null;
+    return /^https?:\/\//i.test(l) ? l : 'https://' + l;
+  }
+  function homeLabel() {
+    var l = homeLink();
+    if (!l) return '';
+    return l.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '');
+  }
+  async function apiPost(path, body, withAuth) {
+    try {
+      var headers = { 'Content-Type': 'application/json' };
+      if (withAuth) { var a = await r2AuthHeader(); if (a) headers.Authorization = a.Authorization; }
+      var res = await fetch(IMAGE_BASE + path, { method: 'POST', headers: headers, body: JSON.stringify(body || {}) });
+      var b = await res.json().catch(function () { return {}; });
+      return { ok: res.ok, status: res.status, body: b, error: res.ok ? null : (b.error || ('Request failed (' + res.status + ')')) };
+    } catch (e) { return { ok: false, status: 0, body: {}, error: e.message || String(e) }; }
+  }
+
+  var DAILY = { code: null, loading: false };
+  async function loadDailyCode() {
+    if (DAILY.loading || DAILY.code) return;
+    DAILY.loading = true;
+    var r = await apiPost('/api/invite/code', {}, true);
+    DAILY.loading = false;
+    if (r.ok && r.body.code) { DAILY.code = r.body.code; renderBrand(); }
+  }
+
+  function renderBrand() {
+    var t = document.getElementById('brandTitle');
+    var st = document.getElementById('brandStudio');
+    if (GALLERY) {
+      t.textContent = state.galleryMissing ? 'Gallery not found' : galleryTitle();
+      st.textContent = (state.profile && state.profile.studio) || '';
+      if (!document.getElementById('printView') || document.getElementById('printView').hidden) document.title = galleryTitle();
+    }
+    /* Daily 5-digit sign-up number: only the studio admin sees it. */
+    var dn = document.getElementById('dailyNoSlot');
+    if (isStudio && !GALLERY) {
+      if (!DAILY.code) loadDailyCode();
+      dn.innerHTML = DAILY.code ? '<button class="daily-no" id="btnDailyNo" type="button" title="Today\'s sign-up number — click to invite someone by email">' + esc(DAILY.code) + '</button>' : '';
+      if (DAILY.code) document.getElementById('btnDailyNo').addEventListener('click', openInviteModal);
+    } else dn.innerHTML = '';
+    /* Sign up / Log in / My gallery, in front of the title. */
+    var su = document.getElementById('signupSlot');
+    var html = '';
+    if (!isEmbedded) {
+      if (!GALLERY && !isStudio) {
+        html = (currentUser && currentUser.role === 'user')
+          ? '<a class="btn btn-ghost btn-sm acct-btn" href="?g=' + encodeURIComponent(currentUser.slug) + '">My gallery</a>'
+          : '<button class="btn btn-ghost btn-sm acct-btn" id="btnSignup" type="button">Sign up</button>';
+      } else if (GALLERY && !isAdmin && ADMIN_ENTRY) {
+        html = '<button class="btn btn-ghost btn-sm acct-btn" id="btnLogin" type="button">Log in</button>';
+      }
+    }
+    su.innerHTML = html;
+    su.style.display = html ? '' : 'none';
+    if (document.getElementById('btnSignup')) document.getElementById('btnSignup').addEventListener('click', function () { openAccountModal('code'); });
+    if (document.getElementById('btnLogin')) document.getElementById('btnLogin').addEventListener('click', function () { openAccountModal('login'); });
+  }
+
+  function goToOwnGallery(b) {
+    sb.auth.setSession(b);
+    window.location.href = window.location.pathname + '?g=' + encodeURIComponent(b.slug);
+  }
+
+  /* Sign up (number → email + password), Log in, Forgot password. */
+  function openAccountModal(step, carry) {
+    carry = carry || {};
+    var root = document.getElementById('modalRoot');
+    var body = '';
+    if (step === 'code') {
+      body = '<h2>Sign up</h2>' +
+        '<p class="field-hint">Type the 5-digit sign-up number you received.</p>' +
+        '<div class="field"><input type="text" id="acCode" class="acct-code-input" inputmode="numeric" maxlength="5" autocomplete="one-time-code" value="' + esc(carry.code || '') + '" placeholder="•••••"></div>' +
+        '<p class="acct-error" id="acErr"></p>' +
+        '<div class="modal-actions"><button class="btn btn-ghost" id="acCancel" type="button">Cancel</button><button class="btn btn-primary" id="acGo" type="button">Next</button></div>' +
+        '<p class="acct-switch">Already have an account? <button class="linkish" id="acToLogin" type="button">Log in</button></p>';
+    } else if (step === 'details') {
+      body = '<h2>Create your account</h2>' +
+        '<p class="field-hint">Use the same email address the number was sent to.</p>' +
+        '<div class="field"><label for="acEmail">Email</label><input type="email" id="acEmail" autocomplete="email" value="' + esc(carry.email || '') + '"></div>' +
+        '<div class="field"><label for="acPass">Password <span style="text-transform:none;font-weight:400">(at least 8 characters)</span></label><input type="password" id="acPass" autocomplete="new-password"></div>' +
+        '<div class="field"><label for="acPass2">Repeat password</label><input type="password" id="acPass2" autocomplete="new-password"></div>' +
+        '<p class="acct-error" id="acErr"></p>' +
+        '<div class="modal-actions"><button class="btn btn-ghost" id="acBack" type="button">Back</button><button class="btn btn-primary" id="acGo" type="button">Create account</button></div>';
+    } else if (step === 'login') {
+      body = '<h2>Log in</h2>' +
+        '<div class="field"><label for="acEmail">Email</label><input type="email" id="acEmail" autocomplete="email" value="' + esc(carry.email || '') + '"></div>' +
+        '<div class="field"><label for="acPass">Password</label><input type="password" id="acPass" autocomplete="current-password"></div>' +
+        '<p class="acct-error" id="acErr"></p>' +
+        '<div class="modal-actions"><button class="btn btn-ghost" id="acCancel" type="button">Cancel</button><button class="btn btn-primary" id="acGo" type="button">Log in</button></div>' +
+        '<p class="acct-switch"><button class="linkish" id="acToForgot" type="button">Forgot password?</button> · New here? <button class="linkish" id="acToSignup" type="button">Sign up</button></p>';
+    } else if (step === 'forgot') {
+      body = '<h2>Forgot password</h2>' +
+        '<p class="field-hint">We\'ll email you a link to choose a new password.</p>' +
+        '<div class="field"><label for="acEmail">Email</label><input type="email" id="acEmail" autocomplete="email" value="' + esc(carry.email || '') + '"></div>' +
+        '<p class="acct-error" id="acErr"></p>' +
+        '<div class="modal-actions"><button class="btn btn-ghost" id="acBack" type="button">Back</button><button class="btn btn-primary" id="acGo" type="button">Send link</button></div>';
+    }
+    root.innerHTML = '<div class="modal-backdrop" id="acBackdrop"><div class="modal acct-modal">' + body + '</div></div>';
+    var $ = function (id) { return document.getElementById(id); };
+    var err = function (m) { $('acErr').textContent = m || ''; };
+    $('acBackdrop').addEventListener('click', function (e) { if (e.target.id === 'acBackdrop') closeModal(); });
+    if ($('acCancel')) $('acCancel').addEventListener('click', closeModal);
+    if ($('acToLogin')) $('acToLogin').addEventListener('click', function () { openAccountModal('login'); });
+    if ($('acToSignup')) $('acToSignup').addEventListener('click', function () { openAccountModal('code'); });
+    if ($('acToForgot')) $('acToForgot').addEventListener('click', function () { openAccountModal('forgot', { email: $('acEmail').value }); });
+    if ($('acBack')) $('acBack').addEventListener('click', function () { openAccountModal(step === 'details' ? 'code' : 'login', carry); });
+    var first = root.querySelector('input');
+    if (first) setTimeout(function () { first.focus(); }, 30);
+    root.querySelectorAll('input').forEach(function (inp) {
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') $('acGo').click(); });
+    });
+    $('acGo').addEventListener('click', async function () {
+      var btn = this;
+      err('');
+      if (step === 'code') {
+        var code = $('acCode').value.replace(/\D/g, '');
+        if (code.length !== 5) return err('The number has 5 digits.');
+        return openAccountModal('details', { code: code });
+      }
+      var email = ($('acEmail').value || '').trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return err('Please enter a valid email address.');
+      btn.disabled = true;
+      var r;
+      if (step === 'details') {
+        var pw = $('acPass').value;
+        if (pw.length < 8) { btn.disabled = false; return err('Password needs at least 8 characters.'); }
+        if (pw !== $('acPass2').value) { btn.disabled = false; return err('The two passwords are not the same.'); }
+        r = await apiPost('/api/signup', { code: carry.code, email: email, password: pw });
+        if (r.ok) { toast('Welcome! Your gallery is ready.'); return goToOwnGallery(r.body); }
+      } else if (step === 'login') {
+        r = await apiPost('/api/login', { email: email, password: $('acPass').value });
+        if (r.ok) return goToOwnGallery(r.body);
+      } else if (step === 'forgot') {
+        r = await apiPost('/api/forgot', { email: email, origin: window.location.origin });
+        if (r.ok) { closeModal(); toast('If that email has an account, a reset link is on its way.'); return; }
+      }
+      btn.disabled = false;
+      err(r.error);
+    });
+  }
+
+  function openResetModal(token) {
+    var root = document.getElementById('modalRoot');
+    root.innerHTML = '<div class="modal-backdrop" id="rsBackdrop"><div class="modal acct-modal">' +
+      '<h2>Choose a new password</h2>' +
+      '<div class="field"><label for="rsPass">New password <span style="text-transform:none;font-weight:400">(at least 8 characters)</span></label><input type="password" id="rsPass" autocomplete="new-password"></div>' +
+      '<div class="field"><label for="rsPass2">Repeat password</label><input type="password" id="rsPass2" autocomplete="new-password"></div>' +
+      '<p class="acct-error" id="rsErr"></p>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" id="rsCancel" type="button">Cancel</button><button class="btn btn-primary" id="rsGo" type="button">Save password</button></div>' +
+      '</div></div>';
+    document.getElementById('rsCancel').addEventListener('click', closeModal);
+    document.getElementById('rsGo').addEventListener('click', async function () {
+      var e = document.getElementById('rsErr'); e.textContent = '';
+      var pw = document.getElementById('rsPass').value;
+      if (pw.length < 8) { e.textContent = 'Password needs at least 8 characters.'; return; }
+      if (pw !== document.getElementById('rsPass2').value) { e.textContent = 'The two passwords are not the same.'; return; }
+      this.disabled = true;
+      var r = await apiPost('/api/reset', { token: token, password: pw });
+      if (r.ok) { toast('Password changed.'); return goToOwnGallery(r.body); }
+      this.disabled = false; e.textContent = r.error;
+    });
+  }
+
+  function inviteMessage(code, link) {
+    return 'Hi! Here is your sign-up number for Ark\'s Gallery: ' + code + '\n\n' +
+      '1. Open ' + link + '\n2. Click "Sign up"\n3. Type the number, then your email and a password.\n\n' +
+      'The number works for 24 hours, only with the email I invited.';
+  }
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(function () { toast('Copied.'); }, function () { toast('Could not copy — select the text and copy it.'); });
+    toast('Select the text and copy it.');
+  }
+
+  /* Studio admin: click the daily number → type an email → send the invitation. */
+  function openInviteModal() {
+    var root = document.getElementById('modalRoot');
+    root.innerHTML = '<div class="modal-backdrop" id="ivBackdrop"><div class="modal acct-modal">' +
+      '<h2>Invite someone</h2>' +
+      '<p class="field-hint">Today\'s sign-up number</p>' +
+      '<div class="invite-code-big">' + esc(DAILY.code) + '</div>' +
+      '<div class="field"><label for="ivEmail">Their email</label><input type="email" id="ivEmail" autocomplete="off" placeholder="name@example.com"></div>' +
+      '<p class="field-hint">The number will only work with this email, once, for 24 hours.</p>' +
+      '<p class="acct-error" id="ivErr"></p>' +
+      '<div id="ivResult"></div>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" id="ivCancel" type="button">Close</button><button class="btn btn-primary" id="ivGo" type="button">Send</button></div>' +
+      '</div></div>';
+    document.getElementById('ivBackdrop').addEventListener('click', function (e) { if (e.target.id === 'ivBackdrop') closeModal(); });
+    document.getElementById('ivCancel').addEventListener('click', closeModal);
+    setTimeout(function () { document.getElementById('ivEmail').focus(); }, 30);
+    document.getElementById('ivGo').addEventListener('click', async function () {
+      var btn = this;
+      var errEl = document.getElementById('ivErr'); errEl.textContent = '';
+      var email = document.getElementById('ivEmail').value.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errEl.textContent = 'Please enter a valid email address.'; return; }
+      btn.disabled = true; btn.textContent = 'Sending…';
+      var r = await apiPost('/api/invite', { email: email, origin: window.location.origin }, true);
+      btn.disabled = false; btn.textContent = 'Send';
+      if (!r.ok) { errEl.textContent = r.error; return; }
+      var out = document.getElementById('ivResult');
+      var msg = inviteMessage(r.body.code, r.body.link);
+      out.innerHTML = (r.body.emailed
+        ? '<p style="color:#2a7d2a;font-weight:600">Sent to ' + esc(r.body.email) + '.</p><p class="field-hint">You can also send this message yourself:</p>'
+        : '<p style="font-weight:600">The invitation is ready, but the email could not be sent automatically' + (r.body.emailError ? ' (' + esc(r.body.emailError) + ')' : '') + '.</p><p class="field-hint">Copy this message and send it to her (WhatsApp, WeChat, email…):</p>') +
+        '<textarea id="ivMsg" readonly>' + esc(msg) + '</textarea>' +
+        '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" id="ivCopy" type="button">Copy message</button>' +
+        '<a class="btn btn-ghost btn-sm" target="_blank" rel="noopener" href="https://wa.me/?text=' + encodeURIComponent(msg) + '">Send by WhatsApp</a></div>';
+      document.getElementById('ivCopy').addEventListener('click', function () { copyText(msg); });
+    });
+  }
+
+  /* Invited user: gallery title, studio name, website link. */
+  function openProfileModal() {
+    var pf = state.profile || {};
+    var root = document.getElementById('modalRoot');
+    root.innerHTML = '<div class="modal-backdrop" id="pfBackdrop"><div class="modal acct-modal">' +
+      '<h2>Gallery name</h2>' +
+      '<div class="field"><label for="pfTitle">Gallery title</label><input type="text" id="pfTitle" maxlength="60" value="' + esc(pf.title || '') + '" placeholder="My Gallery"></div>' +
+      '<div class="field"><label for="pfStudio">Studio / workshop name</label><input type="text" id="pfStudio" maxlength="60" value="' + esc(pf.studio || '') + '" placeholder="e.g. Lotus Studio"></div>' +
+      '<div class="field"><label for="pfLink">Website or Instagram link <span style="text-transform:none;font-weight:400">(optional)</span></label><input type="text" id="pfLink" maxlength="200" value="' + esc(pf.link || '') + '" placeholder="e.g. instagram.com/yourname"></div>' +
+      '<p class="field-hint">Your public gallery address: <b>' + esc(window.location.origin + window.location.pathname + '?g=' + GALLERY) + '</b></p>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" id="pfCancel" type="button">Cancel</button><button class="btn btn-primary" id="pfSave" type="button">Save</button></div>' +
+      '</div></div>';
+    document.getElementById('pfBackdrop').addEventListener('click', function (e) { if (e.target.id === 'pfBackdrop') closeModal(); });
+    document.getElementById('pfCancel').addEventListener('click', closeModal);
+    document.getElementById('pfSave').addEventListener('click', async function () {
+      var next = {
+        title: document.getElementById('pfTitle').value.trim(),
+        studio: document.getElementById('pfStudio').value.trim(),
+        link: document.getElementById('pfLink').value.trim()
+      };
+      this.disabled = true;
+      var res = await sb.from('site_theme').upsert({ id: 5, colors: next, updated_at: new Date().toISOString() });
+      if (res.error) { this.disabled = false; toast('Could not save: ' + res.error.message); return; }
+      state.profile = next;
+      if (state.printAdv && (!state.printAdv.title || state.printAdv.title === "Ark's Gallery" || state.printAdv.title === (pf.title || 'My Gallery'))) state.printAdv.title = galleryTitle();
+      closeModal(); renderAll(); toast('Saved.');
+    });
+  }
+
+  /* Studio admin: people who signed up, and invitations still waiting. */
+  async function openUsersModal() {
+    var root = document.getElementById('modalRoot');
+    root.innerHTML = '<div class="modal-backdrop" id="usBackdrop"><div class="modal modal-wide acct-modal">' +
+      '<h2>Users</h2><div id="usBody"><p class="field-hint">Loading…</p></div>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" id="usClose" type="button">Close</button></div></div></div>';
+    document.getElementById('usBackdrop').addEventListener('click', function (e) { if (e.target.id === 'usBackdrop') closeModal(); });
+    document.getElementById('usClose').addEventListener('click', closeModal);
+    var r = await apiPost('/api/users', { op: 'list' }, true);
+    var bodyEl = document.getElementById('usBody');
+    if (!bodyEl) return;
+    if (!r.ok) { bodyEl.innerHTML = '<p class="acct-error">' + esc(r.error) + '</p>'; return; }
+    var base = window.location.origin + window.location.pathname;
+    var users = r.body.users || [], invites = r.body.invites || [];
+    var html = users.length ? '<table class="users-table"><thead><tr><th>Email</th><th>Gallery</th><th>Paintings</th><th>Status</th><th></th></tr></thead><tbody>' +
+      users.map(function (u) {
+        return '<tr><td>' + esc(u.email) + '</td>' +
+          '<td><a href="' + esc(base + '?g=' + u.slug) + '" target="_blank" rel="noopener">?g=' + esc(u.slug) + '</a></td>' +
+          '<td>' + (u.paintings | 0) + '</td>' +
+          '<td>' + (u.disabled ? '<span style="color:#c0392b">Switched off</span>' : 'Active') + '</td>' +
+          '<td style="white-space:nowrap"><button class="btn btn-ghost" data-us-reset="' + esc(u.id) + '" type="button" title="Make a one-time link she can use to choose a new password (valid 1 hour)">Password link</button> ' +
+          '<button class="btn btn-ghost" data-us-toggle="' + esc(u.id) + '" data-us-on="' + (u.disabled ? '1' : '0') + '" type="button">' + (u.disabled ? 'Switch on' : 'Switch off') + '</button></td></tr>';
+      }).join('') + '</tbody></table>' : '<p class="field-hint">Nobody has signed up yet. Click today\'s number next to "Arkorigin Studio" to invite someone.</p>';
+    if (invites.length) {
+      html += '<h3 style="margin:18px 0 6px;font-size:14px">Invitations waiting</h3><table class="users-table"><tbody>' +
+        invites.map(function (v) {
+          return '<tr><td>' + esc(v.email) + '</td><td>number ' + esc(v.code) + '</td><td>expires ' + esc(new Date(v.exp * 1000).toLocaleString()) + '</td></tr>';
+        }).join('') + '</tbody></table>';
+    }
+    html += '<div id="usOut"></div>';
+    bodyEl.innerHTML = html;
+    bodyEl.querySelectorAll('[data-us-toggle]').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        var on = b.getAttribute('data-us-on') === '1';
+        if (!on && !confirm('Switch this account off? Her gallery will be hidden and she cannot log in until you switch it back on. Nothing is deleted.')) return;
+        var x = await apiPost('/api/users', { op: on ? 'enable' : 'disable', id: b.getAttribute('data-us-toggle') }, true);
+        if (!x.ok) return toast(x.error);
+        openUsersModal();
+      });
+    });
+    bodyEl.querySelectorAll('[data-us-reset]').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        var x = await apiPost('/api/users', { op: 'resetlink', id: b.getAttribute('data-us-reset'), origin: window.location.origin }, true);
+        if (!x.ok) return toast(x.error);
+        var out = document.getElementById('usOut');
+        out.innerHTML = '<p class="field-hint" style="margin-top:14px">Send her this link (works once, for 1 hour):</p><textarea readonly style="min-height:60px">' + esc(x.body.link) + '</textarea>' +
+          '<button class="btn btn-ghost btn-sm" id="usCopy" type="button" style="margin-top:6px">Copy link</button>';
+        document.getElementById('usCopy').addEventListener('click', function () { copyText(x.body.link); });
+      });
+    });
+  }
+
   /* ---------------- init ---------------- */
   sb.auth.onAuthStateChange(function (_event, session) { refreshAuthFromSession(session); });
   (async function () {
@@ -5690,6 +6042,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
         var vr = await sb.auth.verifyLink(loginToken);
         if (vr.error) toast(vr.error.message); else toast('Signed in.');
+      }
+      var resetToken = params.get('reset');
+      if (resetToken) {
+        params.delete('reset');
+        var qs2 = params.toString();
+        window.history.replaceState(null, '', window.location.pathname + (qs2 ? '?' + qs2 : '') + window.location.hash);
+        openResetModal(resetToken);
       }
     } catch (e) { /* ignore */ }
     var sres = await sb.auth.getSession();
