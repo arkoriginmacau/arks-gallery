@@ -270,12 +270,12 @@
   .orb-home svg { width: 20px; height: 20px; }
   .site-home, .orb-home { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
   /* Secret admin sign-in: hold the home button 3s, then the screen corners blink red for 2s. */
-  .corner-blink { position: fixed; inset: 0; pointer-events: none; z-index: 2147483000; }
-  .corner-blink i { position: absolute; width: 56px; height: 56px; border: 0 solid #ff2a2a; animation: cornerBlink .4s steps(1) infinite; }
-  .corner-blink i:nth-child(1) { top: 10px; left: 10px; border-top-width: 5px; border-left-width: 5px; }
-  .corner-blink i:nth-child(2) { top: 10px; right: 10px; border-top-width: 5px; border-right-width: 5px; }
-  .corner-blink i:nth-child(3) { bottom: 10px; left: 10px; border-bottom-width: 5px; border-left-width: 5px; }
-  .corner-blink i:nth-child(4) { bottom: 10px; right: 10px; border-bottom-width: 5px; border-right-width: 5px; }
+  .corner-blink { position: fixed; pointer-events: none; z-index: 2147483000; }
+  .corner-blink i { position: absolute; width: 9px; height: 9px; border: 0 solid #ff2a2a; animation: cornerBlink .4s steps(1) infinite; }
+  .corner-blink i:nth-child(1) { top: -4px; left: -4px; border-top-width: 2px; border-left-width: 2px; }
+  .corner-blink i:nth-child(2) { top: -4px; right: -4px; border-top-width: 2px; border-right-width: 2px; }
+  .corner-blink i:nth-child(3) { bottom: -4px; left: -4px; border-bottom-width: 2px; border-left-width: 2px; }
+  .corner-blink i:nth-child(4) { bottom: -4px; right: -4px; border-bottom-width: 2px; border-right-width: 2px; }
   @keyframes cornerBlink { 0% { opacity: 1; } 50% { opacity: 0; } }
   .orbit.immersive .orb-home { display: flex; }
   /* Exit ✕ in full-screen Orbit: no circle, just a glowing X blinking red/white
@@ -6039,7 +6039,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
 
   /* ---------------- secret admin sign-in (hold the home button) ----------------
-     Hold the arkorigin.xyz button: 3s nothing, then the 4 screen corners blink
+     Hold the arkorigin.xyz button: 3s nothing, then the button's 4 corners blink
      red for 2s, then the one-time sign-in link is emailed to the studio address
      (the Worker only ever sends it to ADMIN_EMAIL). Letting go early cancels;
      a normal quick tap still opens arkorigin.xyz. Studio gallery only. */
@@ -6058,6 +6058,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         blinkEl = document.createElement('div');
         blinkEl.className = 'corner-blink';
         blinkEl.innerHTML = '<i></i><i></i><i></i><i></i>';
+        /* Blink the 4 corners of the button itself. */
+        var r = active.getBoundingClientRect();
+        blinkEl.style.left = r.left + 'px'; blinkEl.style.top = r.top + 'px';
+        blinkEl.style.width = r.width + 'px'; blinkEl.style.height = r.height + 'px';
         document.body.appendChild(blinkEl);
         t2 = setTimeout(async function () {
           cancel();
