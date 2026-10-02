@@ -110,7 +110,20 @@
     font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
     color: var(--ochre-readable); font-weight: 600; margin: 0 0 6px;
   }
-  .brand-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .brand-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; position: relative; }
+  /* Sign up and the daily number sit in front of (to the left of) the two title
+     lines, so "Arkorigin Studio" and "Ark's Gallery" always start on the same line. */
+  .brand-eyebrow { display: flex; align-items: center; gap: 8px; position: relative; }
+  .brand-eyebrow .daily-no { margin-right: 0; }
+  #signupSlot, #dailyNoSlot { white-space: nowrap; }
+  #dailyNoSlot:empty { display: none; }
+  @media (min-width: 1340px) {
+    #signupSlot, #dailyNoSlot { position: absolute; right: 100%; top: 50%; transform: translateY(-50%); margin-right: 14px; }
+  }
+  /* No room in the left margin on smaller screens: they go after the text instead. */
+  @media (max-width: 1339px) {
+    #signupSlot, #dailyNoSlot { order: 2; }
+  }
   .daily-no {
     font: inherit; letter-spacing: 0.14em; font-variant-numeric: tabular-nums; color: inherit;
     background: none; border: 1px dashed currentColor; border-radius: 3px; padding: 1px 6px; margin-right: 8px; cursor: pointer;
