@@ -536,6 +536,43 @@
   .set-badge:hover { background: rgba(34,31,28,.8); }
   .set-assign-btn.has-set { color: var(--ochre); }
 
+  /* ---------- more photos of ONE piece ----------
+     Edit mode only (studio admin, or an invited user on her own gallery): a "live"
+     red icon in the card footer, left of the Set icon. It opens a Set-style overlay
+     where several extra photos can be added to that same piece. Visitors then see a
+     "Photos ×N" badge (same look as the Set badge) that opens the same overlay. */
+  .icon-btn.photos-btn { color: #ff3b30; position: relative; animation: livePulse 1.4s ease-in-out infinite; }
+  .icon-btn.photos-btn:hover { color: #ff3b30; background: rgba(255,59,48,.14); }
+  .photos-btn .photos-n {
+    position: absolute; top: -4px; right: -5px; min-width: 14px; height: 14px; padding: 0 3px;
+    border-radius: 7px; background: #ff3b30; color: #fff; text-align: center;
+    font: 700 9px/14px 'IBM Plex Mono', monospace;
+  }
+  @keyframes livePulse {
+    0%, 100% { opacity: 1; filter: drop-shadow(0 0 3px rgba(255,59,48,.95)); }
+    50% { opacity: .3; filter: drop-shadow(0 0 0 rgba(255,59,48,0)); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .icon-btn.photos-btn { animation: none; filter: drop-shadow(0 0 2px rgba(255,59,48,.8)); }
+  }
+  .set-badge.photos-badge.below-set { top: 36px; }
+  .set-piece .photo-remove {
+    position: absolute; top: 6px; right: 6px; z-index: 2; width: 26px; height: 26px; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,.5); background: rgba(23,19,15,.7); color: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .set-piece .photo-remove:hover { background: #c0392b; }
+  .photos-add-box {
+    display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    border: 2px dashed #ff3b30 !important; box-shadow: none !important; color: #ff3b30;
+    font-size: 13px; font-weight: 700; background: transparent !important;
+  }
+  .set-piece.photos-add { margin-left: 30px; margin-right: 0; }
+  @media (max-width: 620px) { .set-piece.photos-add { margin-left: 0; } }
+  .photos-add.busy { pointer-events: none; opacity: .5; }
+  .photos-modal .set-piece-cap { color: var(--ink-faint); }
+  .photos-status { text-align: center; font-size: 12.5px; color: var(--ink-soft); min-height: 18px; margin: 10px 0 0; }
+
   /* Attention ring on the Set badge — a dot travels the pill's outline,
      switching red/white as it goes, on an endless loop. Pure CSS (no
      images or scripts), so it adds effectively nothing to load time. */
@@ -1255,7 +1292,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
 
-  var state = { thumbPos: {}, tabs: [], paintings: [], suffixes: [], activeTabId: null, printMode: 'A4', printRows: 8, printScope: 'current', printCustom: null, printCustomBreak: false, printStyle: 'standard', printAdv: null, loaded: false, descOpen: {}, gridLayout: null, gridPage: 1, gridShown: 1, gridPageKey: null, search: '' };
+  var state = { thumbPos: {}, extraPhotos: {}, tabs: [], paintings: [], suffixes: [], activeTabId: null, printMode: 'A4', printRows: 8, printScope: 'current', printCustom: null, printCustomBreak: false, printStyle: 'standard', printAdv: null, loaded: false, descOpen: {}, gridLayout: null, gridPage: 1, gridShown: 1, gridPageKey: null, search: '' };
   var isAdmin = false;
   var isStudio = false;      /* the studio admin, on the studio's own gallery */
   var currentUser = null;
@@ -1266,6 +1303,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   /* The Admin sign-in button only appears on  …/?admin  (or #admin). */
   /* Main website — "back" button in the header and in full-screen Orbit. */
   var SITE_HOME = 'https://www.arkorigin.xyz/';
+  /* "Image +" icon for the more-photos button / badge. */
+  var PHOTOS_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M16 5h6M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/><circle cx="9" cy="9" r="2"/></svg>';
+  var PHOTOS_ICON_SM = PHOTOS_ICON.replace('width="14" height="14"', 'width="11" height="11"');
   var SITE_HOME_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M3 11 12 3l9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>';
   var ADMIN_ENTRY = (function () {
     try { return /(^|[?&])admin(=|&|$)/.test(location.search.slice(1)) || location.hash === '#admin'; } catch (e) { return false; }
@@ -1302,7 +1342,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       name: 'Name:', number: 'Number:', date: 'Date:', size: 'Size:', description: 'Description:', untitled: 'Untitled',
       more: 'More', less: 'Less', available: 'Available', sold: 'Sold', nfs: 'Not for sale', markSold: 'Mark sold',
       hiddenChip: 'Hidden', clickToView: 'Click to view', zoomTitle: 'Click to view full size', zoomTitleEmbed: 'Click to view full size (opens in a new tab)',
-      viewSet: 'View the full set', setN: 'Set ×{n}', loadMore: 'Load more', showingOf: 'Showing {a} of {b}', showingAll: 'Showing all {n}',
+      viewSet: 'View the full set', setN: 'Set ×{n}', photosN: 'Photos ×{n}', viewPhotos: 'View all photos', photoN: 'Photo {n}', nPhotos: '{n} photos', loadMore: 'Load more', showingOf: 'Showing {a} of {b}', showingAll: 'Showing all {n}',
       viewGrid: 'Grid', viewOrbit: 'Orbit', orbitHint: 'Swipe or use ‹ › to browse · tap the front painting to view full size', orbitHintNoZoom: 'Swipe or use ‹ › to browse',
       pageOfPieces: 'Page {a} of {b} · {n} pieces', prevPage: 'Previous page', nextPage: 'Next page',
       lbClose: 'Close full-size view', lbHint: 'Click image to zoom', lbHintZoomed: 'Move to explore · click to reset', close: 'Close',
@@ -1333,7 +1373,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       name: '名稱：', number: '編號：', date: '日期：', size: '尺寸：', description: '描述：', untitled: '無題',
       more: '更多', less: '收起', available: '可供出售', sold: '已售', nfs: '非賣品', markSold: '標記已售',
       hiddenChip: '已隱藏', clickToView: '點擊查看', zoomTitle: '點擊查看大圖', zoomTitleEmbed: '點擊查看大圖（在新分頁開啟）',
-      viewSet: '查看整套作品', setN: '一套 ×{n}', loadMore: '載入更多', showingOf: '顯示 {a} / {b}', showingAll: '已顯示全部 {n} 件',
+      viewSet: '查看整套作品', setN: '一套 ×{n}', photosN: '相片 ×{n}', viewPhotos: '查看全部相片', photoN: '相片 {n}', nPhotos: '{n} 張相片', loadMore: '載入更多', showingOf: '顯示 {a} / {b}', showingAll: '已顯示全部 {n} 件',
       viewGrid: '網格', viewOrbit: '環形', orbitHint: '左右滑動或按 ‹ › 瀏覽 · 點擊前方作品查看大圖', orbitHintNoZoom: '左右滑動或按 ‹ › 瀏覽',
       pageOfPieces: '第 {a} 頁，共 {b} 頁 · {n} 件', prevPage: '上一頁', nextPage: '下一頁',
       lbClose: '關閉大圖', lbHint: '點擊圖片放大', lbHintZoomed: '移動查看 · 點擊還原', close: '關閉',
@@ -1364,7 +1404,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       name: '名称：', number: '编号：', date: '日期：', size: '尺寸：', description: '描述：', untitled: '无题',
       more: '更多', less: '收起', available: '可供出售', sold: '已售', nfs: '非卖品', markSold: '标记已售',
       hiddenChip: '已隐藏', clickToView: '点击查看', zoomTitle: '点击查看大图', zoomTitleEmbed: '点击查看大图（在新标签页打开）',
-      viewSet: '查看整套作品', setN: '一套 ×{n}', loadMore: '加载更多', showingOf: '显示 {a} / {b}', showingAll: '已显示全部 {n} 件',
+      viewSet: '查看整套作品', setN: '一套 ×{n}', photosN: '照片 ×{n}', viewPhotos: '查看全部照片', photoN: '照片 {n}', nPhotos: '{n} 张照片', loadMore: '加载更多', showingOf: '显示 {a} / {b}', showingAll: '已显示全部 {n} 件',
       viewGrid: '网格', viewOrbit: '环形', orbitHint: '左右滑动或按 ‹ › 浏览 · 点击前方作品查看大图', orbitHintNoZoom: '左右滑动或按 ‹ › 浏览',
       pageOfPieces: '第 {a} 页，共 {b} 页 · {n} 件', prevPage: '上一页', nextPage: '下一页',
       lbClose: '关闭大图', lbHint: '点击图片放大', lbHintZoomed: '移动查看 · 点击还原', close: '关闭',
@@ -1395,7 +1435,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       name: 'Nome:', number: 'Número:', date: 'Data:', size: 'Dimensões:', description: 'Descrição:', untitled: 'Sem título',
       more: 'Mais', less: 'Menos', available: 'Disponível', sold: 'Vendido', nfs: 'Não está à venda', markSold: 'Marcar vendido',
       hiddenChip: 'Oculto', clickToView: 'Clique para ver', zoomTitle: 'Clique para ver em tamanho real', zoomTitleEmbed: 'Clique para ver em tamanho real (abre num novo separador)',
-      viewSet: 'Ver o conjunto completo', setN: 'Conjunto ×{n}', loadMore: 'Carregar mais', showingOf: 'A mostrar {a} de {b}', showingAll: 'A mostrar todas as {n}',
+      viewSet: 'Ver o conjunto completo', setN: 'Conjunto ×{n}', photosN: 'Fotos ×{n}', viewPhotos: 'Ver todas as fotos', photoN: 'Foto {n}', nPhotos: '{n} fotos', loadMore: 'Carregar mais', showingOf: 'A mostrar {a} de {b}', showingAll: 'A mostrar todas as {n}',
       viewGrid: 'Grelha', viewOrbit: 'Órbita', orbitHint: 'Deslize ou use ‹ › para navegar · toque na pintura da frente para ver em tamanho real', orbitHintNoZoom: 'Deslize ou use ‹ › para navegar',
       pageOfPieces: 'Página {a} de {b} · {n} obras', prevPage: 'Página anterior', nextPage: 'Página seguinte',
       lbClose: 'Fechar vista ampliada', lbHint: 'Clique na imagem para ampliar', lbHintZoomed: 'Mova para explorar · clique para repor', close: 'Fechar',
@@ -1779,6 +1819,31 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var res = await sb.from('site_theme').select('colors').eq('id', 2).maybeSingle();
     state.thumbPos = (res && res.data && res.data.colors && typeof res.data.colors === 'object') ? res.data.colors : {};
   }
+  /* More photos of one piece {paintingId: [{ image_path, thumb_path }, …]}, kept in
+     site_theme row 6 exactly like the thumbnail crops in row 2 — so no new DB column
+     and no Cloudflare Worker change. The piece's own image_path stays its first photo.
+     Returns false (and keeps what we had) when the read fails, so a save that follows
+     never overwrites everyone's photos with an empty list. */
+  async function fetchExtraPhotos() {
+    var res = await sb.from('site_theme').select('colors').eq('id', 6).maybeSingle();
+    if (!res || res.error) return false;
+    var c = res.data && res.data.colors;
+    state.extraPhotos = (c && typeof c === 'object' && !Array.isArray(c)) ? c : {};
+    return true;
+  }
+  function extraPhotos(p) {
+    var l = p && state.extraPhotos && state.extraPhotos[p.id];
+    return Array.isArray(l) ? l.filter(function (x) { return x && x.image_path; }) : [];
+  }
+  /* Every photo of a piece, main one first. */
+  function photoList(p) {
+    var out = [];
+    if (p && (p.image_path || p.thumb_path)) out.push({ image_path: p.image_path || p.thumb_path, thumb_path: p.thumb_path || p.image_path, main: true });
+    return out.concat(extraPhotos(p));
+  }
+  function saveExtraPhotos() {
+    return sb.from('site_theme').upsert({ id: 6, colors: state.extraPhotos, updated_at: new Date().toISOString() });
+  }
   /* Grid layout (columns / rows per page, separately for PC and mobile), kept in
      site_theme row 3 like the theme (row 1) and thumbnail crops (row 2). */
   var GRID_MOBILE_QUERY = '(max-width: 640px)';
@@ -1837,7 +1902,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (pr.error && /not found/i.test(pr.error.message)) { state.galleryMissing = true; state.loaded = true; renderAll(); toast('This gallery does not exist.'); return; }
       state.profile = (pr.data && pr.data.colors && typeof pr.data.colors === 'object') ? pr.data.colors : {};
     }
-    await Promise.all([fetchTabs(), fetchPaintings(), fetchSuffixes(), fetchThumbPos(), fetchGridLayout(), fetchPrintDefaults()]);
+    await Promise.all([fetchTabs(), fetchPaintings(), fetchSuffixes(), fetchThumbPos(), fetchExtraPhotos(), fetchGridLayout(), fetchPrintDefaults()]);
     if (GALLERY && state.printAdv && state.printAdv.title === "Ark's Gallery") state.printAdv.title = galleryTitle();
     if (state.tabs.length && !state.tabs.some(function (t) { return t.id === state.activeTabId; })) state.activeTabId = state.tabs[0].id;
     state.loaded = true;
@@ -2606,6 +2671,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
          suffix, sold / not-for-sale, set, censored/hidden, in-progress lines.
          When adding a new field here, add it there too. */
       var setMates = setMembers(p);
+      var morePhotos = extraPhotos(p).length;
       return '<div class="card' + (p.sold ? ' is-sold' : '') + (p.__testNew ? ' is-test-new' : '') + '" data-card="' + p.id + '">' +
         '<div class="card-image' + (isCensoredView ? ' is-censored' : '') + '"' + (canZoom ? ' data-lightbox="' + esc(fullSrc) + '" title="' + (isEmbedded ? txe('zoomTitleEmbed') : txe('zoomTitle')) + '"' : '') + '>' + imageInner +
         (isInProgress ? '<span class="ip-pen top"></span><span class="ip-pen right"></span><span class="ip-pen bottom"></span><span class="ip-pen left"></span>' : '') +
@@ -2625,6 +2691,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             '<span class="set-badge-ring"></span>' +
             '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2 9 4.9-9 4.9-9-4.9L12 2Z"/><path d="m3 12 9 4.9 9-4.9M3 17l9 4.9 9-4.9"/></svg>' +
             txe('setN', { n: setMates.length }) + '</button>'
+          : '') +
+        ((morePhotos && !isHidden && !p.__testNew)
+          ? '<button class="set-badge photos-badge' + (setMates.length > 1 ? ' below-set' : '') + '" data-view-photos="' + p.id + '" type="button" title="' + txe('viewPhotos') + '">' +
+            '<span class="set-badge-ring"></span>' + PHOTOS_ICON_SM +
+            txe('photosN', { n: photoList(p).length }) + '</button>'
           : '') +
         (canZoom ? '<span class="expand-hint"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 3H5a2 2 0 0 0-2 2v3m0 8v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3m0-8V5a2 2 0 0 0-2-2h-3"/></svg></span>' : '') +
         '</div>' +
@@ -2653,6 +2724,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ((isAdmin && !p.__testNew)
           ? '<button class="sold-toggle" data-toggle-sold="' + p.id + '"><span class="switch"></span>' + (p.sold ? txe('sold') : txe('markSold')) + '</button>' +
             '<div class="card-actions">' +
+            '<button class="icon-btn photos-btn" data-photos="' + p.id + '" type="button" aria-label="Add more photos of this piece" title="' +
+            (morePhotos ? photoList(p).length + ' photos — click to see them or add more' : 'Add more photos of this piece (works like a set)') + '">' + PHOTOS_ICON +
+            (morePhotos ? '<span class="photos-n">' + photoList(p).length + '</span>' : '') + '</button>' +
             '<button class="icon-btn set-assign-btn' + (p.set_id ? ' has-set' : '') + '" data-assign-set="' + p.id + '" aria-label="Add to set" title="' + (p.set_id ? 'In set bucket ' + esc(String(p.set_id)) + ' — click to change' : 'Add to a set') + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2 9 4.9-9 4.9-9-4.9L12 2Z"/><path d="m3 12 9 4.9 9-4.9M3 17l9 4.9 9-4.9"/></svg></button>' +
             '<button class="icon-btn censor-toggle-btn' + (p.censored ? ' active' : '') + '" data-toggle-censor="' + p.id + '" aria-label="' + (p.censored ? 'Remove censor' : 'Censor thumbnail') + '" title="' + (p.censored ? 'Remove censor — thumbnail will show normally' : 'Censor thumbnail — blurs it in the grid, full image still opens on click') + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg></button>' +
             '<button class="icon-btn" data-edit-painting="' + p.id + '" aria-label="Edit" title="Edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' +
@@ -3649,9 +3723,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       (p.description ? '<div class="orb-desc clamped" id="orbDesc">' + esc(p.description) + '</div><button class="desc-more" type="button" id="orbMore" hidden>' + txe('more') + '</button>' : '') +
       '<div class="orb-status sold-static' + (p.sold ? ' is-sold' : (p.not_for_sale ? ' is-nfs' : '')) + '">' + (p.sold ? txe('sold') : (p.not_for_sale ? txe('nfs') : txe('available'))) + '</div>' +
       (setMembers(p).length > 1 ? '<button type="button" class="orb-setbtn" id="orbSetBtn">' + txe('viewSet') + ' · ' + txe('setN', { n: setMembers(p).length }) + '</button>' : '') +
+      ((extraPhotos(p).length && !isHidden) ? ' <button type="button" class="orb-setbtn" id="orbPhotosBtn">' + txe('viewPhotos') + ' · ' + txe('photosN', { n: photoList(p).length }) + '</button>' : '') +
       '<div class="orb-hint">' + txe(isHidden ? 'orbitHintNoZoom' : 'orbitHint') + '</div>';
     var setBtn = document.getElementById('orbSetBtn');
     if (setBtn) setBtn.addEventListener('click', function () { sfx('open'); openSetModal(p.id); });
+    var photosBtn = document.getElementById('orbPhotosBtn');
+    if (photosBtn) photosBtn.addEventListener('click', function () { sfx('open'); openPhotosModal(p.id); });
     el.classList.remove('swap'); void el.offsetWidth; el.classList.add('swap');
     var desc = document.getElementById('orbDesc'), more = document.getElementById('orbMore');
     if (desc && more) {
@@ -3915,6 +3992,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     });
     grid.querySelectorAll('[data-del-painting]').forEach(function (el) {
       el.addEventListener('click', function () { confirmDelete(el); });
+    });
+    grid.querySelectorAll('[data-photos]').forEach(function (el) {
+      el.addEventListener('click', function () { openPhotosModal(el.getAttribute('data-photos')); });
+    });
+    grid.querySelectorAll('[data-view-photos]').forEach(function (el) {
+      el.addEventListener('click', function (e) {
+        e.stopPropagation(); // sits inside the card-image lightbox trigger
+        openPhotosModal(el.getAttribute('data-view-photos'));
+      });
     });
     grid.querySelectorAll('[data-assign-set]').forEach(function (el) {
       el.addEventListener('click', function () { openSetPrompt(el.getAttribute('data-assign-set')); });
@@ -4274,6 +4360,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (res.error) { state.paintings.splice(idx, 0, removed); renderAll(); toast('Could not delete — try again.'); return; }
     // best-effort cleanup of stored images; ignore failures
     var paths = [removed.image_path, removed.thumb_path].filter(Boolean);
+    /* …and its extra photos (site_theme row 6), if it had any. */
+    if (extraPhotos(removed).length && await fetchExtraPhotos()) {
+      var extras = extraPhotos(removed);
+      delete state.extraPhotos[id];
+      var saved = await saveExtraPhotos();
+      if (!saved.error) extras.forEach(function (x) { paths.push(x.image_path, x.thumb_path); });
+    }
+    paths = paths.filter(function (x, i) { return x && paths.indexOf(x) === i; });
     if (paths.length) r2Remove(paths).catch(function () {});
   }
 
@@ -4371,6 +4465,135 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         openLightbox(src, el);
       });
     });
+  }
+  /* More photos of ONE piece — the same overlay as a Set (fanned row on PC, swipe
+     strip on phones, tap a photo for full size), but the photos all belong to this
+     one piece. In edit mode it also has an "Add photos" tile (pick several at once)
+     and a × on each extra photo. Photos are processed and uploaded exactly like
+     Bulk upload (full image + 900px thumbnail, invited users under u/<id>/). */
+  function openPhotosModal(id) {
+    var p = state.paintings.find(function (x) { return x.id === id; });
+    if (!p) return;
+    var canEdit = isAdmin && !p.__testNew;
+    var list = photoList(p);
+    if (!canEdit && list.length < 2) return;
+    var xIcon = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+    var root = document.getElementById('modalRoot');
+    root.innerHTML = '<div class="set-modal-backdrop" id="setViewBackdrop"><div class="set-modal photos-modal">' +
+      '<button class="set-modal-close" id="setViewClose" type="button" aria-label="' + txe('close') + '">' +
+      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>' +
+      '<div class="set-modal-head"><h2>' + esc(p.name || tx('untitled')) + '</h2>' +
+      '<span class="set-count">' + txe('nPhotos', { n: list.length }) + '</span></div>' +
+      '<div class="set-row" data-count="' + (list.length + (canEdit ? 1 : 0)) + '">' +
+      list.map(function (ph, i) {
+        var src = publicImgUrl(ph.thumb_path) || publicImgUrl(ph.image_path);
+        var full = publicImgUrl(ph.image_path) || src;
+        return '<div class="set-piece" data-set-piece-full="' + esc(full || '') + '">' +
+          '<img class="set-piece-img" src="' + esc(src) + '" alt="' + esc((p.name || '') + ' ' + (i + 1)) + '">' +
+          ((canEdit && !ph.main) ? '<button class="photo-remove" type="button" data-photo-remove="' + esc(ph.image_path) + '" title="Remove this photo" aria-label="Remove this photo">' + xIcon + '</button>' : '') +
+          '<div class="set-piece-cap">' + txe('photoN', { n: i + 1 }) +
+          (i === 0 ? '<span class="mono">' + esc(catalogNum(p)) + (p.size ? ' · ' + esc(p.size) : '') + '</span>' : '') + '</div></div>';
+      }).join('') +
+      (canEdit
+        ? '<div class="set-piece photos-add" id="photosAdd" role="button" tabindex="0" title="Add photos (you can pick several at once)">' +
+          '<div class="set-piece-img photos-add-box">' + PHOTOS_ICON.replace('width="14" height="14"', 'width="30" height="30"') + '<span>Add photos</span></div>' +
+          '<div class="set-piece-cap">Pick one or several</div></div>'
+        : '') +
+      '</div>' +
+      (canEdit ? '<input type="file" id="photosInput" accept="image/*" multiple hidden><p class="photos-status" id="photosStatus"></p>' : '') +
+      '</div></div>';
+    document.getElementById('setViewBackdrop').addEventListener('click', function (e) { if (e.target.id === 'setViewBackdrop') closeSetModal(); });
+    document.getElementById('setViewClose').addEventListener('click', closeSetModal);
+    document.removeEventListener('keydown', setModalEscHandler);
+    document.addEventListener('keydown', setModalEscHandler);
+    root.querySelectorAll('[data-set-piece-full]').forEach(function (el) {
+      el.addEventListener('click', function (e) {
+        if (e.target.closest('[data-photo-remove]')) return;
+        var src = el.getAttribute('data-set-piece-full');
+        if (!src) return;
+        closeSetModal();
+        if (isEmbedded) { window.open(src, '_blank', 'noopener'); return; }
+        openLightbox(src, document.querySelector('[data-card="' + p.id + '"]') || el);
+      });
+    });
+    root.querySelectorAll('[data-photo-remove]').forEach(function (el) {
+      el.addEventListener('click', function (e) {
+        e.stopPropagation();
+        removeExtraPhoto(p.id, el.getAttribute('data-photo-remove'));
+      });
+    });
+    var add = document.getElementById('photosAdd'), input = document.getElementById('photosInput');
+    if (add && input) {
+      add.addEventListener('click', function () { input.click(); });
+      add.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+      input.addEventListener('change', function (e) {
+        var files = Array.prototype.slice.call(e.target.files || []);
+        e.target.value = '';
+        if (files.length) addExtraPhotos(p.id, files);
+      });
+    }
+  }
+  async function addExtraPhotos(id, files) {
+    var status = function (t) { var el = document.getElementById('photosStatus'); if (el) el.textContent = t; };
+    var add = document.getElementById('photosAdd');
+    if (add) add.classList.add('busy');
+    var fresh = [], failed = 0;
+    for (var i = 0; i < files.length; i++) {
+      var f = files[i];
+      status('Uploading ' + (i + 1) + ' of ' + files.length + ' — ' + f.name);
+      try {
+        var uid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
+        var processed = await processPhoto(f, 900, 0.78);
+        var fullBase = (f.name || 'photo').replace(/\.[^.]+$/, '');
+        var fullPath = storePath('full/') + uid + '-' + fullBase + extForType(processed.fullBlob.type, f.name);
+        var thumbPath = storePath('thumb/') + uid + '.jpg';
+        var uploads = [r2Upload(fullPath, processed.fullBlob, processed.fullBlob.type || f.type || 'image/jpeg')];
+        if (processed.thumbBlob) uploads.push(r2Upload(thumbPath, processed.thumbBlob, 'image/jpeg'));
+        var results = await Promise.all(uploads);
+        if (results[0].error) throw results[0].error;
+        fresh.push({ image_path: fullPath, thumb_path: (results[1] && !results[1].error) ? thumbPath : fullPath });
+      } catch (e) { failed++; }
+    }
+    if (!fresh.length) { if (add) add.classList.remove('busy'); status(''); toast('Could not upload — try again.'); return; }
+    status('Saving…');
+    /* Re-read row 6 first so photos added on another device aren't lost. */
+    if (!(await fetchExtraPhotos())) {
+      if (add) add.classList.remove('busy'); status('');
+      r2Remove(fresh.reduce(function (a, x) { return a.concat([x.image_path, x.thumb_path]); }, [])).catch(function () {});
+      toast('Could not save — check the connection and try again.'); return;
+    }
+    var prev = Array.isArray(state.extraPhotos[id]) ? state.extraPhotos[id].slice() : null;
+    state.extraPhotos[id] = (prev || []).concat(fresh);
+    var res = await saveExtraPhotos();
+    if (res.error) {
+      if (prev) state.extraPhotos[id] = prev; else delete state.extraPhotos[id];
+      r2Remove(fresh.reduce(function (a, x) { return a.concat([x.image_path, x.thumb_path]); }, [])).catch(function () {});
+      toast('Could not save the photos — try again.');
+    } else {
+      toast(fresh.length + ' photo' + (fresh.length === 1 ? '' : 's') + ' added' + (failed ? ', ' + failed + ' failed' : '') + '.');
+    }
+    var stillOpen = !!document.getElementById('photosInput');
+    renderAll();
+    if (stillOpen) openPhotosModal(id);
+  }
+  async function removeExtraPhoto(id, imagePath) {
+    if (!confirm('Remove this photo from the piece? The main photo is not affected.')) return;
+    if (!(await fetchExtraPhotos())) { toast('Could not update — try again.'); return; }
+    var list = Array.isArray(state.extraPhotos[id]) ? state.extraPhotos[id] : [];
+    var gone = list.filter(function (x) { return x && x.image_path === imagePath; });
+    if (!gone.length) { renderAll(); openPhotosModal(id); return; }
+    var prev = list.slice();
+    var next = list.filter(function (x) { return !(x && x.image_path === imagePath); });
+    if (next.length) state.extraPhotos[id] = next; else delete state.extraPhotos[id];
+    var res = await saveExtraPhotos();
+    if (res.error) { state.extraPhotos[id] = prev; toast('Could not update — try again.'); }
+    else {
+      var paths = gone.reduce(function (a, x) { return a.concat([x.image_path, x.thumb_path]); }, []);
+      paths = paths.filter(function (x, i) { return x && paths.indexOf(x) === i; });
+      r2Remove(paths).catch(function () {});
+    }
+    renderAll();
+    openPhotosModal(id);
   }
   function closeModal() { document.getElementById('modalRoot').innerHTML = ''; }
 
