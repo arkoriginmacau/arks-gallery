@@ -110,20 +110,22 @@
     font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
     color: var(--ochre-readable); font-weight: 600; margin: 0 0 6px;
   }
-  .brand-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; position: relative; }
-  /* Sign up and the daily number sit in front of (to the left of) the two title
-     lines, so "Arkorigin Studio" and "Ark's Gallery" always start on the same line. */
-  .brand-eyebrow { display: flex; align-items: center; gap: 8px; position: relative; }
-  .brand-eyebrow .daily-no { margin-right: 0; }
+  .brand-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  /* The daily number (admin) and Sign up / Log in / My gallery (visitors) sit in a
+     small column in front of (to the left of) the two title lines, inside the page,
+     on every screen size. "Arkorigin Studio" and "Ark's Gallery" stay aligned with
+     each other; with nothing in the column it collapses and the titles sit flush left. */
+  .brand { display: flex; align-items: center; gap: 14px; min-width: 0; max-width: 100%; }
+  .brand-side { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 6px; flex: 0 0 auto; }
+  .brand-side[hidden] { display: none; }
+  .brand-side:not(:has(> :not(:empty))) { display: none; } /* kept separate: older browsers without :has() drop only this rule */
+  .brand-main { min-width: 0; }
+  #brandTitle { overflow-wrap: anywhere; }
   #signupSlot, #dailyNoSlot { white-space: nowrap; }
-  #dailyNoSlot:empty { display: none; }
-  @media (min-width: 1340px) {
-    #signupSlot, #dailyNoSlot { position: absolute; right: 100%; top: 50%; transform: translateY(-50%); margin-right: 14px; }
-  }
-  /* No room in the left margin on smaller screens: they go after the text instead. */
-  @media (max-width: 1339px) {
-    #signupSlot, #dailyNoSlot { order: 2; }
-  }
+  #signupSlot:empty, #dailyNoSlot:empty { display: none; }
+  #dailyNoSlot { font-size: 11px; letter-spacing: 0.14em; color: var(--ochre-readable); font-weight: 600; }
+  #dailyNoSlot .daily-no { margin-right: 0; }
+  @media (max-width: 420px) { .brand { gap: 10px; } }
   .daily-no {
     font: inherit; letter-spacing: 0.14em; font-variant-numeric: tabular-nums; color: inherit;
     background: none; border: 1px dashed currentColor; border-radius: 3px; padding: 1px 6px; margin-right: 8px; cursor: pointer;
@@ -1098,9 +1100,12 @@
 
 <div class="wrap" id="app">
   <header class="top">
-    <div>
-      <p class="brand-eyebrow"><span id="dailyNoSlot"></span><span id="brandStudio">Arkorigin Studio</span></p>
-      <div class="brand-row"><span id="signupSlot"></span><h1 id="brandTitle">Ark's Gallery</h1></div>
+    <div class="brand">
+      <div class="brand-side" id="brandSide" hidden><span id="dailyNoSlot"></span><span id="signupSlot"></span></div>
+      <div class="brand-main">
+        <p class="brand-eyebrow"><span id="brandStudio">Arkorigin Studio</span></p>
+        <div class="brand-row"><h1 id="brandTitle">Ark's Gallery</h1></div>
+      </div>
     </div>
     <div class="top-actions" id="topActions"></div>
   </header>
@@ -5800,7 +5805,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       dn.innerHTML = DAILY.code ? '<button class="daily-no" id="btnDailyNo" type="button" title="Today\'s sign-up number — click to invite someone by email">' + esc(DAILY.code) + '</button>' : '';
       if (DAILY.code) document.getElementById('btnDailyNo').addEventListener('click', openInviteModal);
     } else dn.innerHTML = '';
-    /* Sign up / Log in / My gallery, in front of the title. */
+    /* Sign up / Log in / My gallery, in the same column, below the number. */
     var su = document.getElementById('signupSlot');
     var html = '';
     if (!isEmbedded) {
@@ -5814,6 +5819,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
     su.innerHTML = html;
     su.style.display = html ? '' : 'none';
+    /* The little column in front of the titles collapses when it has nothing to show. */
+    var side = document.getElementById('brandSide');
+    if (side) side.hidden = !(dn.innerHTML || html);
     if (document.getElementById('btnSignup')) document.getElementById('btnSignup').addEventListener('click', function () { openAccountModal('code'); });
     if (document.getElementById('btnLogin')) document.getElementById('btnLogin').addEventListener('click', function () { openAccountModal('login'); });
   }
@@ -6021,7 +6029,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           '<td>' + (u.disabled ? '<span style="color:#c0392b">Switched off</span>' : 'Active') + '</td>' +
           '<td style="white-space:nowrap"><button class="btn btn-ghost" data-us-reset="' + esc(u.id) + '" type="button" title="Make a one-time link she can use to choose a new password (valid 1 hour)">Password link</button> ' +
           '<button class="btn btn-ghost" data-us-toggle="' + esc(u.id) + '" data-us-on="' + (u.disabled ? '1' : '0') + '" type="button">' + (u.disabled ? 'Switch on' : 'Switch off') + '</button></td></tr>';
-      }).join('') + '</tbody></table>' : '<p class="field-hint">Nobody has signed up yet. Click today\'s number next to "Arkorigin Studio" to invite someone.</p>';
+      }).join('') + '</tbody></table>' : '<p class="field-hint">Nobody has signed up yet. Click today\'s number in front of the gallery title (top left) to invite someone.</p>';
     if (invites.length) {
       html += '<h3 style="margin:18px 0 6px;font-size:14px">Invitations waiting</h3><table class="users-table"><tbody>' +
         invites.map(function (v) {
