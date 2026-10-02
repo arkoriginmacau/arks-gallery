@@ -207,7 +207,8 @@
   function loadImg(src) { return new Promise(function (res, rej) { var i = new Image(); i.onload = function () { res(i); }; i.onerror = rej; i.src = src; }); }
   function slug(s) { return String(s || 'untitled').normalize('NFKD').replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-').slice(0, 40) || 'untitled'; }
   function isAdmin() {
-    try { var s = JSON.parse(localStorage.getItem('arks_admin_session') || 'null'); return !!(s && s.token && s.expires_at > Date.now() / 1000); } catch (e) { return false; }
+    /* Same rule as the gallery: signed in until "Sign out" (no local expiry); invited users are not the studio admin. */
+    try { var s = JSON.parse(localStorage.getItem('arks_admin_session') || 'null'); return !!(s && s.token && (s.role || 'admin') !== 'user'); } catch (e) { return false; }
   }
   function db(table) {
     return fetch(API + '/api/db', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ table: table, op: 'select', filters: [] }) })

@@ -1200,17 +1200,53 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
      already uses (sb.from(...).select/insert/update/delete, sb.auth...). */
   var sb = (function () {
     var listeners = [];
+    /* Stay signed in: the session lives in localStorage (kept across reloads, tab
+       closes and browser restarts) and is only dropped on "Sign out" or when the
+       Worker rejects the token (see sessionRejected). The page no longer throws it
+       away by itself when the stored expires_at passes; the Worker decides. */
+    try {
+      if (!localStorage.getItem(SESSION_KEY) && window.sessionStorage && sessionStorage.getItem(SESSION_KEY)) {
+        localStorage.setItem(SESSION_KEY, sessionStorage.getItem(SESSION_KEY));
+      }
+      if (window.sessionStorage) sessionStorage.removeItem(SESSION_KEY);
+    } catch (e) {}
     function readSession() {
       try {
         var raw = localStorage.getItem(SESSION_KEY);
         if (!raw) return null;
         var s = JSON.parse(raw);
-        if (!s || !s.token || !s.expires_at || s.expires_at < Date.now() / 1000) return null;
-        return { access_token: s.token, expires_at: s.expires_at,
+        if (!s || !s.token) return null;
+        return { access_token: s.token, expires_at: s.expires_at || null,
           user: { email: s.email || ADMIN_EMAIL, role: s.role || 'admin', id: s.id || null, slug: s.slug || null } };
       } catch (e) { return null; }
     }
+    function writeSession(obj) {
+      try { localStorage.setItem(SESSION_KEY, JSON.stringify(obj)); } catch (e) {}
+      /* Ask the browser not to clear our storage under storage pressure (best effort). */
+      try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {}); } catch (e) {}
+    }
+    function clearSession() {
+      try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+      try { if (window.sessionStorage) sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
+    }
     function notify() { var s = readSession(); listeners.forEach(function (cb) { try { cb('CHANGED', s); } catch (e) {} }); }
+    /* "The system decides": a 401 (or a 403 that says the sign-in is bad) on a
+       request that carried our token means the Worker no longer accepts it, so
+       sign out here too and tell the page (it shows the right sign-in again).
+       An invited user hitting an admin-only endpoint ("…as admin") is a permission
+       answer, not a dead session, so that one doesn't sign her out. */
+    function sessionRejected(status, message) {
+      var sess = readSession();
+      if (!sess) return false;
+      var msg = String(message || '');
+      var dead = status === 401 || (status === 403 && /sign(ed)?[\s-]*in|log(ged)?[\s-]*in|session|token|expired/i.test(msg));
+      if (!dead) return false;
+      if (sess.user.role === 'user' && /admin/i.test(msg)) return false;
+      clearSession();
+      notify();
+      try { window.dispatchEvent(new CustomEvent('arks-session-ended', { detail: { role: sess.user.role, message: msg } })); } catch (e) {}
+      return true;
+    }
 
     function Query(table) {
       this.table = table; this.op = null; this.values = null; this.filters = [];
@@ -1236,7 +1272,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             order: this.orderBy, returning: this.returning, gallery: GALLERY || undefined })
         });
         var body = await res.json().catch(function () { return {}; });
-        if (!res.ok) return { data: null, error: { message: body.error || ('Request failed (' + res.status + ')') } };
+        if (!res.ok) {
+          if (sess) sessionRejected(res.status, body.error);
+          return { data: null, error: { message: body.error || ('Request failed (' + res.status + ')') } };
+        }
         var rows = body.rows || [];
         if (this.op === 'select' || this.returning) {
           if (this.mode === 'single') {
@@ -1274,15 +1313,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             });
             var body = await res.json().catch(function () { return {}; });
             if (!res.ok || !body.token) return { error: { message: body.error || 'Sign-in failed' } };
-            localStorage.setItem(SESSION_KEY, JSON.stringify({ token: body.token, expires_at: body.expires_at }));
+            writeSession({ token: body.token, expires_at: body.expires_at });
             notify();
             return { error: null };
           } catch (e) { return { error: { message: e.message || String(e) } }; }
         },
-        signOut: async function () { try { localStorage.removeItem(SESSION_KEY); } catch (e) {} notify(); },
+        signOut: async function () { clearSession(); notify(); },
+        sessionRejected: sessionRejected,
         /* Store a session returned by sign-up / log-in / password reset (invited users). */
         setSession: function (b) {
-          try { localStorage.setItem(SESSION_KEY, JSON.stringify({ token: b.token, expires_at: b.expires_at, role: b.role, email: b.email, id: b.id, slug: b.slug })); } catch (e) {}
+          writeSession({ token: b.token, expires_at: b.expires_at, role: b.role, email: b.email, id: b.id, slug: b.slug });
           notify();
         }
       }
@@ -1627,7 +1667,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       var headers = { 'Content-Type': contentType || 'application/octet-stream' };
       headers.Authorization = auth.Authorization;
       var res = await fetch(IMAGE_BASE + '/' + encodePath(path), { method: 'PUT', headers: headers, body: blob });
-      if (!res.ok) return { error: new Error('Upload failed (' + res.status + ')') };
+      if (!res.ok) {
+        var eb = await res.json().catch(function () { return {}; });
+        sb.auth.sessionRejected(res.status, eb.error);
+        return { error: new Error('Upload failed (' + res.status + ')') };
+      }
       return { error: null };
     } catch (e) { return { error: e }; }
   }
@@ -1635,7 +1679,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var auth = await r2AuthHeader();
     if (!auth) return;
     await Promise.all(paths.map(function (p) {
-      return fetch(IMAGE_BASE + '/' + encodePath(p), { method: 'DELETE', headers: auth }).catch(function () {});
+      return fetch(IMAGE_BASE + '/' + encodePath(p), { method: 'DELETE', headers: auth }).then(function (res) {
+        if (!res.ok) return res.json().catch(function () { return {}; }).then(function (b) { sb.auth.sessionRejected(res.status, b.error); });
+      }).catch(function () {});
     }));
   }
   /* A "Dont Exist" placeholder: a catalogue number that was never painted.
@@ -6000,6 +6046,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (withAuth) { var a = await r2AuthHeader(); if (a) headers.Authorization = a.Authorization; }
       var res = await fetch(IMAGE_BASE + path, { method: 'POST', headers: headers, body: JSON.stringify(body || {}) });
       var b = await res.json().catch(function () { return {}; });
+      if (!res.ok && withAuth) sb.auth.sessionRejected(res.status, b.error);
       return { ok: res.ok, status: res.status, body: b, error: res.ok ? null : (b.error || ('Request failed (' + res.status + ')')) };
     } catch (e) { return { ok: false, status: 0, body: {}, error: e.message || String(e) }; }
   }
@@ -6334,6 +6381,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
   /* ---------------- init ---------------- */
   sb.auth.onAuthStateChange(function (_event, session) { refreshAuthFromSession(session); });
+  /* The Worker turned the saved sign-in down: show the way back in. */
+  window.addEventListener('arks-session-ended', function (e) {
+    var role = e.detail && e.detail.role;
+    ADMIN_ENTRY = true; // brings back the "Admin" / "Log in" buttons on this page
+    renderAll();
+    if (role === 'user' && !isEmbedded) {
+      toast('You have been signed out — please log in again.');
+      openAccountModal('login');
+    } else {
+      toast('Your sign-in has ended — click "Admin" to get a new sign-in link.');
+    }
+  });
   (async function () {
     /* Arriving from the emailed link: swap the one-time token for a session. */
     try {
