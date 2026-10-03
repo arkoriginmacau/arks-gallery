@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ark's Gallery</title>
+<link rel="preconnect" href="https://arks-gallery-images.arkoriginmacau.workers.dev">
+<link rel="preconnect" href="https://arks-gallery-images.arkoriginmacau.workers.dev" crossorigin>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
@@ -1766,6 +1768,65 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     return finalCanvas;
   }
 
+  var THUMB_WEBP_Q = 0.80;
+  var VIEW_MAX_DIM = 2560, VIEW_WEBP_Q = 0.80, VIEW_JPEG_Q = 0.85;
+  /* Canvas → WebP blob (webpQ > 0), or JPEG when the browser can't make WebP
+     (it silently returns a PNG for unsupported types, so check the type). */
+  function encodeCanvas(cv, webpQ, jpegQ) {
+    return new Promise(function (resolve) {
+      var jpeg = function () { cv.toBlob(function (b) { resolve(b || null); }, 'image/jpeg', jpegQ); };
+      if (!(webpQ > 0)) { jpeg(); return; }
+      cv.toBlob(function (b) { if (b && b.type === 'image/webp') resolve(b); else jpeg(); }, 'image/webp', webpQ);
+    });
+  }
+  /* Uploads what processPhoto made and returns { image_path, thumb_path }.
+     The view copy sits next to the thumbnail; its existence is recorded in the
+     thumbnail's own file name ("…-t2w.webp" / "…-t2j.jpg" → view "…-v2.webp" /
+     "…-v2.jpg"), so no new database column or Worker change is needed and older
+     pieces (plain "<id>.jpg" thumbnails) simply keep using the full photo. */
+  async function uploadProcessedPhoto(processed, file) {
+    var uid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
+    var fullBase = (file.name || 'photo').replace(/\.[^.]+$/, '');
+    var fullType = processed.fullBlob.type || file.type || 'image/jpeg';
+    var fullPath = storePath('full/') + uid + '-' + fullBase + extForType(processed.fullBlob.type, file.name);
+    var viewPath = processed.viewBlob ? storePath('thumb/') + uid + '-v2' + extForType(processed.viewBlob.type) : null;
+    var results = await Promise.all([
+      r2Upload(fullPath, processed.fullBlob, fullType),
+      viewPath ? r2Upload(viewPath, processed.viewBlob, processed.viewBlob.type) : Promise.resolve(null)
+    ]);
+    if (results[0].error) { if (viewPath && results[1] && !results[1].error) r2Remove([viewPath]).catch(function () {}); throw results[0].error; }
+    var hasView = !!(viewPath && results[1] && !results[1].error);
+    var thumbPath = null;
+    var tb = processed.thumbBlob;
+    for (var attempt = 0; tb && attempt < 2 && !thumbPath; attempt++) {
+      var tType = tb.type || 'image/jpeg';
+      var marker = hasView ? '-t2' + (/\.webp$/.test(viewPath) ? 'w' : 'j') : '';
+      var path = storePath('thumb/') + uid + marker + extForType(tType);
+      var up = await r2Upload(path, tb, tType);
+      if (!up.error) thumbPath = path;
+      else if (tType === 'image/webp' && processed.thumbJpeg) tb = await processed.thumbJpeg(); // storage refused WebP: retry as JPEG
+      else break;
+    }
+    if (!thumbPath && hasView) r2Remove([viewPath]).catch(function () {});
+    return { image_path: fullPath, thumb_path: thumbPath || fullPath };
+  }
+  /* The 2560px view copy of a photo, if it has one (see uploadProcessedPhoto). */
+  function viewPathOf(photo) {
+    var m = photo && photo.thumb_path && String(photo.thumb_path).match(/^(.*)-t2([wj])\.(webp|jpg)$/);
+    return m ? m[1] + '-v2.' + (m[2] === 'w' ? 'webp' : 'jpg') : null;
+  }
+  /* Full-photo URL → its view-copy URL (pieces and their extra photos). */
+  function viewUrlForFull(fullUrl) {
+    if (!fullUrl) return null;
+    var hit = null;
+    state.paintings.some(function (p) {
+      return photoList(p).some(function (ph) {
+        if (publicImgUrl(ph.image_path) === fullUrl && viewPathOf(ph)) { hit = publicImgUrl(viewPathOf(ph)); return true; }
+        return false;
+      });
+    });
+    return hit;
+  }
   function processPhoto(file, thumbMaxDim, thumbQuality) {
     return new Promise(function (resolve) {
       var fallback = { fullBlob: file, thumbBlob: null, reencoded: false };
@@ -1801,24 +1862,46 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         var tw = Math.max(1, Math.round(w * tScale)), th = Math.max(1, Math.round(h * tScale));
         var thumbCanvas = drawHQDownscale(img, w, h, tw, th);
 
+        /* "View" copy for the lightbox and the Orbit front painting: 2560px on the
+           long edge (sharp on a 2x/3x screen at full-window size), a fraction of the
+           7200px full photo's download and decode cost. Only made when the full
+           photo is clearly bigger than that; the full photo is still what Saatchi
+           exports / mockups use and what the lightbox swaps in when zooming. */
+        var viewCanvas = null;
+        if (Math.max(fw, fh) > VIEW_MAX_DIM * 1.25) {
+          var vScale = VIEW_MAX_DIM / Math.max(w, h);
+          viewCanvas = drawHQDownscale(img, w, h, Math.max(1, Math.round(w * vScale)), Math.max(1, Math.round(h * vScale)));
+        }
+
         var MAX_FULL_BYTES = 15 * 1024 * 1024;
         function finishFull(fullBlob) {
-          thumbCanvas.toBlob(function (thumbBlob) {
-            URL.revokeObjectURL(url);
-            var reencoded = !!fullBlob && fullBlob.size < file.size;
-            resolve({
-              fullBlob: reencoded ? fullBlob : file,
-              thumbBlob: thumbBlob || null,
-              reencoded: reencoded
+          /* Thumbnail: WebP at q0.80 — measured at the same bytes as the old JPEG
+             q0.78 but visibly cleaner (SSIM 0.911 vs 0.878 on real paintings).
+             JPEG (the caller's quality) where the browser can't encode WebP. */
+          encodeCanvas(thumbCanvas, THUMB_WEBP_Q, thumbQuality || 0.78).then(function (thumbBlob) {
+            return (viewCanvas ? encodeCanvas(viewCanvas, VIEW_WEBP_Q, VIEW_JPEG_Q) : Promise.resolve(null)).then(function (viewBlob) {
+              URL.revokeObjectURL(url);
+              var reencoded = !!fullBlob && fullBlob.size < file.size;
+              resolve({
+                fullBlob: reencoded ? fullBlob : file,
+                thumbBlob: thumbBlob || null,
+                viewBlob: viewBlob || null,
+                /* JPEG copy of the thumbnail, only built if storage refuses a WebP one. */
+                thumbJpeg: function () { return encodeCanvas(thumbCanvas, 0, thumbQuality || 0.78); },
+                reencoded: reencoded
+              });
             });
-          }, 'image/jpeg', thumbQuality || 0.72);
+          });
         }
         function encodeFullJpegFallback() {
           fullCanvas.toBlob(function (jpegBlob) { finishFull(jpegBlob); }, 'image/jpeg', 0.9);
         }
         function encodeFull(quality, attempts) {
           fullCanvas.toBlob(function (fullBlob) {
-            if (!fullBlob) { encodeFullJpegFallback(); return; } // browser can't encode WebP — fall back to JPEG
+            /* Browsers that can't encode WebP (older Safari) hand back a PNG instead
+               of null — treat that as "no WebP" too, or the full photo became a huge
+               PNG / fell back to the untouched camera original. */
+            if (!fullBlob || fullBlob.type !== 'image/webp') { encodeFullJpegFallback(); return; }
             if (fullBlob.size > MAX_FULL_BYTES && quality > 0.6 && attempts < 4) {
               encodeFull(quality - 0.1, attempts + 1);
               return;
@@ -2680,7 +2763,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   function renderGridCards(grid, items, pagerEl) {
     if (state.view === 'orbit' && !testOverlay) { grid.innerHTML = ''; pagerEl.innerHTML = ''; renderOrbit(items); return; }
     items = paginateGridItems(grid, items, pagerEl);
-    grid.innerHTML = items.map(function (p0) {
+    grid.innerHTML = items.map(function (p0, cardIdx) {
       var p = testView(p0);
       var red = p.__red || {};
       /* Double-click-to-edit (see wireInlineEdit) is a quick shortcut for
@@ -2707,7 +2790,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       var isCensoredView = p.censored || isHidden;
       var canZoom = !!thumbSrc && !isHidden;
       var imageInner = thumbSrc
-        ? '<img src="' + esc(thumbSrc) + '" alt="' + esc(p.name) + '" loading="lazy" decoding="async" draggable="false"' +
+        ? '<img src="' + esc(thumbSrc) + '" alt="' + esc(p.name) + '"' + (cardIdx < 4 ? ' fetchpriority="high"' : ' loading="lazy"') + ' decoding="async" draggable="false"' +
           (isCensoredView ? ' crossorigin="anonymous" data-pixelate="1"' : '') + thumbPosStyle(p) + '>'
         : (isNoPiece(p)
           ? '<div class="swatch" style="background:#000"></div>'
@@ -3737,6 +3820,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var suffix = suffixById(p.suffix_id);
     if (p.censored || (suffix && /^hidden$/i.test(suffix.label || ''))) return;
     var img = c.querySelector('img'); var full = publicImgUrl(p.image_path);
+    /* The 2560px view copy is plenty for the front card and far lighter than a 7200px full photo. */
+    var view = viewPathOf(p) ? publicImgUrl(viewPathOf(p)) : null;
+    if (view) full = view;
     if (!img || !full || !img.naturalHeight || img.src === full) return;
     /* Always use the full photo for the front painting on PC: thumbnails are compressed and look foggy when shown this large. */
     c.__full = true;
@@ -4215,6 +4301,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
   }
   function openLightbox(src, sourceEl) {
+    /* Show the 2560px view copy straight away (when the piece has one) and only
+       fetch the full photo once the visitor zooms in. */
+    var fullSrc = src, viewSrc = viewUrlForFull(src);
+    if (viewSrc) src = viewSrc;
     var root = document.getElementById('lightboxRoot');
     var cardEl = sourceEl ? sourceEl.closest('[data-card]') : null;
     var nameEl = cardEl ? cardEl.querySelector('.card-name') : null;
@@ -4243,6 +4333,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var hintEl = document.getElementById('lbZoomHint');
     var ZOOM_SCALE = 2.5;
     var zoomed = false;
+    var upgraded = !viewSrc;
+    function upgradeToFull() {
+      if (upgraded) return; upgraded = true;
+      var hi = new Image();
+      hi.onload = function () {
+        var go = function () { if (lbImg.isConnected) lbImg.src = fullSrc; };
+        if (hi.decode) hi.decode().then(go, go); else go();
+      };
+      hi.src = fullSrc;
+    }
+    if (viewSrc) lbImg.addEventListener('error', function () { if (lbImg.getAttribute('src') !== fullSrc) { upgraded = true; lbImg.src = fullSrc; } });
     function setOriginFromPoint(clientX, clientY) {
       var rect = lbImg.getBoundingClientRect();
       var px = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
@@ -4255,6 +4356,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         lbImg.classList.add('zoomed');
         lbImg.style.transform = 'scale(' + ZOOM_SCALE + ')';
         zoomed = true;
+        upgradeToFull();
         if (hintEl) hintEl.textContent = tx('lbHintZoomed');
       } else {
         lbImg.classList.remove('zoomed');
@@ -4405,13 +4507,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var res = await sb.from('paintings').delete().eq('id', id);
     if (res.error) { state.paintings.splice(idx, 0, removed); renderAll(); toast('Could not delete — try again.'); return; }
     // best-effort cleanup of stored images; ignore failures
-    var paths = [removed.image_path, removed.thumb_path].filter(Boolean);
+    var paths = [removed.image_path, removed.thumb_path, viewPathOf(removed)].filter(Boolean);
     /* …and its extra photos (site_theme row 6), if it had any. */
     if (extraPhotos(removed).length && await fetchExtraPhotos()) {
       var extras = extraPhotos(removed);
       delete state.extraPhotos[id];
       var saved = await saveExtraPhotos();
-      if (!saved.error) extras.forEach(function (x) { paths.push(x.image_path, x.thumb_path); });
+      if (!saved.error) extras.forEach(function (x) { paths.push(x.image_path, x.thumb_path, viewPathOf(x)); });
     }
     paths = paths.filter(function (x, i) { return x && paths.indexOf(x) === i; });
     if (paths.length) r2Remove(paths).catch(function () {});
@@ -4588,16 +4690,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       var f = files[i];
       status('Uploading ' + (i + 1) + ' of ' + files.length + ' — ' + f.name);
       try {
-        var uid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
         var processed = await processPhoto(f, 900, 0.78);
-        var fullBase = (f.name || 'photo').replace(/\.[^.]+$/, '');
-        var fullPath = storePath('full/') + uid + '-' + fullBase + extForType(processed.fullBlob.type, f.name);
-        var thumbPath = storePath('thumb/') + uid + '.jpg';
-        var uploads = [r2Upload(fullPath, processed.fullBlob, processed.fullBlob.type || f.type || 'image/jpeg')];
-        if (processed.thumbBlob) uploads.push(r2Upload(thumbPath, processed.thumbBlob, 'image/jpeg'));
-        var results = await Promise.all(uploads);
-        if (results[0].error) throw results[0].error;
-        fresh.push({ image_path: fullPath, thumb_path: (results[1] && !results[1].error) ? thumbPath : fullPath });
+        fresh.push(await uploadProcessedPhoto(processed, f));
       } catch (e) { failed++; }
     }
     if (!fresh.length) { if (add) add.classList.remove('busy'); status(''); toast('Could not upload — try again.'); return; }
@@ -4605,7 +4699,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     /* Re-read row 6 first so photos added on another device aren't lost. */
     if (!(await fetchExtraPhotos())) {
       if (add) add.classList.remove('busy'); status('');
-      r2Remove(fresh.reduce(function (a, x) { return a.concat([x.image_path, x.thumb_path]); }, [])).catch(function () {});
+      r2Remove(fresh.reduce(function (a, x) { return a.concat([x.image_path, x.thumb_path, viewPathOf(x)].filter(Boolean)); }, [])).catch(function () {});
       toast('Could not save — check the connection and try again.'); return;
     }
     var prev = Array.isArray(state.extraPhotos[id]) ? state.extraPhotos[id].slice() : null;
@@ -4613,7 +4707,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var res = await saveExtraPhotos();
     if (res.error) {
       if (prev) state.extraPhotos[id] = prev; else delete state.extraPhotos[id];
-      r2Remove(fresh.reduce(function (a, x) { return a.concat([x.image_path, x.thumb_path]); }, [])).catch(function () {});
+      r2Remove(fresh.reduce(function (a, x) { return a.concat([x.image_path, x.thumb_path, viewPathOf(x)].filter(Boolean)); }, [])).catch(function () {});
       toast('Could not save the photos — try again.');
     } else {
       toast(fresh.length + ' photo' + (fresh.length === 1 ? '' : 's') + ' added' + (failed ? ', ' + failed + ' failed' : '') + '.');
@@ -4634,7 +4728,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var res = await saveExtraPhotos();
     if (res.error) { state.extraPhotos[id] = prev; toast('Could not update — try again.'); }
     else {
-      var paths = gone.reduce(function (a, x) { return a.concat([x.image_path, x.thumb_path]); }, []);
+      var paths = gone.reduce(function (a, x) { return a.concat([x.image_path, x.thumb_path, viewPathOf(x)]); }, []);
       paths = paths.filter(function (x, i) { return x && paths.indexOf(x) === i; });
       r2Remove(paths).catch(function () {});
     }
@@ -4900,17 +4994,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (pendingFile) {
         saveBtn.textContent = 'Uploading…'; saveBtn.disabled = true;
         try {
-          var uid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
           var processed = await processPhoto(pendingFile, 900, 0.78);
-          var fullBase = (pendingFile.name || 'photo').replace(/\.[^.]+$/, '');
-          var fullPath = storePath('full/') + uid + '-' + fullBase + extForType(processed.fullBlob.type, pendingFile.name);
-          var thumbPath = storePath('thumb/') + uid + '.jpg';
-          var uploads = [r2Upload(fullPath, processed.fullBlob, processed.fullBlob.type || pendingFile.type || 'image/jpeg')];
-          if (processed.thumbBlob) uploads.push(r2Upload(thumbPath, processed.thumbBlob, 'image/jpeg'));
-          var results = await Promise.all(uploads);
-          if (results[0].error) throw results[0].error;
-          data.image_path = fullPath;
-          data.thumb_path = (results[1] && !results[1].error) ? thumbPath : fullPath;
+          var paths = await uploadProcessedPhoto(processed, pendingFile);
+          data.image_path = paths.image_path;
+          data.thumb_path = paths.thumb_path;
         } catch (e) {
           toast('Photo upload failed — saved without it.');
           saveBtn.disabled = false;
@@ -4982,21 +5069,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       var fillEl = document.getElementById('bulkProgressFill');
       if (fillEl) fillEl.style.width = Math.round((i / total) * 100) + '%';
       try {
-        var uid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
         var processed = await processPhoto(f, 900, 0.78);
-        var fullBase = (f.name || 'photo').replace(/\.[^.]+$/, '');
-        var fullPath = storePath('full/') + uid + '-' + fullBase + extForType(processed.fullBlob.type, f.name);
-        var thumbPath = storePath('thumb/') + uid + '.jpg';
-        var uploads = [r2Upload(fullPath, processed.fullBlob, processed.fullBlob.type || f.type || 'image/jpeg')];
-        if (processed.thumbBlob) uploads.push(r2Upload(thumbPath, processed.thumbBlob, 'image/jpeg'));
-        var results = await Promise.all(uploads);
-        if (results[0].error) throw results[0].error;
+        var paths = await uploadProcessedPhoto(processed, f);
         var data = {
           tab_id: tabId, name: defaultName, number: (tab && !tab.prefix) ? 'N/A' : stripExt(f.name), date: null,
           price: 0, size: '', description: '', sold: false, not_for_sale: false, censored: false,
           hue: Math.floor(Math.random() * 360),
-          image_path: fullPath,
-          thumb_path: (results[1] && !results[1].error) ? thumbPath : fullPath
+          image_path: paths.image_path,
+          thumb_path: paths.thumb_path
         };
         var res = await sb.from('paintings').insert(data).select().single();
         if (res.error) throw res.error;
