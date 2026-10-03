@@ -1403,7 +1403,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       qrText: 'Text beside it', qrTextPh: 'e.g. Scan to visit', websitePh: 'e.g. arks-gallery.vercel.app',
       contactPh: 'e.g. Instagram @arkorigin · email', linkPh: 'e.g. instagram.com/yourname',
       filter: 'Filter', skipNo: 'Leave out pieces without a photo', onlyAvail: 'Only available (not sold)', blankCens: 'Blank out censored photos',
-      photoHidden: 'Photo hidden', scanMe: 'Scan me'
+      photoHidden: 'Photo hidden', scanMe: 'Scan me',
+      optImages: 'Optimize images', optTip: 'Give large older photos a fast-loading view copy and a WebP thumbnail (the full photos are never changed)',
+      optScanning: 'Checking photos… {a} of {b}', optNone: 'Nothing to optimize: {d} photos already have a fast view copy and {s} are small enough as they are.',
+      optConfirm: '{n} large photos ({p} main, {x} extra) have no fast view copy yet. Each gets a 2560px view copy and a new WebP thumbnail; the full photos are not changed. About {mb} MB to download and {up} MB to upload — roughly {min} min. Keep this tab open.',
+      optUnreadable: '{n} photos could not be read and will be left as they are.', optStart: 'Optimize', optPause: 'Pause', optResume: 'Resume', optStop: 'Stop',
+      optRunning: 'Optimizing {a} of {b} — {t}', optPaused: 'Paused after {a} of {b}.', optStopping: 'Stopping after this photo…',
+      optDone: 'Done.', optStopped: 'Stopped.', optSummary: '{ok} optimized · {sk} skipped · {f} failed.',
+      optKept: 'The old thumbnails were kept in storage as a backup.', optRerun: 'Run it again any time to finish the rest — finished photos are skipped.', optFailedList: 'Failed:'
     },
     'zh-Hant': {
       language: '語言', printExport: '列印及匯出', backToGallery: '← 返回畫廊', closeTitle: '返回畫廊（Esc）',
@@ -1434,7 +1441,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       qrText: '旁邊文字', qrTextPh: '例如：掃描瀏覽', websitePh: '例如：arks-gallery.vercel.app',
       contactPh: '例如：Instagram @arkorigin · 電郵', linkPh: '例如：instagram.com/你的名字',
       filter: '篩選', skipNo: '不包括沒有相片的作品', onlyAvail: '只限可供出售（未售）', blankCens: '隱藏已遮蔽的相片',
-      photoHidden: '相片已隱藏', scanMe: '掃描我'
+      photoHidden: '相片已隱藏', scanMe: '掃描我',
+      optImages: '優化圖片', optTip: '為較舊的大相片製作快速載入的瀏覽版本及 WebP 縮圖（原相片不會被更改）',
+      optScanning: '正在檢查相片… {a} / {b}', optNone: '無需優化：{d} 張相片已有快速瀏覽版本，另外 {s} 張尺寸已經夠小。',
+      optConfirm: '有 {n} 張大相片（主相片 {p} 張、其他相片 {x} 張）尚未有快速瀏覽版本。每張會製作 2560px 瀏覽版本及新的 WebP 縮圖；原相片不會更改。約需下載 {mb} MB、上載 {up} MB，大約 {min} 分鐘。請保持此分頁開啟。',
+      optUnreadable: '{n} 張相片無法讀取，會保持原狀。', optStart: '開始優化', optPause: '暫停', optResume: '繼續', optStop: '停止',
+      optRunning: '正在優化 {a} / {b} — {t}', optPaused: '已暫停（完成 {a} / {b}）。', optStopping: '完成這張相片後停止…',
+      optDone: '完成。', optStopped: '已停止。', optSummary: '已優化 {ok} 張 · 略過 {sk} 張 · 失敗 {f} 張。',
+      optKept: '舊縮圖已保留在儲存空間作備份。', optRerun: '可隨時再次執行以完成餘下相片——已完成的會自動略過。', optFailedList: '失敗：'
     },
     'zh-Hans': {
       language: '语言', printExport: '打印及导出', backToGallery: '← 返回画廊', closeTitle: '返回画廊（Esc）',
@@ -1465,7 +1479,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       qrText: '旁边文字', qrTextPh: '例如：扫码浏览', websitePh: '例如：arks-gallery.vercel.app',
       contactPh: '例如：Instagram @arkorigin · 邮箱', linkPh: '例如：instagram.com/你的名字',
       filter: '筛选', skipNo: '不包括没有照片的作品', onlyAvail: '仅限可供出售（未售）', blankCens: '隐藏已遮蔽的照片',
-      photoHidden: '照片已隐藏', scanMe: '扫一扫'
+      photoHidden: '照片已隐藏', scanMe: '扫一扫',
+      optImages: '优化图片', optTip: '为较旧的大照片制作快速加载的浏览版本及 WebP 缩略图（原照片不会被更改）',
+      optScanning: '正在检查照片… {a} / {b}', optNone: '无需优化：{d} 张照片已有快速浏览版本，另外 {s} 张尺寸已经够小。',
+      optConfirm: '有 {n} 张大照片（主照片 {p} 张、其他照片 {x} 张）尚未有快速浏览版本。每张会制作 2560px 浏览版本及新的 WebP 缩略图；原照片不会更改。约需下载 {mb} MB、上传 {up} MB，大约 {min} 分钟。请保持此标签页打开。',
+      optUnreadable: '{n} 张照片无法读取，将保持原样。', optStart: '开始优化', optPause: '暂停', optResume: '继续', optStop: '停止',
+      optRunning: '正在优化 {a} / {b} — {t}', optPaused: '已暂停（完成 {a} / {b}）。', optStopping: '完成这张照片后停止…',
+      optDone: '完成。', optStopped: '已停止。', optSummary: '已优化 {ok} 张 · 跳过 {sk} 张 · 失败 {f} 张。',
+      optKept: '旧缩略图已保留在存储空间作备份。', optRerun: '可随时再次运行以完成剩余照片——已完成的会自动跳过。', optFailedList: '失败：'
     },
     pt: {
       language: 'Idioma', printExport: 'Imprimir e exportar', backToGallery: '← Voltar à galeria', closeTitle: 'Voltar à galeria (Esc)',
@@ -1496,7 +1517,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       qrText: 'Texto ao lado', qrTextPh: 'ex.: Digitalize para visitar', websitePh: 'ex.: arks-gallery.vercel.app',
       contactPh: 'ex.: Instagram @arkorigin · email', linkPh: 'ex.: instagram.com/o-seu-nome',
       filter: 'Filtro', skipNo: 'Excluir obras sem fotografia', onlyAvail: 'Só disponíveis (não vendidas)', blankCens: 'Ocultar fotografias censuradas',
-      photoHidden: 'Fotografia oculta', scanMe: 'Digitalize-me'
+      photoHidden: 'Fotografia oculta', scanMe: 'Digitalize-me',
+      optImages: 'Otimizar imagens', optTip: 'Criar uma cópia de visualização rápida e uma miniatura WebP para fotografias grandes antigas (as fotografias originais nunca são alteradas)',
+      optScanning: 'A verificar fotografias… {a} de {b}', optNone: 'Nada a otimizar: {d} fotografias já têm cópia de visualização rápida e {s} já são pequenas o suficiente.',
+      optConfirm: '{n} fotografias grandes ({p} principais, {x} adicionais) ainda não têm cópia de visualização rápida. Cada uma recebe uma cópia de 2560px e uma nova miniatura WebP; as fotografias originais não são alteradas. Cerca de {mb} MB a descarregar e {up} MB a carregar — aprox. {min} min. Mantenha este separador aberto.',
+      optUnreadable: '{n} fotografias não puderam ser lidas e ficam como estão.', optStart: 'Otimizar', optPause: 'Pausar', optResume: 'Retomar', optStop: 'Parar',
+      optRunning: 'A otimizar {a} de {b} — {t}', optPaused: 'Em pausa após {a} de {b}.', optStopping: 'A parar depois desta fotografia…',
+      optDone: 'Concluído.', optStopped: 'Parado.', optSummary: '{ok} otimizadas · {sk} ignoradas · {f} falharam.',
+      optKept: 'As miniaturas antigas ficaram guardadas como cópia de segurança.', optRerun: 'Pode executar de novo a qualquer momento para terminar — as já otimizadas são ignoradas.', optFailedList: 'Falharam:'
     }
   };
   /* Built-in translations for the suffix tags (matched by their English label). */
@@ -1757,6 +1785,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       sctx.imageSmoothingEnabled = true;
       sctx.imageSmoothingQuality = 'high';
       sctx.drawImage(curSource, 0, 0, curW, curH, 0, 0, nextW, nextH);
+      if (curSource !== source) { curSource.width = 0; curSource.height = 0; } // free the previous step's pixels now, not at GC time
       curSource = stepCanvas; curW = nextW; curH = nextH;
     }
     var finalCanvas = document.createElement('canvas');
@@ -1765,6 +1794,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     fctx.imageSmoothingEnabled = true;
     fctx.imageSmoothingQuality = 'high';
     fctx.drawImage(curSource, 0, 0, curW, curH, 0, 0, destW, destH);
+    if (curSource !== source) { curSource.width = 0; curSource.height = 0; }
     return finalCanvas;
   }
 
@@ -1784,14 +1814,26 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
      thumbnail's own file name ("…-t2w.webp" / "…-t2j.jpg" → view "…-v2.webp" /
      "…-v2.jpg"), so no new database column or Worker change is needed and older
      pieces (plain "<id>.jpg" thumbnails) simply keep using the full photo. */
+  function newUid() {
+    return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
+  }
   async function uploadProcessedPhoto(processed, file) {
-    var uid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
+    var uid = newUid();
     var fullBase = (file.name || 'photo').replace(/\.[^.]+$/, '');
     var fullType = processed.fullBlob.type || file.type || 'image/jpeg';
     var fullPath = storePath('full/') + uid + '-' + fullBase + extForType(processed.fullBlob.type, file.name);
+    var r = await uploadViewAndThumb(uid, processed, r2Upload(fullPath, processed.fullBlob, fullType));
+    return { image_path: fullPath, thumb_path: r.thumbPath || fullPath };
+  }
+  /* The shared second half of every upload: the view copy (uploaded alongside
+     `alongside`, e.g. the full photo's own upload — if that fails, nothing is
+     kept) and then the thumbnail, named with the "-t2w"/"-t2j" marker only when
+     the view copy really landed. Used by new uploads and by "Optimize images"
+     for existing photos. Resolves { thumbPath, viewPath } (either may be null). */
+  async function uploadViewAndThumb(uid, processed, alongside) {
     var viewPath = processed.viewBlob ? storePath('thumb/') + uid + '-v2' + extForType(processed.viewBlob.type) : null;
     var results = await Promise.all([
-      r2Upload(fullPath, processed.fullBlob, fullType),
+      alongside || Promise.resolve({ error: null }),
       viewPath ? r2Upload(viewPath, processed.viewBlob, processed.viewBlob.type) : Promise.resolve(null)
     ]);
     if (results[0].error) { if (viewPath && results[1] && !results[1].error) r2Remove([viewPath]).catch(function () {}); throw results[0].error; }
@@ -1808,7 +1850,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       else break;
     }
     if (!thumbPath && hasView) r2Remove([viewPath]).catch(function () {});
-    return { image_path: fullPath, thumb_path: thumbPath || fullPath };
+    return { thumbPath: thumbPath, viewPath: (hasView && thumbPath) ? viewPath : null };
   }
   /* The 2560px view copy of a photo, if it has one (see uploadProcessedPhoto). */
   function viewPathOf(photo) {
@@ -2089,6 +2131,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         '<input type="file" id="descPdfTestInput" accept="application/pdf" style="display:none">' +
         '<button class="btn btn-ghost btn-sm" id="btnXlsxExport" type="button" title="Download the inventory (date, number, name, size) as an Excel file — edit it, print it to PDF, then re-import with Import from PDF">' + txe('exportXlsx') + '</button>' +
         '<button class="btn btn-ghost btn-sm" id="btnSharpenThumbs" type="button" title="Find thumbnails smaller than 900px (older uploads look soft/foggy) and rebuild them sharp from the full photo">Sharpen thumbnails</button>' +
+        '<button class="btn btn-ghost btn-sm" id="btnOptimizeImages" type="button" title="' + txe('optTip') + '">' + txe('optImages') + '</button>' +
         '<button class="btn btn-ghost btn-sm" id="btnPdfExport" type="button" title="Download the current inventory as a PDF, in the exact layout Import from PDF reads — a ready-made master copy to correct offline and bring back in">' + txe('downloadPdf') + '</button>' +
         '<button class="btn btn-primary" id="btnAddPainting" type="button">' +
         '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>' + txe('addPainting') + '</button>' +
@@ -2120,6 +2163,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       document.getElementById('btnXlsxExport').addEventListener('click', exportInventoryXlsx);
       document.getElementById('btnPdfExport').addEventListener('click', exportInventoryPdf);
       document.getElementById('btnSharpenThumbs').addEventListener('click', openSharpenThumbsModal);
+      document.getElementById('btnOptimizeImages').addEventListener('click', openOptimizeImagesModal);
       document.getElementById('btnPdfTest').addEventListener('click', function () {
         document.getElementById('pdfTestInput').click();
       });
@@ -3814,8 +3858,23 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   /* On PC the front painting can be shown bigger than its grid thumbnail
      (900px), so once the ring settles on it, swap in the sharper full-size
      photo. Phones keep the thumbnail — it's already sharp at that size. */
+  /* Set by the visitor's first touch / click / key / wheel on the page. */
+  var orbUserActed = false;
+  (function () {
+    var evs = ['pointerdown', 'touchstart', 'keydown', 'wheel'];
+    function acted() {
+      if (orbUserActed) return;
+      orbUserActed = true;
+      evs.forEach(function (n) { window.removeEventListener(n, acted, true); });
+      /* Upgrade the painting already in front (if the ring is resting on it). */
+      setTimeout(function () {
+        if (state.view === 'orbit' && ORB.cards && ORB.cards.length && !ORB.dragging && ORB.pos === ORB.target) orbSharpen(orbIndex());
+      }, 400);
+    }
+    evs.forEach(function (n) { window.addEventListener(n, acted, { capture: true, passive: true }); });
+  })();
   function orbSharpen(i) {
-    /* Same on PC and phones: the front painting always gets the full photo. */
+    /* Same on PC and phones: the front painting gets a sharper photo than its thumbnail. */
     var p = ORB.items[i], c = ORB.cards[i]; if (!p || !c || c.__full) return;
     var suffix = suffixById(p.suffix_id);
     if (p.censored || (suffix && /^hidden$/i.test(suffix.label || ''))) return;
@@ -3823,6 +3882,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     /* The 2560px view copy is plenty for the front card and far lighter than a 7200px full photo. */
     var view = viewPathOf(p) ? publicImgUrl(viewPathOf(p)) : null;
     if (view) full = view;
+    /* Without a view copy the only sharper file is the full photo — up to 7200px /
+       3+ MB. Orbit is the default view for visitors, so loading it as soon as the
+       ring settled made every page load (and Lighthouse) download the first
+       painting's full photo with no click at all. Wait until the visitor has
+       actually touched the page; the thumbnail stays until then. */
+    if (!view && !orbUserActed) return;
     if (!img || !full || !img.naturalHeight || img.src === full) return;
     /* Always use the full photo for the front painting on PC: thumbnails are compressed and look foggy when shown this large. */
     c.__full = true;
@@ -4813,6 +4878,260 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       cancelled = false;
       document.getElementById('shCancel').onclick = function () { closeModal(); renderAll(); };
     });
+  }
+
+  /* ---------------- Optimize images (admin, one-off) ----------------
+     New uploads get a 2560px "view" copy plus a WebP thumbnail whose name
+     ("<id>-t2w.webp") tells the page the view copy exists. Photos uploaded
+     before that only have the full photo (up to 7200px / several MB), which
+     the lightbox and Orbit then download just to show on screen. This finds
+     every photo — main photos and the extra photos in site_theme row 6 — whose
+     full photo is over 3200px on its long edge and has no view copy yet, and
+     makes both from the full photo. The full photo itself is never changed
+     or deleted; the old thumbnail file is kept in storage as a backup.
+     Rerunning skips anything already done (its thumbnail has the marker). */
+  var OPT_MIN_DIM = Math.round(VIEW_MAX_DIM * 1.25); // same rule as new uploads (3200px)
+  /* Long-edge pixel size from the first bytes of a JPEG / WebP / PNG, or null. */
+  function parseImageSize(b) {
+    var n = b.length;
+    if (n > 30 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) {
+      var fourcc = String.fromCharCode(b[12], b[13], b[14], b[15]);
+      if (fourcc === 'VP8X') return { w: 1 + (b[24] | b[25] << 8 | b[26] << 16), h: 1 + (b[27] | b[28] << 8 | b[29] << 16) };
+      if (fourcc === 'VP8 ' && b[23] === 0x9d && b[24] === 0x01 && b[25] === 0x2a) return { w: (b[26] | b[27] << 8) & 0x3fff, h: (b[28] | b[29] << 8) & 0x3fff };
+      if (fourcc === 'VP8L' && b[20] === 0x2f) { var v = b[21] | b[22] << 8 | b[23] << 16 | b[24] << 24; return { w: (v & 0x3fff) + 1, h: ((v >>> 14) & 0x3fff) + 1 }; }
+      return null;
+    }
+    if (n > 24 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) {
+      return { w: (b[16] << 24 | b[17] << 16 | b[18] << 8 | b[19]) >>> 0, h: (b[20] << 24 | b[21] << 16 | b[22] << 8 | b[23]) >>> 0 };
+    }
+    if (n > 4 && b[0] === 0xff && b[1] === 0xd8) {
+      var i = 2;
+      while (i + 9 < n) {
+        if (b[i] !== 0xff) { i++; continue; }
+        var m = b[i + 1];
+        if (m === 0xff) { i++; continue; }
+        if (m === 0xd8 || m === 0x01 || (m >= 0xd0 && m <= 0xd7)) { i += 2; continue; }
+        if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return { w: b[i + 7] << 8 | b[i + 8], h: b[i + 5] << 8 | b[i + 6] };
+        i += 2 + (b[i + 2] << 8 | b[i + 3]);
+      }
+      return 'more';
+    }
+    return null;
+  }
+  /* Reads just enough of a stored photo to know its pixel size (the download is
+     cut off once the header is parsed), plus its byte size for the estimate.
+     Falls back to decoding the whole image if the header can't be read. */
+  async function probeImageSize(url) {
+    var ctl = window.AbortController ? new AbortController() : null;
+    try {
+      var res = await fetch(url, ctl ? { signal: ctl.signal } : {});
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var bytes = Number(res.headers.get('content-length')) || 0;
+      if (res.body && res.body.getReader) {
+        var reader = res.body.getReader(), buf = new Uint8Array(0), size = null;
+        while (buf.length < 512 * 1024) {
+          var chunk = await reader.read();
+          if (chunk.done) break;
+          var nb = new Uint8Array(buf.length + chunk.value.length); nb.set(buf); nb.set(chunk.value, buf.length); buf = nb;
+          size = parseImageSize(buf);
+          if (size !== 'more' && (size || buf.length >= 64)) break;
+        }
+        try { reader.cancel().catch(function () {}); } catch (e) {}
+        if (ctl) ctl.abort();
+        if (size && size !== 'more' && size.w && size.h) return { w: size.w, h: size.h, bytes: bytes };
+      } else if (ctl) ctl.abort();
+    } catch (e) { if (ctl) ctl.abort(); }
+    var im = await loadImg(url);
+    var out = { w: im.naturalWidth, h: im.naturalHeight, bytes: 0 };
+    im.src = '';
+    return out;
+  }
+  /* Decodes a stored photo CORS-safely as an ImageBitmap (closed by the caller
+     to free its pixels at once), or an <img> where createImageBitmap isn't usable. */
+  async function decodeStoredImage(url) {
+    if (window.createImageBitmap) {
+      try {
+        var res = await fetch(url, { mode: 'cors' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var blob = await res.blob();
+        var bmp = await createImageBitmap(blob);
+        return { src: bmp, w: bmp.width, h: bmp.height, release: function () { try { bmp.close(); } catch (e) {} } };
+      } catch (e) { /* fall back to <img> below */ }
+    }
+    var im = await loadImg(url);
+    return { src: im, w: im.naturalWidth, h: im.naturalHeight, release: function () { im.src = ''; } };
+  }
+  function freeCanvas(cv) { if (cv) { cv.width = 0; cv.height = 0; } }
+
+  function openOptimizeImagesModal() {
+    var root = document.getElementById('modalRoot');
+    var phase = 'scan', cancelled = false, paused = false, stopping = false;
+    root.innerHTML = '<div class="modal-backdrop" id="optBackdrop"><div class="modal">' +
+      '<h2>' + txe('optImages') + '</h2>' +
+      '<p class="field-hint" id="optText">' + txe('optScanning', { a: 0, b: '…' }) + '</p>' +
+      '<div style="height:6px;background:var(--line-soft);border-radius:3px;overflow:hidden;margin:12px 0"><div id="optFill" style="height:100%;width:0;background:var(--ochre);transition:width .2s"></div></div>' +
+      '<div class="field-hint" id="optLog" style="max-height:140px;overflow:auto;white-space:pre-line"></div>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" id="optClose" type="button">' + txe('close') + '</button>' +
+      '<button class="btn btn-ghost" id="optPause" type="button" style="display:none">' + txe('optPause') + '</button>' +
+      '<button class="btn btn-ghost" id="optStop" type="button" style="display:none">' + txe('optStop') + '</button>' +
+      '<button class="btn btn-primary" id="optGo" type="button" disabled>' + txe('optStart') + '</button></div>' +
+      '</div></div>';
+    var text = document.getElementById('optText'), fill = document.getElementById('optFill'), log = document.getElementById('optLog');
+    var goBtn = document.getElementById('optGo'), closeBtn = document.getElementById('optClose');
+    var pauseBtn = document.getElementById('optPause'), stopBtn = document.getElementById('optStop');
+    closeBtn.addEventListener('click', function () {
+      if (phase === 'run') return;
+      cancelled = true; closeModal();
+      if (phase === 'done') renderAll();
+    });
+
+    /* Every photo (main + extras) that has a full photo and no view copy yet;
+       the scan below keeps only those over OPT_MIN_DIM on the long edge. */
+    var photos = [], alreadyDone = 0;
+    state.paintings.forEach(function (p) {
+      photoList(p).forEach(function (ph, idx) {
+        if (!ph.image_path) return;
+        if (viewPathOf(ph)) { alreadyDone++; return; }
+        photos.push({ p: p, idx: idx, main: !!ph.main, image_path: ph.image_path, thumb_path: ph.thumb_path });
+      });
+    });
+    var todo = [], unreadable = 0;
+    function itemTitle(it) {
+      var t = it.p.name || catalogNum(it.p) || tx('untitled');
+      return it.main ? t : t + ' · ' + tx('photoN', { n: it.idx + 1 });
+    }
+
+    (async function scan() {
+      var q = photos.slice(), done = 0;
+      text.textContent = tx('optScanning', { a: 0, b: photos.length });
+      await Promise.all([0, 1, 2, 3, 4, 5].map(async function () {
+        while (q.length && !cancelled) {
+          var it = q.shift();
+          try {
+            var sz = await probeImageSize(publicImgUrl(it.image_path));
+            if (Math.max(sz.w, sz.h) > OPT_MIN_DIM) { it.w = sz.w; it.h = sz.h; it.bytes = sz.bytes; todo.push(it); }
+          } catch (e) { unreadable++; }
+          done++;
+          fill.style.width = Math.round(done / Math.max(1, photos.length) * 100) + '%';
+          text.textContent = tx('optScanning', { a: done, b: photos.length });
+        }
+      }));
+      if (cancelled) return;
+      fill.style.width = '0';
+      // keep the gallery's own order (newest first, main photo before its extras)
+      todo.sort(function (a, b) { return photos.indexOf(a) - photos.indexOf(b); });
+      var extra = unreadable ? ' ' + tx('optUnreadable', { n: unreadable }) : '';
+      if (!todo.length) { text.textContent = tx('optNone', { d: alreadyDone, s: photos.length - unreadable }) + extra; goBtn.style.display = 'none'; phase = 'done'; return; }
+      var mb = todo.reduce(function (a, it) { return a + (it.bytes || 1.5e6); }, 0) / 1e6;
+      var mins = Math.max(1, Math.round(todo.length * 4 / 60 + mb / 1.5 / 60));
+      var nMain = todo.filter(function (it) { return it.main; }).length;
+      text.textContent = tx('optConfirm', { n: todo.length, p: nMain, x: todo.length - nMain, mb: Math.round(mb), up: Math.round(todo.length * 0.7), min: mins }) + extra;
+      goBtn.disabled = false;
+      phase = 'confirm';
+    })();
+
+    pauseBtn.addEventListener('click', function () {
+      paused = !paused;
+      pauseBtn.textContent = tx(paused ? 'optResume' : 'optPause');
+    });
+    stopBtn.addEventListener('click', function () {
+      stopping = true; paused = false;
+      stopBtn.disabled = true; pauseBtn.disabled = true;
+      text.textContent = tx('optStopping');
+    });
+
+    goBtn.addEventListener('click', async function () {
+      if (phase !== 'confirm') return;
+      phase = 'run';
+      // (.btn sets display, so the hidden attribute alone wouldn't hide them)
+      goBtn.style.display = 'none'; closeBtn.disabled = true; pauseBtn.style.display = ''; stopBtn.style.display = '';
+      var ok = 0, skipped = 0, failed = 0, failures = [];
+      for (var i = 0; i < todo.length && !stopping; i++) {
+        while (paused && !stopping) {
+          text.textContent = tx('optPaused', { a: i, b: todo.length });
+          await new Promise(function (r) { setTimeout(r, 250); });
+        }
+        if (stopping) break;
+        var it = todo[i];
+        text.textContent = tx('optRunning', { a: i + 1, b: todo.length, t: itemTitle(it) });
+        fill.style.width = Math.round(i / todo.length * 100) + '%';
+        try {
+          var r = await optimizeOne(it);
+          if (r === 'skip') skipped++; else ok++;
+        } catch (e) {
+          failed++;
+          failures.push(itemTitle(it) + ' — ' + ((e && e.message) || e));
+          log.textContent = tx('optFailedList') + '\n' + failures.join('\n');
+        }
+        // give the browser a moment to reclaim the previous photo's memory
+        await new Promise(function (r) { setTimeout(r, 60); });
+      }
+      phase = 'done';
+      fill.style.width = '100%';
+      pauseBtn.style.display = 'none'; stopBtn.style.display = 'none'; closeBtn.disabled = false;
+      var notRun = todo.length - ok - skipped - failed;
+      text.textContent = tx(stopping ? 'optStopped' : 'optDone') + ' ' +
+        tx('optSummary', { ok: ok, sk: skipped + notRun, f: failed }) +
+        (ok ? ' ' + tx('optKept') : '') + (failed || notRun ? ' ' + tx('optRerun') : '');
+      renderAll();
+    });
+
+    /* One photo: decode the full photo, build the view copy and thumbnail, upload
+       both through the shared upload step, then point the record at the new
+       thumbnail. Any new files are removed again if the record can't be updated. */
+    async function optimizeOne(it) {
+      var img = await decodeStoredImage(publicImgUrl(it.image_path));
+      var viewCanvas = null, thumbCanvas = null, newFiles = [];
+      try {
+        var w = img.w, h = img.h, long = Math.max(w, h);
+        if (!w || !h) throw new Error('could not decode');
+        if (long <= OPT_MIN_DIM) return 'skip';
+        var vs = VIEW_MAX_DIM / long, vw = Math.max(1, Math.round(w * vs)), vh = Math.max(1, Math.round(h * vs));
+        viewCanvas = drawHQDownscale(img.src, w, h, vw, vh);
+        img.release(); // the 7200px decode is no longer needed
+        var ts = 900 / long, tw = Math.max(1, Math.round(w * ts)), th = Math.max(1, Math.round(h * ts));
+        thumbCanvas = drawHQDownscale(viewCanvas, vw, vh, tw, th);
+        var viewBlob = await encodeCanvas(viewCanvas, VIEW_WEBP_Q, VIEW_JPEG_Q);
+        freeCanvas(viewCanvas); viewCanvas = null;
+        var thumbBlob = await encodeCanvas(thumbCanvas, THUMB_WEBP_Q, 0.78);
+        if (!viewBlob || !thumbBlob) throw new Error('encode failed');
+        var tc = thumbCanvas;
+        var up = await uploadViewAndThumb(newUid(), {
+          viewBlob: viewBlob, thumbBlob: thumbBlob,
+          thumbJpeg: function () { return encodeCanvas(tc, 0, 0.78); }
+        });
+        if (up.thumbPath) newFiles.push(up.thumbPath);
+        if (up.viewPath) newFiles.push(up.viewPath);
+        if (!up.viewPath || !up.thumbPath) throw new Error('upload failed');
+
+        if (it.main) {
+          /* Re-read the piece first: if its photo or thumbnail changed since the
+             scan (edited in another tab), leave it alone. */
+          var cur = await sb.from('paintings').select('*').eq('id', it.p.id).maybeSingle();
+          if (cur.error) throw new Error(cur.error.message || 'read failed');
+          if (!cur.data || cur.data.image_path !== it.image_path || (cur.data.thumb_path || null) !== (it.p.thumb_path || null)) { r2Remove(newFiles).catch(function () {}); newFiles = []; return 'skip'; }
+          var res = await sb.from('paintings').update({ thumb_path: up.thumbPath }).eq('id', it.p.id);
+          if (res.error) throw new Error(res.error.message || 'save failed');
+          it.p.thumb_path = up.thumbPath;
+        } else {
+          /* Extra photo: re-read row 6 right before saving (as the multi-photo code
+             does) so photos added/removed elsewhere aren't overwritten. */
+          if (!(await fetchExtraPhotos())) throw new Error('could not read photo list');
+          var list = Array.isArray(state.extraPhotos[it.p.id]) ? state.extraPhotos[it.p.id] : [];
+          var entry = list.find(function (x) { return x && x.image_path === it.image_path; });
+          if (!entry || viewPathOf(entry)) { r2Remove(newFiles).catch(function () {}); newFiles = []; return 'skip'; }
+          var oldThumb = entry.thumb_path;
+          entry.thumb_path = up.thumbPath;
+          var res2 = await saveExtraPhotos();
+          if (res2.error) { entry.thumb_path = oldThumb; throw new Error(res2.error.message || 'save failed'); }
+        }
+        newFiles = []; // saved: the new files are in use now
+        return 'ok';
+      } finally {
+        if (newFiles.length) r2Remove(newFiles).catch(function () {});
+        img.release(); freeCanvas(viewCanvas); freeCanvas(thumbCanvas);
+      }
+    }
   }
 
   function openTabModal(tabId) {
